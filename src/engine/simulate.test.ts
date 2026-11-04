@@ -185,5 +185,14 @@ describe('simulate', () => {
       for (const b of buckets.slice(0, 3)) expect(b.rps).toBeGreaterThan(40), expect(b.rps).toBeLessThan(60);
       for (const b of buckets.slice(3)) expect(b.rps).toBeGreaterThan(130), expect(b.rps).toBeLessThan(170);
     });
+
+    it('shows latency and errors rising only in the buckets where traffic exceeds capacity', () => {
+      const overloadLate = levelAt(0, { durationS: 30, traffic: [{ fromS: 0, toS: 15, rps: 50 }, { fromS: 15, toS: 30, rps: 300 }] });
+      const { buckets } = simulate(overloadLate, serverAndDatabase, 3);
+
+      for (const b of buckets.slice(0, 3)) expect(b.errorRate).toBe(0), expect(b.p95).toBeLessThan(150);
+      expect(buckets[5]!.errorRate).toBeGreaterThan(0.1);
+      expect(buckets[5]!.p95).toBeGreaterThan(300);
+    });
   });
 });

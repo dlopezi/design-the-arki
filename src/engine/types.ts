@@ -61,7 +61,7 @@ export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: numbe
 export type ComponentResult = { id: string; served: number; rejected: number; timedOut: number };
 
 /** Metrics for one slice of the run, used for charts and playback. */
-export type Bucket = { fromS: number; rps: number };
+export type Bucket = { fromS: number; rps: number; p95: number; errorRate: number };
 
 export type Result = {
   seed: number;

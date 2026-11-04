@@ -106,6 +106,9 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   const bucketCount = Math.ceil(level.durationS / BUCKET_S);
   const bucketOf = (timeMs: number) => Math.min(bucketCount - 1, Math.floor(timeMs / (BUCKET_S * 1000)));
   const bucketRequests = new Array<number>(bucketCount).fill(0);
+  const bucketErrors = new Array<number>(bucketCount).fill(0);
+  const bucketLatencies: number[][] = Array.from({ length: bucketCount }, () => []);
+  const fail = (request: Request) => { bucketErrors[bucketOf(request.createdAt)]!++; };
   for (const segment of level.traffic) {
     const end = segment.toS * 1000;
     const meanGap = 1000 / segment.rps;
@@ -121,7 +124,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
 
   const start = (station: Station, instance: number, request: Request, now: number) => {
     if (now - request.createdAt > TIMEOUT_MS) {
-      errors.timedOut++; station.stats.timedOut++;
+      errors.timedOut++; station.stats.timedOut++; fail(request);
       return;
     }
     station.instances[instance]!.busy++;
@@ -130,8 +133,9 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
 
   const complete = (request: Request, now: number) => {
     const latency = now - request.createdAt + request.hops * HOP_MS;
-    if (latency > TIMEOUT_MS) errors.timedOut++;
-    else latencies.push(latency);
+    if (latency > TIMEOUT_MS) { errors.timedOut++; fail(request); return; }
+    latencies.push(latency);
+    bucketLatencies[bucketOf(request.createdAt)]!.push(latency);
   };
 
   for (let event = events.pop(); event; event = events.pop()) {
@@ -144,7 +148,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       const instance = station.instances[index]!;
       if (instance.busy < station.workers) start(station, index, value.request, now);
       else if (instance.queue.length < station.queueSize) instance.queue.push(value.request);
-      else { errors.rejected++; station.stats.rejected++; }
+      else { errors.rejected++; station.stats.rejected++; fail(value.request); }
     } else {
       const instance = station.instances[value.instance]!;
       instance.busy--;
@@ -160,7 +164,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   }
 
   latencies.sort((a, b) => a - b);
-  const percentile = (p: number) => (latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(p * latencies.length))]! : 0);
+  const percentile = (p: number, sorted = latencies) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]! : 0);
   const p95 = percentile(0.95);
   const errorRate = totalRequests ? (errors.rejected + errors.timedOut) / totalRequests : 0;
   const cost = designCost(design, catalog);
@@ -182,6 +186,10 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stars,
     nextStarCost,
     components: [...stations.values()].map(s => s.stats),
-    buckets: bucketRequests.map((count, i) => ({ fromS: i * BUCKET_S, rps: count / BUCKET_S })),
+    buckets: bucketRequests.map((count, i) => ({
+      fromS: i * BUCKET_S, rps: count / BUCKET_S,
+      p95: percentile(0.95, bucketLatencies[i]!.sort((a, b) => a - b)),
+      errorRate: count ? bucketErrors[i]! / count : 0,
+    })),
   };
 }
