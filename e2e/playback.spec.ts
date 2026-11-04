@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { buildScaledOut, node } from './helpers';
+import { buildScaledOut, node, openLevel } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/#02-first-spike');
+  await openLevel(page, '02-first-spike');
   await expect(page.getByRole('heading', { name: 'First spike' })).toBeVisible();
   await buildScaledOut(page);
 });

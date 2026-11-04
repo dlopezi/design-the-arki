@@ -13,7 +13,9 @@ export function Stars({ earned, max }: { earned: number; max: number }) {
 const REQUIREMENT_LABEL = { p95: t.statP95, errorRate: t.statErrors, budget: t.statCost } as const;
 
 /** Verdict after a run: stars, the three key numbers, and what to aim for next. */
-export function ReportCard({ result, maxStars, hint, onClose, onDetails }: { result: Result; maxStars: number; hint: string | null; onClose: () => void; onDetails: () => void }) {
+export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetails }: {
+  result: Result; maxStars: number; hint: string | null; nextHref: string | null; onClose: () => void; onDetails: () => void;
+}) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -41,6 +43,7 @@ export function ReportCard({ result, maxStars, hint, onClose, onDetails }: { res
         <div className="actions">
           <button ref={closeRef} className="secondary" onClick={onClose}>{t.backToDesign}</button>
           <button className="secondary" onClick={onDetails}>{t.viewDetails}</button>
+          {result.passed && nextHref && <a className="primary-link" href={nextHref}>{t.nextLevel}</a>}
         </div>
       </div>
     </div>

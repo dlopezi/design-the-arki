@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { buildScaledOut, node, playAndSkip } from './helpers';
+import { buildScaledOut, node, playAndSkip, openLevel } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/#06-server-goes-down');
+  await openLevel(page, '06-server-goes-down');
   await expect(page.getByRole('heading', { name: 'A server goes down' })).toBeVisible();
 });
 

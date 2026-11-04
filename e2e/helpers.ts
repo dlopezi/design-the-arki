@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { readdirSync } from 'node:fs';
 
 export const node = (page: Page, label: string, nth = 0) => page.locator('.react-flow__node', { hasText: label }).nth(nth);
 
@@ -45,4 +46,14 @@ export async function buildScaledOut(page: Page, instances = 2) {
   await connect(page, { label: 'App server' }, { label: 'Database' });
   await select(page, 'App server');
   for (let i = 1; i < instances; i++) await page.getByRole('complementary', { name: 'Inspector' }).getByRole('button', { name: 'Add instance' }).click();
+}
+
+const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
+
+/** Opens a level directly, with every level unlocked (for tests that are not about progress). */
+export async function openLevel(page: Page, id: string) {
+  await page.addInitScript(ids => {
+    localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, levels: Object.fromEntries(ids.map(i => [i, { bestStars: 1 }])) }));
+  }, levelIds);
+  await page.goto(`/#${id}`);
 }

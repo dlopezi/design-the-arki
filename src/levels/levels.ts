@@ -11,6 +11,7 @@ const designSchema = z.object({
 
 const levelSchema = z.object({
   id: z.string().min(1),
+  chapter: z.string().min(1),
   title: z.string().min(1),
   brief: z.string().min(1),
   durationS: z.number().positive(),
@@ -33,7 +34,7 @@ const levelSchema = z.object({
 export type ComponentOptions = { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> };
 
 export type LevelDefinition = Level & {
-  id: string; title: string; brief: string; allowedComponents: string[];
+  id: string; chapter: string; title: string; brief: string; allowedComponents: string[];
   componentOptions: Record<string, ComponentOptions>; referenceDesign: Design;
 };
 

@@ -1,18 +1,49 @@
 {
   "id": "01-hello-world",
+  "chapter": "Core",
   "title": "Hello world",
   "brief": "A small online shop is opening. About 50 people per second will browse the catalogue. Serve them with one app server and a database.",
   "durationS": 60,
-  "traffic": [{ "fromS": 0, "toS": 60, "rps": 50 }],
-  "requirements": { "p95Ms": 200, "maxErrorRate": 0.01 },
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 50
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
   "budget": 150,
-  "starCostThresholds": [120, 100],
-  "allowedComponents": ["appServer", "database"],
+  "starCostThresholds": [
+    120,
+    100
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database"
+  ],
   "referenceDesign": {
     "components": [
-      { "id": "api", "type": "appServer" },
-      { "id": "db", "type": "database" }
+      {
+        "id": "api",
+        "type": "appServer"
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
     ],
-    "connections": [["client", "api"], ["api", "db"]]
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ]
+    ]
   }
 }

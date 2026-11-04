@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { canvasSettled, connect, node, playAndSkip } from './helpers';
+import { canvasSettled, connect, node, playAndSkip, openLevel } from './helpers';
 
 /** Builds Clients → App server → Database from the hotbar. */
 async function buildServerAndDatabase(page: Page) {
@@ -10,7 +10,7 @@ async function buildServerAndDatabase(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
+  await openLevel(page, '01-hello-world');
   await expect(page.getByRole('heading', { name: 'Hello world' })).toBeVisible();
 });
 

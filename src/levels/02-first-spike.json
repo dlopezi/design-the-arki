@@ -1,5 +1,6 @@
 {
   "id": "02-first-spike",
+  "chapter": "Core",
   "title": "First spike",
   "brief": "The shop was mentioned in a newsletter and traffic jumped to 300 people per second. One app server handles about 200. Put a load balancer in front and run more instances.",
   "durationS": 60,

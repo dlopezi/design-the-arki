@@ -3,6 +3,22 @@ const stars = (n: number) => '★'.repeat(n);
 
 export const en = {
   play: 'Play',
+  levelSelect: {
+    title: 'archi-game',
+    subtitle: 'Design systems that survive real traffic. Pass a level to unlock the next.',
+    chapter: (n: number, name: string) => `Chapter ${n} · ${name}`,
+    play: 'Play',
+    locked: 'Locked',
+    lockedNotice: (title: string) => `${title} is locked. Pass the level before it first.`,
+    noStorage: 'This browser is not saving progress, so stars and designs will be lost when you close the tab.',
+    resetProgress: 'Reset progress',
+    resetTitle: 'Reset all progress?',
+    resetBody: 'This clears your stars and saved designs and locks every level except the first.',
+    cancel: 'Cancel',
+    reset: 'Reset',
+  },
+  levels: 'Levels',
+  nextLevel: 'Next level',
   hints: {
     appServer: 'The app servers are saturated: add instances (scale out) or use bigger ones (scale up).',
     database: 'The database is saturated: give it a bigger tier or take load off it.',

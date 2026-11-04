@@ -1,5 +1,6 @@
 {
   "id": "04-flash-sale",
+  "chapter": "Core",
   "title": "Flash sale",
   "brief": "A 10-second flash sale starts at 30 s and traffic jumps from 200 to 500 people per second. Most of them load the same product pages. A bigger database would cope, but is there a cheaper way?",
   "durationS": 60,

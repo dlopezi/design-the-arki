@@ -153,3 +153,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .c4-instance.down { background: #262a33; border-color: #3a3f4a; color: var(--muted); }
 .badge.down { background: var(--muted); color: #111; }
 .loads li.down { color: var(--muted); } .loads li.down .load-bar span { width: 0 !important; }
+
+/* Level select */
+.level-select { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 28px; }
+.level-select h1 { margin: 0; font-size: 30px; }
+.level-select header { display: grid; gap: 8px; }
+.level-select h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.notice { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.level-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.level-cards li { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; }
+.level-cards li.locked { opacity: .55; }
+.level-cards h3 { margin: 0; font-size: 16px; }
+.level-cards .number { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.level-cards .stars { font-size: 18px; letter-spacing: 2px; }
+.play-link, .primary-link { justify-self: start; padding: 6px 14px; border-radius: 8px; background: var(--ok); color: #04130b; font-weight: 700; text-decoration: none; }
+.play-link:focus-visible, .primary-link:focus-visible, .back:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.reset { justify-self: start; }
+.mission .back { color: var(--muted); font-size: 13px; text-decoration: none; }
+.mission .back:hover { color: var(--fg); }

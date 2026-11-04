@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, playAndSkip, select } from './helpers';
+import { connect, playAndSkip, select, openLevel } from './helpers';
 
 const inspector = (page: Page) => page.getByRole('complementary', { name: 'Inspector' });
 
@@ -15,7 +15,7 @@ async function buildWithCache(page: Page) {
 }
 
 test('level 4: a cache in front of the database earns 3 stars, and its hit rate shows after the run', async ({ page }) => {
-  await page.goto('/#04-flash-sale');
+  await openLevel(page, '04-flash-sale');
   await expect(page.getByRole('heading', { name: 'Flash sale' })).toBeVisible();
   await buildWithCache(page);
 
@@ -33,7 +33,7 @@ test('level 4: a cache in front of the database earns 3 stars, and its hit rate 
 });
 
 test('level 4: the database tier can be raised instead, at a higher cost', async ({ page }) => {
-  await page.goto('/#04-flash-sale');
+  await openLevel(page, '04-flash-sale');
   await expect(page.getByRole('heading', { name: 'Flash sale' })).toBeVisible();
   await page.keyboard.press('4');
   await select(page, 'Database');
@@ -46,7 +46,7 @@ test('level 4: the database tier can be raised instead, at a higher cost', async
 });
 
 test('level 5: the TTL is capped by the level and the database tier is fixed', async ({ page }) => {
-  await page.goto('/#05-popular-content');
+  await openLevel(page, '05-popular-content');
   await expect(page.getByRole('heading', { name: 'Popular content' })).toBeVisible();
   await page.keyboard.press('3');
   await select(page, 'Cache');

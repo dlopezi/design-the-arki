@@ -11,6 +11,8 @@ import { Inspector } from './inspector';
 import { Objectives } from './objectives';
 import { ReportCard } from './reportCard';
 import { ResultsDrawer } from './resultsDrawer';
+import { LevelSelect } from './levelSelect';
+import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withStars, type Progress } from '../progress/progress';
 
 const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
@@ -51,15 +53,26 @@ function describeProblem(problem: DesignProblem, design: Design): string {
 const problemComponents = (problem: DesignProblem): string[] =>
   problem.kind === 'noEntry' ? ['client'] : problem.kind === 'loop' ? problem.componentIds : [problem.componentId];
 
-function Game({ level }: { level: LevelDefinition }) {
-  const [design, setDesign] = useState<Design>(EMPTY);
+type GameProps = {
+  level: LevelDefinition;
+  initialDesign: Design | null;
+  nextLevelId: string | null;
+  onDesignChange: (design: Design) => void;
+  onPassed: (stars: number) => void;
+};
+
+/** Highest numeric suffix among component ids, so new ids never clash with a restored design. */
+const lastIdNumber = (design: Design) => Math.max(0, ...design.components.map(c => Number(c.id.split('-').pop()) || 0));
+
+function Game({ level, initialDesign, nextLevelId, onDesignChange, onPassed }: GameProps) {
+  const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [problem, setProblem] = useState<{ message: string; componentIds: string[] } | null>(null);
   const [playT, setPlayT] = useState<number | null>(null);
   const frame = useRef(0);
-  const counter = useRef(0);
+  const counter = useRef(lastIdNumber(initialDesign ?? EMPTY));
   const { fitView } = useReactFlow();
   const reduceMotion = usePrefersReducedMotion();
   const running = playT !== null;
@@ -84,6 +97,7 @@ function Game({ level }: { level: LevelDefinition }) {
   const designKey = JSON.stringify(design);
   // Any change to the design invalidates the last run.
   useEffect(() => { cancelAnimationFrame(frame.current); setPlayT(null); setResult(null); setShowReport(false); setProblem(null); }, [designKey]);
+  useEffect(() => { onDesignChange(design); }, [designKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
   const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
@@ -122,7 +136,9 @@ function Game({ level }: { level: LevelDefinition }) {
 
   const play = useCallback(() => {
     try {
-      setResult(simulate(level, design, 1));
+      const run = simulate(level, design, 1);
+      setResult(run);
+      if (run.passed) onPassed(run.stars);
       setShowReport(false);
       setProblem(null);
       // Replay the run: the whole level in PLAYBACK_MS, then the report.
@@ -141,7 +157,7 @@ function Game({ level }: { level: LevelDefinition }) {
       if (!(e instanceof DesignError)) throw e;
       setProblem({ message: describeProblem(e.problem, design), componentIds: problemComponents(e.problem) });
     }
-  }, [level, design]);
+  }, [level, design, onPassed]);
 
   const skip = useCallback(() => { cancelAnimationFrame(frame.current); setPlayT(null); setShowReport(true); }, []);
 
@@ -182,6 +198,7 @@ function Game({ level }: { level: LevelDefinition }) {
       </ReactFlow>
 
       <section className="hud mission">
+        <a className="back" href="#">← {t.levels}</a>
         <h1>{level.title}</h1>
         <p>{level.brief}</p>
         <Objectives level={level} cost={cost} result={running ? null : result} />
@@ -232,25 +249,59 @@ function Game({ level }: { level: LevelDefinition }) {
       {problem && <div className="hud problem" role="alert">{problem.message}</div>}
 
       {result && showReport && (
-        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} onClose={() => setShowReport(false)}
+        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}` : null} onClose={() => setShowReport(false)}
           onDetails={() => { setShowReport(false); setPanels({ inspector: true, results: true }); setSelected(result.bottleneck?.componentId ?? null); }} />
       )}
     </div>
   );
 }
 
-/** Until the level select exists (ticket 09), `#<level id>` picks a level; the default is the first one. */
-function levelFromHash(): LevelDefinition {
-  const levels = allLevels();
-  return levels.find(l => l.id === decodeURIComponent(location.hash.slice(1))) ?? levels[0]!;
-}
+const levelIdFromHash = () => decodeURIComponent(location.hash.slice(1));
 
+/** `#` (or nothing) is the level select; `#<level id>` opens that level if it is unlocked. */
 export function App() {
-  const [level, setLevel] = useState(levelFromHash);
+  const levels = useMemo(() => allLevels(), []);
+  const ids = useMemo(() => levels.map(l => l.id), [levels]);
+  const [progress, setProgress] = useState<Progress>(loadProgress);
+  const [storageWorks, setStorageWorks] = useState(true);
+  const [route, setRoute] = useState(levelIdFromHash);
+  const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    const onHash = () => setLevel(levelFromHash());
+    const onHash = () => setRoute(levelIdFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  return <ReactFlowProvider key={level.id}><Game level={level} /></ReactFlowProvider>;
+
+  const update = useCallback((next: (p: Progress) => Progress) => {
+    setProgress(current => {
+      const updated = next(current);
+      if (updated !== current) setStorageWorks(saveProgress(updated));
+      return updated;
+    });
+  }, []);
+
+  const level = levels.find(l => l.id === route);
+  const locked = !!level && !isUnlocked(ids, level.id, progress);
+  useEffect(() => {
+    if (level && locked) {
+      setNotice(t.levelSelect.lockedNotice(level.title));
+      history.replaceState(null, '', location.pathname);
+      setRoute('');
+    } else if (level) {
+      setNotice(null);
+    }
+  }, [level, locked]);
+
+  if (!level || locked) {
+    return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
+      onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
+  }
+  const next = ids[ids.indexOf(level.id) + 1];
+  return (
+    <ReactFlowProvider key={level.id}>
+      <Game level={level} initialDesign={progress.levels[level.id]?.lastDesign ?? null} nextLevelId={next ?? null}
+        onDesignChange={design => update(p => withDesign(p, level.id, design))}
+        onPassed={stars => update(p => withStars(p, level.id, stars))} />
+    </ReactFlowProvider>
+  );
 }

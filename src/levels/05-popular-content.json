@@ -1,5 +1,6 @@
 {
   "id": "05-popular-content",
+  "chapter": "Core",
   "title": "Popular content",
   "brief": "A viral post sends 600 people per second for 40 seconds. Your database plan is fixed at the small tier and product data may be at most 60 seconds stale. How long should the cache keep answers?",
   "durationS": 60,

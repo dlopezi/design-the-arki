@@ -1,5 +1,6 @@
 {
   "id": "06-server-goes-down",
+  "chapter": "Core",
   "title": "A server goes down",
   "brief": "Traffic is a steady 300 people per second, and at 20 s one of your app server instances crashes. Two instances are enough on a good day. Are they enough on a bad one?",
   "durationS": 60,

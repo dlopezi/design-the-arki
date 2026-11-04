@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { canvasSettled, connect, hotbarButton, node, playAndSkip, select } from './helpers';
+import { canvasSettled, connect, hotbarButton, node, playAndSkip, select, openLevel } from './helpers';
 
 test.describe('level 2: first spike', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#02-first-spike');
+    await openLevel(page, '02-first-spike');
     await expect(page.getByRole('heading', { name: 'First spike' })).toBeVisible();
   });
 
@@ -57,7 +57,7 @@ test.describe('level 2: first spike', () => {
 });
 
 test('level 3: a player scales up with a large instance instead', async ({ page }) => {
-  await page.goto('/#03-bigger-or-more');
+  await openLevel(page, '03-bigger-or-more');
   await expect(page.getByRole('heading', { name: 'Bigger or more?' })).toBeVisible();
   await hotbarButton(page, /App server/).click();
   await hotbarButton(page, /Database/).click();

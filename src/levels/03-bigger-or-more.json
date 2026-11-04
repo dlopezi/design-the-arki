@@ -1,5 +1,6 @@
 {
   "id": "03-bigger-or-more",
+  "chapter": "Core",
   "title": "Bigger or more?",
   "brief": "Traffic settled at 250 people per second. You can now choose the size of each app server instance. Is one bigger machine cheaper than several smaller ones behind a load balancer?",
   "durationS": 60,
