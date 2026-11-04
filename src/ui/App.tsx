@@ -3,7 +3,7 @@ import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFl
 import { BUCKET_S, DesignError, designCost, simulate } from '../engine/simulate';
 import type { Design, DesignProblem, Result } from '../engine/types';
 import { en as t, percent } from '../i18n/en';
-import { allLevels, type LevelDefinition } from '../levels/levels';
+import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/levels';
 import { CostMeter } from './costMeter';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
@@ -12,7 +12,7 @@ import { Objectives } from './objectives';
 import { ReportCard } from './reportCard';
 import { ResultsDrawer } from './resultsDrawer';
 import { LevelSelect } from './levelSelect';
-import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, type Progress } from '../progress/progress';
+import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, withTutorialDone, type Progress } from '../progress/progress';
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
 
@@ -63,12 +63,17 @@ type GameProps = {
   nextLevelId: string | null;
   onDesignChange: (design: Design) => void;
   onPassed: (stars: number) => void;
+  /** Steps to walk through, or null when there is no tutorial to show. */
+  tutorial: TutorialStep[] | null;
+  onTutorialDone: () => void;
 };
 
 /** Highest numeric suffix among component ids, so new ids never clash with a restored design. */
 const lastIdNumber = (design: Design) => Math.max(0, ...design.components.map(c => Number(c.id.split('-').pop()) || 0));
 
-function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPassed }: GameProps) {
+function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPassed, tutorial: tutorialAtStart, onTutorialDone }: GameProps) {
+  // Keep the steps for this session, so the closing message stays after progress records the tutorial as done.
+  const [tutorial] = useState(tutorialAtStart);
   const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -83,6 +88,25 @@ function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPasse
   const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
   const live = running && result ? { result, bucket, animate: !reduceMotion, t: playT } : null;
   const [panels, setPanels] = useState({ inspector: true, results: true });
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [tutorialFinished, setTutorialFinished] = useState(false);
+  const [tutorialSkipped, setTutorialSkipped] = useState(false);
+  const step = tutorial && !tutorialFinished ? tutorial[tutorialStep] : undefined;
+  const typeOf = (id: string) => design.components.find(c => c.id === id)?.type;
+  // Advance the tutorial when the player does what the current step asks.
+  useEffect(() => {
+    if (!tutorial || !step) return;
+    const until = step.until;
+    const done = 'select' in until ? !!selected && typeOf(selected) === until.select
+      : 'connect' in until ? design.connections.some(([a, b]) => typeOf(a) === until.connect[0] && typeOf(b) === until.connect[1])
+      : until.event === 'run' ? running || !!result
+      : !!result?.passed && !running;
+    if (!done) return;
+    if (tutorialStep + 1 < tutorial.length) setTutorialStep(tutorialStep + 1);
+    else { setTutorialFinished(true); onTutorialDone(); }
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  const tutorialTargetType = step?.target && 'component' in step.target ? step.target.component : null;
+  const tutorialOnPlay = !!step?.target && 'control' in step.target;
   const togglePanel = useCallback((panel: 'inspector' | 'results') => setPanels(p => ({ ...p, [panel]: !p[panel] })), []);
   const bottleneckId = result && !running && !result.passed ? (result.bottleneck?.componentId ?? null) : null;
   const hintFor = (r: Result | null): string | null => {
@@ -95,8 +119,8 @@ function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPasse
   };
   const hint = hintFor(result);
 
-  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId }),
-    [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType }),
+    [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
   const FIT = fitOptions(panels.inspector, panels.results);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
@@ -239,7 +263,7 @@ function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPasse
 
       <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>
         <Hotbar types={level.allowedComponents} onAdd={addComponent} />
-        <button className="play" onClick={play} disabled={running}>{t.play}</button>
+        <button className={`play ${tutorialOnPlay ? 'tutorial-target' : ''}`} onClick={play} disabled={running}>{t.play}</button>
         {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
       </div>
       {running && result && (() => {
@@ -254,6 +278,15 @@ function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPasse
         );
       })()}
       {problem && <div className="hud problem" role="alert">{problem.message}</div>}
+      {tutorial && (step || (tutorialFinished && !tutorialSkipped)) && (
+        <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
+          {step ? <>
+            <span className="eyebrow">{t.tutorial.step(tutorialStep + 1, tutorial.length)}</span>
+            <p>{step.text}</p>
+            <button className="link-button" onClick={() => { setTutorialSkipped(true); setTutorialFinished(true); onTutorialDone(); }}>{t.tutorial.skip}</button>
+          </> : <p>{t.tutorial.done}</p>}
+        </section>
+      )}
 
       {result && showReport && (
         <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
@@ -306,7 +339,9 @@ export function App() {
     return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
       onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
   }
-  if (!route.mode) return <ModePicker level={level} />;
+  const tutorialDone = !!progress.tutorialDone;
+  // Until the tutorial is done, only guided mode can be played.
+  if (!route.mode || (!tutorialDone && route.mode !== 'guided')) return <ModePicker level={level} tutorialDone={tutorialDone} />;
   const mode = route.mode;
   const next = ids[ids.indexOf(level.id) + 1];
   return (
@@ -314,7 +349,9 @@ export function App() {
       <Game level={level} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
         nextLevelId={next ?? null}
         onDesignChange={design => update(p => withDesign(p, level.id, mode, design))}
-        onPassed={stars => update(p => withPass(p, level.id, stars, mode))} />
+        onPassed={stars => update(p => withPass(p, level.id, stars, mode))}
+        tutorial={!tutorialDone && mode === 'guided' && level.tutorial ? level.tutorial : null}
+        onTutorialDone={() => update(withTutorialDone)} />
     </ReactFlowProvider>
   );
 }

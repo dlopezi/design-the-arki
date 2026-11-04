@@ -11,7 +11,7 @@ export type LevelProgress = {
   /** Last design per mode, so each mode resumes where the player left it. */
   designs?: Partial<Record<Mode, Design>>;
 };
-export type Progress = { version: 1; levels: Record<string, LevelProgress> };
+export type Progress = { version: 1; levels: Record<string, LevelProgress>; tutorialDone?: boolean };
 
 const KEY = 'archi-game:progress';
 const empty = (): Progress => ({ version: 1, levels: {} });
@@ -62,4 +62,8 @@ export function withPass(progress: Progress, id: string, stars: number, mode: Mo
 export function withDesign(progress: Progress, id: string, mode: Mode, design: Design): Progress {
   const current = progress.levels[id] ?? { bestStars: 0 };
   return { ...progress, levels: { ...progress.levels, [id]: { ...current, designs: { ...current.designs, [mode]: design } } } };
+}
+
+export function withTutorialDone(progress: Progress): Progress {
+  return progress.tutorialDone ? progress : { ...progress, tutorialDone: true };
 }

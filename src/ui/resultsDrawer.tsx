@@ -36,7 +36,7 @@ type Props = { level: LevelDefinition; design: Design; result: Result | null; ru
 /** Bottom drawer: verdict, hint, charts over time and peak load of every resource. */
 export function ResultsDrawer({ level, design, result, running, bucket, hint }: Props) {
   if (!result) {
-    return <section className="hud results" aria-label={t.results.title}><h2 className="eyebrow">{t.results.title}</h2><p className="muted">{t.results.empty}</p></section>;
+    return <section className="hud results empty" aria-label={t.results.title}><h2 className="eyebrow">{t.results.title}</h2><p className="muted">{t.results.empty}</p></section>;
   }
   // While the run replays, charts grow bucket by bucket.
   const shown = running ? result.buckets.slice(0, bucket + 1) : result.buckets;

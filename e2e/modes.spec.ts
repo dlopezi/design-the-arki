@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { canvasSettled, connect, node, openLevel, playAndSkip, select } from './helpers';
+import { canvasSettled, connect, node, openLevel, playAndSkip, select, skipTutorial } from './helpers';
 
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
 test('opening a level asks for a mode', async ({ page }) => {
+  await skipTutorial(page);
   await page.goto('/');
   await levelCard(page, 'Hello world').getByRole('link', { name: /Play/ }).click();
   const modes = page.getByRole('list', { name: 'Modes' });
@@ -45,6 +46,7 @@ test('hard mode hands over a broken design to fix', async ({ page }) => {
 });
 
 test('passing in hard mode earns the Hard badge, and each mode remembers its own design', async ({ page }) => {
+  await skipTutorial(page);
   await page.goto('/#01-hello-world/hard');
   await canvasSettled(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);

@@ -28,6 +28,13 @@ export const en = {
     hard: { name: 'Hard', description: 'You inherit a broken design. Find what is wrong and fix it.' },
     god: { name: 'God', description: 'An empty canvas and no hints, like a real interview.' },
   },
+  tutorial: {
+    title: 'Tutorial',
+    step: (n: number, total: number) => `Step ${n} of ${total}`,
+    done: 'Tutorial complete. Every mode is now unlocked: try Normal, Hard or God on any level.',
+    skip: 'Skip tutorial',
+    lockedMode: 'Finish the tutorial first',
+  },
   levels: 'Levels',
   nextLevel: 'Next level',
   hints: {

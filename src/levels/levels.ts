@@ -33,7 +33,23 @@ const levelSchema = z.object({
   /** Shown from the start in guided mode: the one idea this level teaches. */
   guidedHint: z.string().min(1),
   referenceDesign: designSchema,
+  /** Step-by-step tutorial (level 1): each step points at something and waits for the real action. */
+  tutorial: z.array(z.object({
+    text: z.string().min(1),
+    target: z.union([z.object({ component: componentType }), z.object({ control: z.literal('play') })]).optional(),
+    until: z.union([
+      z.object({ select: componentType }),
+      z.object({ connect: z.tuple([componentType, componentType]) }),
+      z.object({ event: z.enum(['run', 'pass']) }),
+    ]),
+  })).optional(),
 });
+
+export type TutorialStep = {
+  text: string;
+  target?: { component: string } | { control: 'play' };
+  until: { select: string } | { connect: [string, string] } | { event: 'run' | 'pass' };
+};
 
 export type ComponentOptions = { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> };
 
@@ -41,6 +57,7 @@ export type LevelDefinition = Level & {
   id: string; chapter: string; title: string; brief: string; allowedComponents: string[];
   componentOptions: Record<string, ComponentOptions>; referenceDesign: Design;
   startingDesigns: { guided: Design; normal: Design; hard: Design }; guidedHint: string;
+  tutorial?: TutorialStep[];
 };
 
 /** Validates raw level data; throws with every problem listed (path and message). */

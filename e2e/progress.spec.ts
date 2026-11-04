@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, node, playAndSkip } from './helpers';
+import { connect, node, playAndSkip, skipTutorial } from './helpers';
 
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
@@ -18,6 +18,8 @@ async function passLevel1(page: Page) {
   await playAndSkip(page);
   await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
 }
+
+test.beforeEach(async ({ page }) => { await skipTutorial(page); });
 
 test('a new player starts at the level select with only level 1 open', async ({ page }) => {
   await page.goto('/');

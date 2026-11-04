@@ -24,6 +24,19 @@
     "appServer",
     "database"
   ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    }
+  },
   "guidedHint": "Connect the app server to the database so it can answer requests, then press Play.",
   "startingDesigns": {
     "guided": {
@@ -101,5 +114,43 @@
         "db"
       ]
     ]
-  }
+  },
+  "tutorial": [
+    {
+      "text": "Select the app server to see its settings in the inspector.",
+      "target": {
+        "component": "appServer"
+      },
+      "until": {
+        "select": "appServer"
+      }
+    },
+    {
+      "text": "Requests reach the app server but go no further. Drag from its right handle to the database to connect them.",
+      "target": {
+        "component": "database"
+      },
+      "until": {
+        "connect": [
+          "appServer",
+          "database"
+        ]
+      }
+    },
+    {
+      "text": "Press Play to send 60 seconds of traffic through your design.",
+      "target": {
+        "control": "play"
+      },
+      "until": {
+        "event": "run"
+      }
+    },
+    {
+      "text": "The run replays in a few seconds: watch the clock and each component's load, then read the report.",
+      "until": {
+        "event": "pass"
+      }
+    }
+  ]
 }

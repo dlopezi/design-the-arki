@@ -18,7 +18,7 @@ export type PersonData = { title: string };
 export type BoundaryData = { title: string; kind: string; system: boolean };
 export type ComponentData = {
   componentId: string; title: string; technology: string; detail: string;
-  container: boolean; selected: boolean; problem: boolean; bottleneck: boolean;
+  container: boolean; selected: boolean; problem: boolean; bottleneck: boolean; tutorialTarget: boolean;
   /** Share of capacity in use during playback (0–1); null when not playing or hidden. */
   load: number | null;
 };
@@ -57,7 +57,7 @@ function BoundaryNode({ data }: NodeProps<Node<BoundaryData>>) {
 
 function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
   return (
-    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''}`}>
+    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''} ${data.tutorialTarget ? 'tutorial-target' : ''}`}>
       <Handle type="target" position={Position.Left} />
       <strong>{data.title}{data.bottleneck && <span className="badge">{t.bottleneck}</span>}</strong>
       <span className="c4-kind">[{data.technology}]</span>
@@ -114,6 +114,8 @@ export type DiagramState = {
   live?: { result: Result; bucket: number; animate: boolean; t: number } | null;
   /** After a failed run: the component that held requests back. */
   bottleneckId?: string | null;
+  /** Component type the tutorial points at. */
+  tutorialTargetType?: string | null;
 };
 
 /** Display names of every instance (app-1, app-2…), numbered per prefix across the design. */
@@ -186,7 +188,7 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
         position: { x: ZONE.pad, y }, selected: state.selected === member.id,
         data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
           detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id),
-          bottleneck: state.bottleneckId === member.id,
+          bottleneck: state.bottleneckId === member.id, tutorialTarget: state.tutorialTargetType === member.type,
           load: live && !spec.presentation?.hideCapacity ? (liveOf(member.id)?.bucketUtilization[live.bucket] ?? null) : null } }, BOX.w, member.height));
       if (member.container) {
         for (let k = 0; k < member.instances; k++) {
