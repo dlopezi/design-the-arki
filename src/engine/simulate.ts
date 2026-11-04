@@ -104,6 +104,8 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   }
   const entry = nextOf('client');
   if (!entry || !stations.has(entry)) throw new DesignError({ kind: 'noEntry' });
+  const entryType = design.components.find(c => c.id === entry)!.type;
+  if (!catalog[entryType]!.acceptsClients) throw new DesignError({ kind: 'notPublic', componentId: entry });
   const path: string[] = [];
   for (let id: string | null = entry; id; id = stations.get(id)!.next) {
     if (path.includes(id)) throw new DesignError({ kind: 'loop', componentIds: path.slice(path.indexOf(id)) });

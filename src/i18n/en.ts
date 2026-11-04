@@ -80,6 +80,7 @@ export const en = {
     noEntry: 'Connect Clients to a component first: drag from the Clients handle to an app server.',
     deadEnd: (label: string) => `${label} has nowhere to send requests. Connect it to a component that can answer them.`,
     needsBalancer: (label: string) => `${label} runs several instances but nothing spreads requests between them. Put a load balancer in front of it.`,
+    notPublic: (label: string) => `Clients cannot talk to ${label} directly. Put an app server (or a load balancer) in front of it.`,
     loop: (labels: string[]) => `Requests would go round in a loop between ${labels.join(' and ')}. Remove one of those connections.`,
   },
   clients: 'Clients',

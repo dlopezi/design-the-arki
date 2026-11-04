@@ -47,6 +47,7 @@ function describeProblem(problem: DesignProblem, design: Design): string {
     case 'deadEnd': return t.problems.deadEnd(label(problem.componentId));
     case 'loop': return t.problems.loop(problem.componentIds.map(label));
     case 'needsBalancer': return t.problems.needsBalancer(label(problem.componentId));
+    case 'notPublic': return t.problems.notPublic(label(problem.componentId));
   }
 }
 

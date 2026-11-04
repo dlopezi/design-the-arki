@@ -108,6 +108,11 @@ describe('simulate', () => {
       expect(problemOf({ components: [{ id: 'api', type: 'appServer' }], connections: [] })).toEqual({ kind: 'noEntry' });
     });
 
+    it('rejects clients talking straight to a component that is not meant to face them, such as the database', () => {
+      const design: Design = { components: [{ id: 'db', type: 'database' }], connections: [['client', 'db']] };
+      expect(problemOf(design)).toEqual({ kind: 'notPublic', componentId: 'db' });
+    });
+
     it('rejects a design where a component that cannot answer requests has nowhere to send them', () => {
       // An app server needs its data; only a database can end a request in this catalogue.
       const design: Design = { components: [{ id: 'api', type: 'appServer' }], connections: [['client', 'api']] };

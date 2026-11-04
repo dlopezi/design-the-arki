@@ -4,11 +4,11 @@ import type { Catalog } from '../engine/types';
 export const catalog: Catalog = {
   // Capacity (~10 000 req/s) is deliberately far above early-access traffic and not shown to players.
   loadBalancer: {
-    primitive: 'station', workers: 10, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, distributes: true,
+    primitive: 'station', workers: 10, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, distributes: true, acceptsClients: true,
     presentation: { zone: 'edge', technology: 'L7 · round-robin', hideCapacity: true },
   },
   appServer: {
-    primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false, scalesOut: true,
+    primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false, scalesOut: true, acceptsClients: true,
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
       medium: { workers: 4, monthlyCost: 40, vcpu: 2 },

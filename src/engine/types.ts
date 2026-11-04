@@ -32,6 +32,8 @@ export type StationPrimitive = {
   endsRequests: boolean;
   /** Whether the player can run several instances (param `instances`); requests are spread round-robin. */
   scalesOut?: boolean;
+  /** Whether clients may connect to it directly (the design's entry point). */
+  acceptsClients?: boolean;
   /** Whether it can spread requests over the instances of the next component. */
   distributes?: boolean;
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
@@ -63,7 +65,8 @@ export type Catalog = Record<string, ComponentSpec>;
 /** Why a design cannot serve traffic. */
 export type DesignProblem = { kind: 'noEntry' } | { kind: 'deadEnd'; componentId: string }
   | { kind: 'loop'; componentIds: string[] }
-  | { kind: 'needsBalancer'; componentId: string };
+  | { kind: 'needsBalancer'; componentId: string }
+  | { kind: 'notPublic'; componentId: string };
 
 export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: number; actual: number; ok: boolean };
 
