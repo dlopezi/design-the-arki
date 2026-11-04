@@ -201,3 +201,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .new-components { list-style: none; margin: 0; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 12%, transparent); font-size: 12.5px; display: grid; gap: 4px; }
 .new-components strong { color: var(--ok); }
+
+.mission-links { display: flex; justify-content: space-between; }
+.footer-actions { display: flex; gap: 10px; align-items: center; }
+a.secondary { text-decoration: none; }

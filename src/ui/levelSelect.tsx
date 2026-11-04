@@ -3,6 +3,7 @@ import { en as t } from '../i18n/en';
 import type { LevelDefinition } from '../levels/levels';
 import { isUnlocked, type Progress } from '../progress/progress';
 import { Stars } from './reportCard';
+import { feedbackUrl } from '../analytics/analytics';
 
 type Props = { levels: LevelDefinition[]; progress: Progress; notice: string | null; storageWorks: boolean; onReset: () => void };
 
@@ -68,7 +69,10 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
           </ol>
         </section>
       ))}
-      <button className="danger reset" onClick={() => setConfirming(true)}>{t.levelSelect.resetProgress}</button>
+      <div className="footer-actions">
+        <button className="danger reset" onClick={() => setConfirming(true)}>{t.levelSelect.resetProgress}</button>
+        <a className="secondary" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>
+      </div>
       {confirming && <ConfirmReset onCancel={() => setConfirming(false)} onConfirm={() => { setConfirming(false); onReset(); }} />}
     </main>
   );

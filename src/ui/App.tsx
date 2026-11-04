@@ -15,6 +15,7 @@ import { LevelSelect } from './levelSelect';
 import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, withTutorialDone, type Progress } from '../progress/progress';
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
+import { feedbackUrl, track } from '../analytics/analytics';
 
 const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
@@ -76,6 +77,11 @@ const lastIdNumber = (design: Design) => Math.max(0, ...design.components.map(c 
 function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChange, onPassed, tutorial: tutorialAtStart, onTutorialDone }: GameProps) {
   // Keep the steps for this session, so the closing message stays after progress records the tutorial as done.
   const [tutorial] = useState(tutorialAtStart);
+  const passedOnce = useRef(false);
+  useEffect(() => {
+    track('Level started', { level: level.id, mode });
+    return () => { if (!passedOnce.current) track('Level abandoned', { level: level.id, mode }); };
+  }, [level.id, mode]);
   const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -169,7 +175,12 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     try {
       const run = simulate(level, design, 1);
       setResult(run);
-      if (run.passed) onPassed(run.stars);
+      track('Run', { level: level.id, mode, passed: run.passed ? 'yes' : 'no' });
+      if (run.passed) {
+        onPassed(run.stars);
+        if (!passedOnce.current) track('Level passed', { level: level.id, mode, stars: run.stars });
+        passedOnce.current = true;
+      }
       setShowReport(false);
       setProblem(null);
       // Replay the run: the whole level in PLAYBACK_MS, then the report.
@@ -188,7 +199,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       if (!(e instanceof DesignError)) throw e;
       setProblem({ message: describeProblem(e.problem, design), componentIds: problemComponents(e.problem) });
     }
-  }, [level, design, onPassed]);
+  }, [level, design, onPassed, mode]);
 
   const skip = useCallback(() => { cancelAnimationFrame(frame.current); setPlayT(null); setShowReport(true); }, []);
 
@@ -229,7 +240,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       </ReactFlow>
 
       <section className="hud mission">
-        <a className="back" href="#">← {t.levels}</a>
+        <span className="mission-links"><a className="back" href="#">← {t.levels}</a><a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a></span>
         <h1>{level.title}</h1>
         <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
         <p>{level.brief}</p>

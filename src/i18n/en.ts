@@ -35,6 +35,7 @@ export const en = {
     skip: 'Skip tutorial',
     lockedMode: 'Finish the tutorial first',
   },
+  feedback: 'Send feedback',
   levels: 'Levels',
   nextLevel: 'Next level',
   hints: {
