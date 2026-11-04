@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo del motor</title>
+<style>
+  :root { --bg:#fafafa; --card:#fff; --fg:#1d1d1f; --muted:#6b6b70; --line:#e4e4e7; --accent:#2563eb; --ok:#15803d; --bad:#b91c1c; --soft:#eff4ff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111214; --card:#1a1b1e; --fg:#ececef; --muted:#9a9aa2; --line:#2c2d31; --accent:#60a5fa; --ok:#4ade80; --bad:#f87171; --soft:#1c2533; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:17px; margin:0 0 12px; } h3 { font-size:14px; margin:16px 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--soft); color:var(--accent); font-weight:600; }
+  .intro { color:var(--muted); max-width:780px; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px; }
+  @media (max-width:820px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+  .full { grid-column:1 / -1; }
+  dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; margin:0; } dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; }
+  button { font:inherit; font-size:14px; padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--accent); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; align-items:center; }
+  .row .lbl { width:120px; color:var(--muted); font-size:13px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; }
+  .scroll { overflow-x:auto; }
+  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  .verdict { font-size:22px; font-weight:700; } .stars { font-size:22px; color:#eab308; letter-spacing:2px; }
+  .hint { background:var(--soft); border-left:3px solid var(--accent); padding:8px 12px; border-radius:6px; margin-top:12px; }
+  .bar { height:8px; border-radius:4px; background:var(--accent); display:inline-block; vertical-align:middle; }
+  .bar.bad { background:var(--bad); }
+  tr.hot td { background:color-mix(in srgb, var(--bad) 10%, transparent); }
+  .changed { background:color-mix(in srgb, var(--accent) 18%, transparent); border-radius:4px; padding:0 4px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--line); margin-bottom:12px; }
+  .tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:8px 12px; }
+  .tabs button.active { border-bottom-color:var(--accent); color:var(--accent); font-weight:600; }
+  ol.steps { padding-left:20px; margin:8px 0 0; } ol.steps li { margin-bottom:6px; }
+  ol.steps li.done button { text-decoration:line-through; }
+  .muted { color:var(--muted); font-size:13px; }
+  .empty { color:var(--muted); padding:24px 0; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <span class="tag">PROTOTIPO · desechable</span>
+  <h1>Motor de simulación de archi-game</h1>
+  <p class="intro"><strong>Pregunta:</strong> ¿un modelo de eventos discretos y determinista (cada componente es un pool de workers con cola limitada; peticiones con llegadas de Poisson y tiempos de servicio exponenciales) da métricas que un jugador entienda? ¿Señala el <em>cuello de botella</em> correcto y recompensa los trade-offs que queremos enseñar (caché frente a BD más grande, redundancia frente a coste)?</p>
+
+  <div class="grid">
+    <section class="card" id="level"></section>
+    <section class="card" id="design"></section>
+
+    <section class="card full">
+      <h2>Juego libre</h2>
+      <div class="row"><span class="lbl">Servidores</span><button data-act="addServer">Añadir servidor</button><button data-act="removeServer">Quitar servidor</button></div>
+      <div class="row"><span class="lbl">Base de datos</span><button data-act="dbSmall">BD pequeña</button><button data-act="dbMedium">BD mediana</button><button data-act="dbLarge">BD grande</button></div>
+      <div class="row"><span class="lbl">Caché</span><button data-act="cacheOn">Poner caché</button><button data-act="cacheOff">Quitar caché</button><button data-act="ttlUp">TTL +30 s</button><button data-act="ttlDown">TTL −30 s</button></div>
+      <div class="row"><span class="lbl">Incidente</span><button data-act="failureOn">Activar caída de un servidor (t=20 s)</button><button data-act="failureOff">Sin caída</button></div>
+      <div class="row"><span class="lbl">Ejecución</span><button data-act="run" class="primary">Simular</button><button data-act="reseed">Cambiar semilla</button><button data-act="reset">Reiniciar</button></div>
+    </section>
+
+    <section class="card full" id="walk"></section>
+    <section class="card full" id="results"></section>
+  </div>
+</main>
+
+<script>
+// PROTOTYPE: pure simulation engine (no DOM). Lifted into the HTML demo.
+const Engine = (() => {
+  const HOP_MS = 1, QUEUE_CAP = 100, TIMEOUT_MS = 1000, BUCKET_S = 5;
+
+  const CATALOG = {
+    lb:     { label: 'Balanceador',     serviceMs: 1,  workers: 500, cost: () => 20 },
+    server: { label: 'Servidor de app', serviceMs: 20, workers: 4,   cost: p => 40 * p.instances },
+    cache:  { label: 'Caché',           serviceMs: 2,  workers: 50,  cost: () => 30 },
+    db:     { label: 'Base de datos',   serviceMs: 20,
+              tiers: { small: { workers: 8, cost: 50 }, medium: { workers: 16, cost: 150 }, large: { workers: 32, cost: 400 } },
+              cost: p => CATALOG.db.tiers[p.tier].cost },
+  };
+  const cacheHitRate = ttlS => ttlS / (ttlS + 30);
+
+  function mulberry32(a) {
+    return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  const exp = (rng, mean) => -Math.log(1 - rng()) * mean;
+
+  class Heap {
+    constructor() { this.a = []; }
+    less(x, y) { return x.t < y.t || (x.t === y.t && x.seq < y.seq); }
+    push(x) { const a = this.a; a.push(x); let i = a.length - 1;
+      while (i > 0) { const p = (i - 1) >> 1; if (!this.less(a[i], a[p])) break; [a[i], a[p]] = [a[p], a[i]]; i = p; } }
+    pop() { const a = this.a, top = a[0], last = a.pop();
+      if (a.length) { a[0] = last; let i = 0;
+        for (;;) { const l = 2 * i + 1, r = l + 1; let m = i;
+          if (l < a.length && this.less(a[l], a[m])) m = l; if (r < a.length && this.less(a[r], a[m])) m = r;
+          if (m === i) break; [a[i], a[m]] = [a[m], a[i]]; i = m; } }
+      return top; }
+    get size() { return this.a.length; }
+  }
+
+  function designCost(design) {
+    return design.components.reduce((s, c) => s + CATALOG[c.type].cost(c.params || {}), 0);
+  }
+
+  function percentile(sorted, p) { return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] : 0; }
+
+  function simulate(level, design, seed) {
+    const rng = mulberry32(seed);
+    const durMs = level.durationS * 1000, nB = Math.ceil(level.durationS / BUCKET_S);
+    const comps = {};
+    for (const c of design.components) {
+      const spec = CATALOG[c.type], p = c.params || {};
+      const workers = c.type === 'db' ? spec.tiers[p.tier].workers : spec.workers;
+      const n = c.type === 'server' ? p.instances : 1;
+      comps[c.id] = { id: c.id, type: c.type, label: spec.label, params: p, workers, serviceMs: spec.serviceMs, rr: 0,
+        instances: Array.from({ length: n }, () => ({ busy: 0, queue: [], alive: true })),
+        busyBuckets: new Array(nB).fill(0),
+        stats: { arrived: 0, served: 0, waitMs: 0, busyMs: 0, maxQueue: 0, rejected: 0, timedOut: 0, lost: 0, hits: 0, misses: 0 } };
+    }
+    const next = id => design.connections.filter(([f]) => f === id).map(([, t]) => t);
+    const buckets = Array.from({ length: nB }, (_, i) => ({ fromS: i * BUCKET_S, requests: 0, ok: 0, errors: 0, lat: [] }));
+    const bucketOf = t => buckets[Math.min(nB - 1, Math.floor(t / (BUCKET_S * 1000)))];
+    const errors = { rejected: 0, timedOut: 0, lost: 0, unavailable: 0 };
+    const latencies = [];
+    const heap = new Heap(); let seq = 0;
+    const at = (t, type, data) => heap.push({ t, seq: seq++, type, ...data });
+
+    let reqId = 0;
+    const entry = next('client')[0];
+    for (const seg of level.traffic) {
+      let t = seg.fromS * 1000; const end = seg.toS * 1000, mean = 1000 / seg.rps;
+      for (;;) { t += exp(rng, mean); if (t >= end) break; at(t, 'arrive', { comp: entry, req: { id: reqId++, created: t, hops: 1 } }); }
+    }
+    for (const f of level.failureEvents || []) at(f.atS * 1000, 'kill', { comp: f.componentId, inst: f.instance });
+
+    const fail = (req, kind, c) => { errors[kind]++; if (c && kind in c.stats) c.stats[kind]++; const b = bucketOf(req.created); b.requests++; b.errors++; };
+    const complete = (req, t) => {
+      const lat = t - req.created + req.hops * HOP_MS;
+      if (lat > TIMEOUT_MS) return fail(req, 'timedOut', null);
+      latencies.push(lat); const b = bucketOf(req.created); b.requests++; b.ok++; b.lat.push(lat);
+    };
+    const addBusy = (c, t0, d) => {
+      c.stats.busyMs += d; let t = t0; const t1 = t0 + d, bMs = BUCKET_S * 1000;
+      while (t < t1) { const i = Math.floor(t / bMs); if (i >= nB) break; const e = Math.min(t1, (i + 1) * bMs); c.busyBuckets[i] += e - t; t = e; }
+    };
+    const start = (c, i, req, t) => {
+      if (t - req.created > TIMEOUT_MS) return fail(req, 'timedOut', c);
+      c.stats.waitMs += t - req.enq;
+      c.instances[i].busy++;
+      const svc = exp(rng, c.serviceMs); addBusy(c, t, svc);
+      at(t + svc, 'done', { comp: c.id, inst: i, req });
+    };
+    const route = (c, req, t) => {
+      if (c.type === 'cache') {
+        if (rng() < cacheHitRate(c.params.ttlS)) { c.stats.hits++; return complete(req, t); }
+        c.stats.misses++;
+      }
+      const targets = next(c.id);
+      if (!targets.length) return complete(req, t);
+      req.hops++; at(t + HOP_MS, 'arrive', { comp: targets[0], req });
+    };
+
+    while (heap.size) {
+      const e = heap.pop(), c = comps[e.comp];
+      if (e.type === 'arrive') {
+        c.stats.arrived++;
+        const alive = c.instances.map((x, i) => i).filter(i => c.instances[i].alive);
+        if (!alive.length) { fail(e.req, 'unavailable', c); continue; }
+        const i = alive[c.rr++ % alive.length], inst = c.instances[i];
+        e.req.enq = e.t;
+        if (inst.busy < c.workers) start(c, i, e.req, e.t);
+        else if (inst.queue.length < QUEUE_CAP) { inst.queue.push(e.req); c.stats.maxQueue = Math.max(c.stats.maxQueue, inst.queue.length); }
+        else fail(e.req, 'rejected', c);
+      } else if (e.type === 'done') {
+        const inst = c.instances[e.inst]; inst.busy--;
+        if (!inst.alive) { fail(e.req, 'lost', c); continue; }
+        c.stats.served++;
+        route(c, e.req, e.t);
+        while (inst.busy < c.workers && inst.queue.length) start(c, e.inst, inst.queue.shift(), e.t);
+      } else if (e.type === 'kill') {
+        const inst = c.instances[e.inst]; if (!inst || !inst.alive) continue;
+        inst.alive = false; for (const r of inst.queue) fail(r, 'lost', c); inst.queue = [];
+      }
+    }
+
+    const total = reqId, errCount = Object.values(errors).reduce((a, b) => a + b, 0);
+    const sorted = latencies.slice().sort((a, b) => a - b);
+    const p50 = percentile(sorted, 0.5), p95 = percentile(sorted, 0.95), p99 = percentile(sorted, 0.99);
+    const errorRate = total ? errCount / total : 0;
+    const cost = designCost(design);
+
+    const components = Object.values(comps).map(c => {
+      const cap = c.workers * c.instances.length;
+      const s = c.stats, overload = s.rejected + s.timedOut;
+      return { id: c.id, type: c.type, label: c.label, capacityRps: Math.round(cap * 1000 / c.serviceMs),
+        utilization: s.busyMs / (cap * durMs),
+        peakUtilization: Math.max(...c.busyBuckets.map(b => b / (cap * BUCKET_S * 1000))),
+        avgWaitMs: s.arrived ? s.waitMs / s.arrived : 0, ...s,
+        hitRate: c.type === 'cache' ? s.hits / Math.max(1, s.hits + s.misses) : null,
+        pressure: s.waitMs + overload * TIMEOUT_MS };
+    });
+    const worst = components.reduce((a, b) => (b.pressure > a.pressure ? b : a));
+    const bottleneck = worst.pressure / Math.max(1, total) >= 2 ? worst.id : null;
+
+    const checks = [
+      { name: 'Latencia p95', target: `≤ ${level.requirements.p95Ms} ms`, actual: `${p95.toFixed(0)} ms`, ok: p95 <= level.requirements.p95Ms },
+      { name: 'Tasa de errores', target: `≤ ${(level.requirements.maxErrorRate * 100).toFixed(1)} %`, actual: `${(errorRate * 100).toFixed(2)} %`, ok: errorRate <= level.requirements.maxErrorRate },
+      { name: 'Coste mensual', target: `≤ $${level.budget}`, actual: `$${cost}`, ok: cost <= level.budget },
+    ];
+    const passed = checks.every(c => c.ok);
+    const stars = passed ? 1 + level.starCostThresholds.filter(th => cost <= th).length : 0;
+
+    let hint = null;
+    if (errors.lost + errors.unavailable > 0 && !passed)
+      hint = 'Una instancia se cayó y el resto no absorbió la carga: añade redundancia (N+1 instancias).';
+    else if (bottleneck) {
+      const type = comps[bottleneck].type;
+      hint = { server: 'Los servidores de aplicación están saturados: añade instancias (escalado horizontal).',
+               db: 'La base de datos está saturada: reduce lecturas con una caché o sube de tier (escalado vertical).',
+               cache: 'La caché está saturada.', lb: 'El balanceador está saturado.' }[type];
+    }
+
+    return { seed, totalRequests: total, ok: latencies.length, errors, errorRate, p50, p95, p99, cost, checks, passed, stars,
+      components, bottleneck, hint,
+      buckets: buckets.map(b => { const s = b.lat.sort((x, y) => x - y);
+        return { fromS: b.fromS, rps: b.requests / BUCKET_S, p95: percentile(s, 0.95), errorRate: b.requests ? b.errors / b.requests : 0 }; }) };
+  }
+
+  return { CATALOG, cacheHitRate, designCost, simulate };
+})();
+
+</script>
+
+<script>
+// ---- Page shell (throwaway) ----
+const LEVEL = {
+  name: 'Rebajas en la tienda online',
+  durationS: 60,
+  traffic: [{ fromS: 0, toS: 30, rps: 200 }, { fromS: 30, toS: 40, rps: 500 }, { fromS: 40, toS: 60, rps: 200 }],
+  requirements: { p95Ms: 200, maxErrorRate: 0.01 },
+  budget: 400, starCostThresholds: [300, 230],
+};
+const INITIAL = { servers: 1, dbTier: 'small', cacheOn: false, ttlS: 60, failure: false, seed: 42 };
+let ui = { ...INITIAL }, result = null, prev = null, changed = new Set();
+
+function buildDesign(s) {
+  const components = [{ id: 'lb', type: 'lb' }, { id: 'app', type: 'server', params: { instances: s.servers } }, { id: 'db', type: 'db', params: { tier: s.dbTier } }];
+  const connections = [['client', 'lb'], ['lb', 'app']];
+  if (s.cacheOn) { components.push({ id: 'cache', type: 'cache', params: { ttlS: s.ttlS } }); connections.push(['app', 'cache'], ['cache', 'db']); }
+  else connections.push(['app', 'db']);
+  return { components, connections };
+}
+const buildLevel = s => ({ ...LEVEL, failureEvents: s.failure ? [{ atS: 20, componentId: 'app', instance: 0 }] : [] });
+
+const ACTIONS = {
+  addServer:   ['Añadir servidor', s => ({ ...s, servers: Math.min(8, s.servers + 1) })],
+  removeServer:['Quitar servidor', s => ({ ...s, servers: Math.max(1, s.servers - 1) })],
+  dbSmall:     ['BD pequeña', s => ({ ...s, dbTier: 'small' })],
+  dbMedium:    ['BD mediana', s => ({ ...s, dbTier: 'medium' })],
+  dbLarge:     ['BD grande', s => ({ ...s, dbTier: 'large' })],
+  cacheOn:     ['Poner caché', s => ({ ...s, cacheOn: true })],
+  cacheOff:    ['Quitar caché', s => ({ ...s, cacheOn: false })],
+  ttlUp:       ['TTL +30 s', s => ({ ...s, ttlS: Math.min(600, s.ttlS + 30) })],
+  ttlDown:     ['TTL −30 s', s => ({ ...s, ttlS: Math.max(0, s.ttlS - 30) })],
+  failureOn:   ['Activar caída de un servidor', s => ({ ...s, failure: true })],
+  failureOff:  ['Sin caída', s => ({ ...s, failure: false })],
+  reseed:      ['Cambiar semilla', s => ({ ...s, seed: s.seed + 1 })],
+};
+function dispatch(act) {
+  if (act === 'reset') { ui = { ...INITIAL }; result = prev = null; changed = new Set(); return render(); }
+  if (act === 'run') { prev = result; result = Engine.simulate(buildLevel(ui), buildDesign(ui), ui.seed); changed = new Set(); return render(); }
+  const before = ui; ui = ACTIONS[act][1](ui);
+  changed = new Set(Object.keys(ui).filter(k => ui[k] !== before[k]));
+  render();
+}
+
+const TIER = { small: 'pequeña', medium: 'mediana', large: 'grande' };
+const pct = x => (x * 100).toFixed(1) + ' %';
+const ms = x => x.toFixed(0) + ' ms';
+const ch = (k, html) => changed.has(k) ? `<span class="changed">${html}</span>` : html;
+
+function renderLevel() {
+  document.getElementById('level').innerHTML = `
+    <h2>Nivel: ${LEVEL.name}</h2>
+    <dl>
+      <dt>Tráfico</dt><dd>${LEVEL.traffic.map(t => `${t.rps} pet/s (${t.fromS}–${t.toS} s)`).join('<br>')}</dd>
+      <dt>Requisitos</dt><dd>p95 ≤ ${LEVEL.requirements.p95Ms} ms · errores ≤ ${pct(LEVEL.requirements.maxErrorRate)}</dd>
+      <dt>Presupuesto</dt><dd>$${LEVEL.budget}/mes</dd>
+      <dt>Estrellas</dt><dd>★ aprobar · ★★ ≤ $${LEVEL.starCostThresholds[0]} · ★★★ ≤ $${LEVEL.starCostThresholds[1]}</dd>
+      <dt>Reglas del motor</dt><dd class="muted">cola máx. 100 por instancia · timeout 1 s · 1 ms por salto de red</dd>
+    </dl>`;
+}
+function renderDesign() {
+  const C = Engine.CATALOG, d = buildDesign(ui);
+  const srvCap = ui.servers * C.server.workers * 1000 / C.server.serviceMs;
+  const dbCap = C.db.tiers[ui.dbTier].workers * 1000 / C.db.serviceMs;
+  document.getElementById('design').innerHTML = `
+    <h2>Diseño actual</h2>
+    <dl>
+      <dt>Flujo</dt><dd>Clientes → Balanceador → Servidores → ${ui.cacheOn ? 'Caché → (si falla) ' : ''}BD</dd>
+      <dt>Servidores</dt><dd>${ch('servers', `${ui.servers} instancia(s)`)} · capacidad ≈ ${srvCap} pet/s</dd>
+      <dt>Base de datos</dt><dd>${ch('dbTier', `tier ${TIER[ui.dbTier]}`)} · capacidad ≈ ${dbCap} pet/s</dd>
+      <dt>Caché</dt><dd>${ch('cacheOn', ui.cacheOn ? 'sí' : 'no')}${ui.cacheOn ? ` · ${ch('ttlS', `TTL ${ui.ttlS} s`)} → acierto ≈ ${pct(Engine.cacheHitRate(ui.ttlS))}` : ''}</dd>
+      <dt>Incidente</dt><dd>${ch('failure', ui.failure ? 'cae el servidor nº 1 en t=20 s' : 'ninguno')}</dd>
+      <dt>Semilla</dt><dd>${ch('seed', ui.seed)}</dd>
+      <dt>Coste</dt><dd><strong>$${Engine.designCost(d)}/mes</strong></dd>
+    </dl>`;
+}
+function delta(cur, old, fmt, lowerIsBetter = true) {
+  if (old == null) return '';
+  const diff = cur - old; if (Math.abs(diff) < 1e-9) return ' <span class="muted">(=)</span>';
+  const good = lowerIsBetter ? diff < 0 : diff > 0;
+  return ` <span class="${good ? 'ok' : 'bad'}">(${diff > 0 ? '+' : ''}${fmt(diff)})</span>`;
+}
+function renderResults() {
+  const el = document.getElementById('results');
+  if (!result) { el.innerHTML = `<h2>Resultado</h2><div class="empty">Pulsa <strong>Simular</strong> para ejecutar el nivel con el diseño actual.</div>`; return; }
+  const r = result, p = prev;
+  const bn = r.components.find(c => c.id === r.bottleneck);
+  const maxRps = Math.max(...r.buckets.map(b => b.rps), 1), maxP95 = Math.max(...r.buckets.map(b => b.p95), 1);
+  el.innerHTML = `
+    <h2>Resultado <span class="muted">(semilla ${r.seed}, ${r.totalRequests.toLocaleString('es')} peticiones)</span></h2>
+    <div class="row"><span class="verdict ${r.passed ? 'ok' : 'bad'}">${r.passed ? 'Nivel superado' : 'No superado'}</span>
+      <span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span></div>
+    <table><tr><th>Requisito</th><th>Objetivo</th><th>Obtenido</th><th></th></tr>
+      ${r.checks.map(c => `<tr><td>${c.name}</td><td>${c.target}</td><td>${c.actual}</td><td class="${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'}</td></tr>`).join('')}
+    </table>
+    <p class="muted">p50 ${ms(r.p50)}${delta(r.p50, p?.p50, ms)} · p95 ${ms(r.p95)}${delta(r.p95, p?.p95, ms)} · p99 ${ms(r.p99)}${delta(r.p99, p?.p99, ms)} · errores ${pct(r.errorRate)}${delta(r.errorRate, p?.errorRate, pct)} · coste $${r.cost}${delta(r.cost, p?.cost, x => '$' + x)}
+      <br>Errores por tipo: rechazadas (cola llena) ${r.errors.rejected} · timeout ${r.errors.timedOut} · perdidas por caída ${r.errors.lost} · sin instancias vivas ${r.errors.unavailable}</p>
+    ${bn ? `<div class="hint"><strong>${r.passed ? 'Componente más cargado' : 'Cuello de botella'}: ${bn.label}.</strong> ${r.passed ? '' : (r.hint || '')}</div>` : (r.hint ? `<div class="hint">${r.hint}</div>` : '')}
+
+    <h3>Componentes</h3>
+    <div class="scroll"><table>
+      <tr><th>Componente</th><th>Capacidad</th><th>Utilización media</th><th>Pico (5 s)</th><th>Espera media en cola</th><th>Cola máx.</th><th>Rechazadas</th><th>Timeouts</th><th>Acierto caché</th></tr>
+      ${r.components.map(c => `<tr class="${c.id === r.bottleneck && !r.passed ? 'hot' : ''}"><td>${c.label}</td><td>${c.capacityRps} pet/s</td>
+        <td><span class="bar ${c.utilization > .85 ? 'bad' : ''}" style="width:${Math.min(60, c.utilization * 60)}px"></span> ${pct(c.utilization)}</td>
+        <td>${pct(c.peakUtilization)}</td><td>${ms(c.avgWaitMs)}</td><td>${c.maxQueue}</td><td>${c.rejected}</td><td>${c.timedOut}</td><td>${c.hitRate == null ? '—' : pct(c.hitRate)}</td></tr>`).join('')}
+    </table></div>
+
+    <h3>Línea temporal (tramos de 5 s)</h3>
+    <div class="scroll"><table>
+      <tr><th>Tramo</th><th>Peticiones/s</th><th>p95</th><th>Errores</th></tr>
+      ${r.buckets.map(b => `<tr><td>${b.fromS}–${b.fromS + 5} s</td>
+        <td><span class="bar" style="width:${b.rps / maxRps * 120}px"></span> ${b.rps.toFixed(0)}</td>
+        <td><span class="bar ${b.p95 > LEVEL.requirements.p95Ms ? 'bad' : ''}" style="width:${b.p95 / maxP95 * 120}px"></span> ${ms(b.p95)}</td>
+        <td class="${b.errorRate > LEVEL.requirements.maxErrorRate ? 'bad' : ''}">${pct(b.errorRate)}</td></tr>`).join('')}
+    </table></div>`;
+}
+
+// ---- Guided walkthroughs ----
+const WALKS = [
+  { title: '1 · Diseño ingenuo', text: 'Un solo servidor y la BD pequeña. Un servidor aguanta ~200 pet/s y el tráfico base ya es de 200. <strong>Observa:</strong> el cuello de botella debería ser el servidor, con muchas peticiones rechazadas y la pista de escalar en horizontal.', steps: ['run'] },
+  { title: '2 · Escalar servidores', text: 'Pasamos a 3 servidores (≈600 pet/s). El pico de 500 pet/s ahora lo sufre la BD pequeña (≈400 pet/s). <strong>Observa:</strong> ¿el cuello de botella pasa a ser la BD? ¿Se nota en la línea temporal sólo durante el pico (30–40 s)?', steps: ['addServer', 'addServer', 'run'] },
+  { title: '3 · Caché o BD mayor', text: 'Dos formas de salvar la BD: subir de tier o poner una caché delante. <strong>Observa:</strong> ambas aprueban, pero la caché es más barata y da más estrellas. Es el trade-off que queremos enseñar.', steps: ['addServer', 'addServer', 'dbMedium', 'run', 'dbSmall', 'cacheOn', 'run'] },
+  { title: '4 · Caída de un servidor', text: 'Con el diseño de 3★ cae un servidor en t=20 s y el pico llega con sólo 2. <strong>Observa:</strong> el nivel falla y la pista habla de redundancia; con un 4º servidor vuelve a aprobar, pero baja a 2★ por el coste.', steps: ['addServer', 'addServer', 'cacheOn', 'failureOn', 'run', 'addServer', 'run'] },
+  { title: '5 · TTL de la caché', text: 'Con 3 servidores y caché, baja el TTL. Menos aciertos de caché significa más carga en la BD. <strong>Observa:</strong> ¿en qué punto la BD vuelve a ser el cuello de botella?', steps: ['addServer', 'addServer', 'cacheOn', 'run', 'ttlDown', 'run', 'ttlDown', 'run'] },
+  { title: '6 · Determinismo', text: 'La misma semilla da exactamente el mismo resultado; otra semilla da un resultado parecido pero no idéntico. <strong>Observa:</strong> las diferencias (=) en la segunda ejecución y las pequeñas variaciones con otra semilla.', steps: ['addServer', 'addServer', 'cacheOn', 'run', 'run', 'reseed', 'run'] },
+];
+let walk = 0, stepIdx = 0;
+const actLabel = a => a === 'run' ? 'Simular' : ACTIONS[a][0];
+function startWalk(i) { walk = i; stepIdx = 0; dispatch('reset'); }
+function renderWalk() {
+  const w = WALKS[walk];
+  document.getElementById('walk').innerHTML = `
+    <h2>Recorridos guiados</h2>
+    <div class="tabs">${WALKS.map((x, i) => `<button data-walk="${i}" class="${i === walk ? 'active' : ''}">${x.title}</button>`).join('')}</div>
+    <p>${w.text}</p>
+    <ol class="steps">${w.steps.map((a, i) => `<li class="${i < stepIdx ? 'done' : ''}"><button data-step="${i}" ${i === stepIdx ? '' : 'disabled'} class="${i === stepIdx ? 'primary' : ''}">${actLabel(a)}</button></li>`).join('')}</ol>
+    ${stepIdx >= w.steps.length ? '<p class="muted">Recorrido terminado. Pulsa la pestaña de nuevo para repetirlo.</p>' : '<p class="muted">Al abrir una pestaña, el diseño vuelve al estado inicial.</p>'}`;
+}
+function render() { renderLevel(); renderDesign(); renderResults(); renderWalk(); }
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.act) dispatch(b.dataset.act);
+  else if (b.dataset.walk) startWalk(+b.dataset.walk);
+  else if (b.dataset.step) { const a = WALKS[walk].steps[stepIdx]; stepIdx++; dispatch(a); }
+});
+render();
+</script>
+</body>
+</html>
