@@ -46,8 +46,8 @@ function Game({ level }: { level: LevelDefinition }) {
   const counter = useRef(0);
   const { screenToFlowPosition, fitView } = useReactFlow();
   const nodeCount = nodes.length;
-  // Keep every component in view as the design grows.
-  useEffect(() => { const timer = setTimeout(() => fitView({ maxZoom: 1.2, duration: 200 }), 30); return () => clearTimeout(timer); }, [nodeCount, fitView]);
+  // Keep every component in view as the design grows. Instant, so the view never slides under a drag.
+  useEffect(() => { const timer = setTimeout(() => fitView({ maxZoom: 1.2 }), 30); return () => clearTimeout(timer); }, [nodeCount, fitView]);
 
   const design = useMemo(() => toDesign(nodes, edges), [nodes, edges]);
   const designKey = JSON.stringify(design);
