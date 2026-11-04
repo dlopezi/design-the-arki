@@ -1,5 +1,6 @@
 import { BaseEdge, getBezierPath, Handle, Position, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
 import { catalog } from '../catalog/catalog';
+import { hitRateOf } from '../engine/simulate';
 import type { Design, Presentation, Result } from '../engine/types';
 import { en as t } from '../i18n/en';
 
@@ -175,9 +176,12 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
       const spec = catalog[member.type]!;
       const size = sizeOf(member.type, member.params);
       const workers = size && spec.sizes ? spec.sizes[size]!.workers : spec.workers;
+      const component = design.components.find(c => c.id === member.id)!;
       const detail = member.container
         ? `${t.instanceCount(member.instances)}${size ? ` · ${t.inspector.sizes[size]}` : ''}`
-        : spec.presentation?.hideCapacity ? '' : `${workers} connections`;
+        : spec.shortcut
+          ? `TTL ${Number(component.params?.[spec.shortcut.param] ?? spec.shortcut.defaultValue)} s · ~${Math.round(hitRateOf(component) * 100)}% hits`
+          : spec.presentation?.hideCapacity ? '' : `${size ? `${t.inspector.sizes[size]} · ` : ''}${t.inspector.connections(workers)}`;
       nodes.push(sized<ComponentData>({ id: member.id, type: 'component', parentId: zoneId, extent: 'parent',
         position: { x: ZONE.pad, y }, selected: state.selected === member.id,
         data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
