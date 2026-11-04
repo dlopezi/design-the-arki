@@ -5,8 +5,8 @@ import { en as t } from '../i18n/en';
 
 // Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
 const PERSON = { w: 150, h: 112 };
-const BOX = { w: 200, h: 76 };
-const INSTANCE = { w: 172, h: 50, gap: 10 };
+const BOX = { w: 200, h: 90 };
+const INSTANCE = { w: 172, h: 64, gap: 10 };
 const CONTAINER_HEAD = 78;
 const ZONE = { pad: 20, head: 42, gap: 50 };
 const SYSTEM = { head: 54, pad: 30, gapFromPerson: 90 };
@@ -90,7 +90,7 @@ function FlowEdge(props: EdgeProps<Edge<FlowEdgeData>>) {
       <BaseEdge id={props.id} path={path} style={props.style} />
       {Array.from({ length: dots }, (_, i) => (
         <circle key={i} className="flow-dot" r={3.5}>
-          <animateMotion dur="1.2s" repeatCount="indefinite" begin={`${(i * 1.2) / dots}s`} path={path} />
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin={`-${(i * 1.2) / dots}s`} path={path} />
         </circle>
       ))}
     </>
