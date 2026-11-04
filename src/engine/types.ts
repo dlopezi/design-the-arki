@@ -11,7 +11,11 @@ export type Level = {
   budget: number;
   /** Monthly costs at or below which the 2nd, 3rd… star is earned. */
   starCostThresholds: number[];
+  /** Scripted incidents: at `atS`, instance number `instance` of the first component of `componentType` goes down. */
+  failureEvents?: FailureEvent[];
 };
+
+export type FailureEvent = { atS: number; componentType: string; instance: number };
 
 export type DesignComponent = { id: string; type: string; params?: Record<string, unknown> };
 
@@ -65,6 +69,8 @@ export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: numbe
 
 export type ComponentResult = {
   id: string; served: number; rejected: number; timedOut: number;
+  /** Requests dropped because the instance holding them went down. */
+  lost: number;
   /** Share of worker time busy in each 5-second bucket, 0–1, across all instances. */
   bucketUtilization: number[];
   peakUtilization: number;
@@ -76,7 +82,11 @@ export type ComponentResult = {
   instances: InstanceResult[];
 };
 
-export type InstanceResult = { served: number; rejected: number; maxQueue: number; bucketUtilization: number[]; peakUtilization: number };
+export type InstanceResult = {
+  served: number; rejected: number; maxQueue: number; bucketUtilization: number[]; peakUtilization: number;
+  /** When it went down, in seconds; null if it stayed up. */
+  killedAtS: number | null;
+};
 
 /** Metrics for one slice of the run, used for charts and playback. */
 export type Bucket = { fromS: number; rps: number; p95: number; errorRate: number };
@@ -94,7 +104,8 @@ export type Result = {
   p95: number;
   p99: number;
   errorRate: number;
-  errors: { rejected: number; timedOut: number };
+  /** rejected: queue full · timedOut: too slow · lost: held by an instance that went down · unavailable: no instance alive. */
+  errors: { rejected: number; timedOut: number; lost: number; unavailable: number };
   checks: Check[];
   components: ComponentResult[];
   /** The run in 5-second buckets, by request arrival time. */

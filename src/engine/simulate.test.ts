@@ -294,4 +294,22 @@ describe('simulate', () => {
       expect(() => simulate(levelAt(50), design, 1)).toThrow(expect.objectContaining({ problem: { kind: 'deadEnd', componentId: 'cache' } }));
     });
   });
+
+  describe('failure events', () => {
+    const scaledOut = (instances: number): Design => ({
+      components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances } }, { id: 'db', type: 'database' }],
+      connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+    });
+    const failingAt = (rps: number, atS: number) => levelAt(rps, { failureEvents: [{ atS, componentType: 'appServer', instance: 0 }] });
+
+    it('loses the requests a failed instance was holding and shifts its traffic to the instances still alive', () => {
+      const result = simulate(failingAt(450, 10), scaledOut(3), 1);
+      const api = result.components.find(c => c.id === 'api')!;
+
+      expect(result.errors.lost).toBeGreaterThan(0);
+      expect(api.instances[0]!.killedAtS).toBe(10);
+      expect(api.instances[0]!.bucketUtilization.slice(3).every(u => u === 0)).toBe(true);
+      expect(api.instances[1]!.served).toBeGreaterThan(api.instances[0]!.served);
+    });
+  });
 });

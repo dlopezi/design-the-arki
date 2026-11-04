@@ -21,7 +21,7 @@ const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
 
-type Instance = { busy: number; queue: Request[]; busyMs: number[]; served: number; rejected: number; maxQueue: number };
+type Instance = { busy: number; queue: Request[]; busyMs: number[]; served: number; rejected: number; maxQueue: number; killedAt: number | null };
 
 type Station = {
   id: string;
@@ -31,7 +31,7 @@ type Station = {
   nextInstance: number;
   queueSize: number;
   next: string | null;
-  stats: { id: string; served: number; rejected: number; timedOut: number };
+  stats: { id: string; served: number; rejected: number; timedOut: number; lost: number };
   /** Total time requests spent queued here, and how many requests started service. */
   waitMs: number;
   started: number;
@@ -42,7 +42,8 @@ type Station = {
 
 type SimEvent =
   | { kind: 'arrive'; station: string; request: Request }
-  | { kind: 'done'; station: string; instance: number; request: Request };
+  | { kind: 'done'; station: string; instance: number; request: Request }
+  | { kind: 'fail'; station: string; instance: number };
 
 /** Workers and monthly cost per instance, after applying the `size` param. */
 function perInstance(component: Design['components'][number], catalog: Catalog): { workers: number; monthlyCost: number } {
@@ -96,9 +97,9 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     if (!spec) throw new Error(`Unknown component type: ${component.type}`);
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
-      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0), served: 0, rejected: 0, maxQueue: 0 })), nextInstance: 0,
+      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0), served: 0, rejected: 0, maxQueue: 0, killedAt: null })), nextInstance: 0,
       queueSize: queueSizeOf(component), waitMs: 0, started: 0, hitRate: hitRateOf(component, catalog), hits: 0,
-      next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
+      next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0, lost: 0 },
     });
   }
   const entry = nextOf('client');
@@ -136,8 +137,16 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     }
   }
 
+  for (const failure of level.failureEvents ?? []) {
+    const target = design.components.find(c => c.type === failure.componentType);
+    if (target && failure.instance < stations.get(target.id)!.instances.length) {
+      events.push(failure.atS * 1000, { kind: 'fail', station: target.id, instance: failure.instance });
+    }
+  }
+
   const latencies: number[] = [];
-  const errors = { rejected: 0, timedOut: 0 };
+  const errors = { rejected: 0, timedOut: 0, lost: 0, unavailable: 0 };
+  const lose = (station: Station, request: Request) => { errors.lost++; station.stats.lost++; fail(request); };
 
   const start = (station: Station, instance: number, request: Request, now: number) => {
     if (now - request.createdAt > TIMEOUT_MS) {
@@ -170,10 +179,23 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   for (let event = events.pop(); event; event = events.pop()) {
     const { time: now, value } = event;
     const station = stations.get(value.station)!;
-    if (value.kind === 'arrive') {
+    if (value.kind === 'fail') {
+      const instance = station.instances[value.instance]!;
+      if (instance.killedAt !== null) continue;
+      instance.killedAt = now;
+      for (const queued of instance.queue) lose(station, queued);
+      instance.queue = [];
+    } else if (value.kind === 'arrive') {
       value.request.enqueuedAt = now;
-      const index = station.nextInstance;
-      station.nextInstance = (index + 1) % station.instances.length;
+      // Round-robin over the instances still alive.
+      const n = station.instances.length;
+      let index = -1;
+      for (let k = 0; k < n; k++) {
+        const candidate = (station.nextInstance + k) % n;
+        if (station.instances[candidate]!.killedAt === null) { index = candidate; break; }
+      }
+      if (index < 0) { errors.unavailable++; fail(value.request); continue; }
+      station.nextInstance = (index + 1) % n;
       const instance = station.instances[index]!;
       if (instance.busy < station.workers) start(station, index, value.request, now);
       else if (instance.queue.length < station.queueSize) { instance.queue.push(value.request); instance.maxQueue = Math.max(instance.maxQueue, instance.queue.length); }
@@ -181,6 +203,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     } else {
       const instance = station.instances[value.instance]!;
       instance.busy--;
+      if (instance.killedAt !== null) { lose(station, value.request); continue; }
       instance.served++;
       station.stats.served++;
       const hit = station.hitRate > 0 && random() < station.hitRate;
@@ -198,7 +221,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   latencies.sort((a, b) => a - b);
   const percentile = (p: number, sorted = latencies) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]! : 0);
   const p95 = percentile(0.95);
-  const errorRate = totalRequests ? (errors.rejected + errors.timedOut) / totalRequests : 0;
+  const errorRate = totalRequests ? (errors.rejected + errors.timedOut + errors.lost + errors.unavailable) / totalRequests : 0;
   const cost = designCost(design, catalog);
   const checks: Result['checks'] = [
     { requirement: 'p95', target: level.requirements.p95Ms, actual: p95, ok: p95 <= level.requirements.p95Ms },
@@ -223,13 +246,23 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stars,
     nextStarCost,
     components: [...stations.values()].map(s => {
-      const bucketMs = BUCKET_S * 1000 * s.workers;
+      // Utilisation is measured against the capacity that was alive in each bucket.
+      const aliveMs = (i: Instance, b: number) => {
+        const from = b * BUCKET_S * 1000, to = Math.min((b + 1) * BUCKET_S * 1000, level.durationS * 1000);
+        return Math.max(0, Math.min(to, i.killedAt ?? to) - from);
+      };
       const instances = s.instances.map(i => {
-        const util = i.busyMs.map(ms => Math.min(1, ms / bucketMs));
-        return { served: i.served, rejected: i.rejected, maxQueue: i.maxQueue, bucketUtilization: util, peakUtilization: Math.max(0, ...util) };
+        const util = i.busyMs.map((ms, b) => { const alive = aliveMs(i, b); return alive > 0 ? Math.min(1, ms / (alive * s.workers)) : 0; });
+        return {
+          served: i.served, rejected: i.rejected, maxQueue: i.maxQueue, bucketUtilization: util, peakUtilization: Math.max(0, ...util),
+          killedAtS: i.killedAt === null ? null : i.killedAt / 1000,
+        };
       });
-      const bucketUtilization = Array.from({ length: bucketCount }, (_, b) =>
-        Math.min(1, s.instances.reduce((sum, i) => sum + i.busyMs[b]!, 0) / (bucketMs * s.instances.length)));
+      const bucketUtilization = Array.from({ length: bucketCount }, (_, b) => {
+        const alive = s.instances.reduce((sum, i) => sum + aliveMs(i, b), 0);
+        const busy = s.instances.reduce((sum, i) => sum + (aliveMs(i, b) > 0 ? i.busyMs[b]! : 0), 0);
+        return alive > 0 ? Math.min(1, busy / (alive * s.workers)) : 0;
+      });
       return {
         ...s.stats, bucketUtilization, peakUtilization: Math.max(0, ...bucketUtilization),
         avgWaitMs: s.started ? s.waitMs / s.started : 0,
