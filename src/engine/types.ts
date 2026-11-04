@@ -71,6 +71,8 @@ export type ComponentResult = {
   /** Mean time a request spent queued here, over requests that started service. */
   avgWaitMs: number;
   maxQueue: number;
+  /** Share of requests completed here early (shortcut primitive); null for plain stations. */
+  hitRate: number | null;
   instances: InstanceResult[];
 };
 

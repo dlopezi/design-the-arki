@@ -259,5 +259,20 @@ describe('simulate', () => {
     it('sends fewer requests to the database the longer the cache keeps answers (TTL)', () => {
       expect(dbServed(withCache(60))).toBeLessThan(dbServed(withCache(10)));
     });
+
+    it('lets a design pass that fails without a cache because the small database saturates (500 req/s)', () => {
+      const noCache: Design = {
+        components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 3 } }, { id: 'db', type: 'database' }],
+        connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+      };
+      expect(simulate(levelAt(500), noCache, 1).passed).toBe(false);
+      expect(simulate(levelAt(500), withCache(60), 1).passed).toBe(true);
+    });
+
+    it('reports the observed hit rate, close to TTL / (TTL + 30 s): 60 s gives about 67%', () => {
+      const cache = simulate(levelAt(200), withCache(60), 1).components.find(c => c.id === 'cache')!;
+      expect(cache.hitRate).toBeGreaterThan(0.64);
+      expect(cache.hitRate).toBeLessThan(0.7);
+    });
   });
 });

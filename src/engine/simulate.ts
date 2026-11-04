@@ -37,6 +37,7 @@ type Station = {
   started: number;
   /** Share of requests that complete here early (shortcut primitive); 0 for plain stations. */
   hitRate: number;
+  hits: number;
 };
 
 type SimEvent =
@@ -96,7 +97,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
       instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0), served: 0, rejected: 0, maxQueue: 0 })), nextInstance: 0,
-      queueSize: queueSizeOf(component), waitMs: 0, started: 0, hitRate: hitRateOf(component, catalog),
+      queueSize: queueSizeOf(component), waitMs: 0, started: 0, hitRate: hitRateOf(component, catalog), hits: 0,
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
   }
@@ -183,6 +184,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       instance.served++;
       station.stats.served++;
       const hit = station.hitRate > 0 && random() < station.hitRate;
+      if (hit) station.hits++;
       if (station.next && !hit) {
         value.request.hops++;
         events.push(now + HOP_MS, { kind: 'arrive', station: station.next, request: value.request });
@@ -230,7 +232,8 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
         Math.min(1, s.instances.reduce((sum, i) => sum + i.busyMs[b]!, 0) / (bucketMs * s.instances.length)));
       return {
         ...s.stats, bucketUtilization, peakUtilization: Math.max(0, ...bucketUtilization),
-        avgWaitMs: s.started ? s.waitMs / s.started : 0, maxQueue: Math.max(0, ...s.instances.map(i => i.maxQueue)), instances,
+        avgWaitMs: s.started ? s.waitMs / s.started : 0,
+        hitRate: s.hitRate > 0 ? (s.stats.served ? s.hits / s.stats.served : 0) : null, maxQueue: Math.max(0, ...s.instances.map(i => i.maxQueue)), instances,
       };
     }),
     bottleneck,
