@@ -5,11 +5,12 @@ import type { Design, DesignProblem, Result } from '../engine/types';
 import { en as t, percent } from '../i18n/en';
 import { allLevels, type LevelDefinition } from '../levels/levels';
 import { CostMeter } from './costMeter';
-import { edgeTypes, layoutDiagram, nodeTypes } from './diagram';
+import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
 import { Inspector } from './inspector';
 import { Objectives } from './objectives';
 import { ReportCard } from './reportCard';
+import { ResultsDrawer } from './resultsDrawer';
 
 const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
@@ -26,8 +27,12 @@ function usePrefersReducedMotion(): boolean {
   }, []);
   return reduce;
 }
-// Keep the diagram clear of the floating panels: mission (left), inspector (right), controls (bottom).
-const FIT = { maxZoom: 1.1, padding: { top: '40px', left: '340px', right: '340px', bottom: '140px' } } as const;
+// Keep the diagram clear of the floating panels: mission (left), inspector (right), controls and results (bottom).
+const px = (n: number) => `${n}px` as const;
+const fitOptions = (inspector: boolean, results: boolean) => ({
+  maxZoom: 1.1,
+  padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) },
+});
 const labelOf = (design: Design, id: string) => {
   const component = design.components.find(c => c.id === id);
   return component ? (t.componentTypes[component.type] ?? component.type) : t.clients;
@@ -60,9 +65,20 @@ function Game({ level }: { level: LevelDefinition }) {
   const running = playT !== null;
   const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
   const live = running && result ? { result, bucket, animate: !reduceMotion } : null;
+  const [panels, setPanels] = useState({ inspector: true, results: true });
+  const togglePanel = useCallback((panel: 'inspector' | 'results') => setPanels(p => ({ ...p, [panel]: !p[panel] })), []);
+  const bottleneckId = result && !running && !result.passed ? (result.bottleneck?.componentId ?? null) : null;
+  const hintFor = (r: Result | null): string | null => {
+    const id = r?.bottleneck?.componentId;
+    const component = id ? design.components.find(c => c.id === id) : undefined;
+    if (!component) return null;
+    return t.hints[component.type] ?? t.genericHint(t.componentTypes[component.type] ?? component.type);
+  };
+  const hint = hintFor(result);
 
-  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live }),
-    [design, selected, problem, live?.result, live?.bucket, live?.animate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId }),
+    [design, selected, problem, live?.result, live?.bucket, live?.animate, bottleneckId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const FIT = fitOptions(panels.inspector, panels.results);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
   // Any change to the design invalidates the last run.
@@ -70,7 +86,7 @@ function Game({ level }: { level: LevelDefinition }) {
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
   const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
-  useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView]);
+  useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView, panels.inspector, panels.results]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addComponent = useCallback((type: string) => {
     const id = `${type}-${++counter.current}`;
@@ -139,16 +155,20 @@ function Game({ level }: { level: LevelDefinition }) {
       } else if (e.code === 'Space' && !target.closest('button')) {
         play();
         e.preventDefault();
+      } else if (e.key === 'i' || e.key === 'I') {
+        togglePanel('inspector');
+      } else if (e.key === 'r' || e.key === 'R') {
+        togglePanel('results');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addComponent, play, level.allowedComponents, showReport, running]);
+  }, [addComponent, play, level.allowedComponents, showReport, running, togglePanel]);
 
   const selectedComponent = design.components.find(c => c.id === selected) ?? null;
 
   return (
-    <div className="game">
+    <div className="game" data-results={panels.results}>
       <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
         onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
         onNodeClick={(_, n) => setSelected(n.type === 'component' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
@@ -172,11 +192,22 @@ function Game({ level }: { level: LevelDefinition }) {
         <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />
       </section>
 
-      <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
-        onChange={params => selectedComponent && updateParams(selectedComponent.id, params)}
-        onRemove={() => selectedComponent && removeComponent(selectedComponent.id)} />
+      <div className="hud panel-toggles">
+        <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
+        <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
+      </div>
 
-      <div className="hud controls">
+      {panels.inspector && (
+        <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
+          onChange={params => selectedComponent && updateParams(selectedComponent.id, params)}
+          onRemove={() => selectedComponent && removeComponent(selectedComponent.id)}
+          lastRun={result && !running && selectedComponent ? (result.components.find(c => c.id === selectedComponent.id) ?? null) : null}
+          instanceNames={selectedComponent ? instanceNames(design).get(selectedComponent.id) : undefined} />
+      )}
+
+      {panels.results && <ResultsDrawer level={level} design={design} result={result} running={running} bucket={bucket} hint={hint} />}
+
+      <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>
         <Hotbar types={level.allowedComponents} onAdd={addComponent} />
         <button className="play" onClick={play} disabled={running}>{t.play}</button>
         {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
@@ -194,7 +225,10 @@ function Game({ level }: { level: LevelDefinition }) {
       })()}
       {problem && <div className="hud problem" role="alert">{problem.message}</div>}
 
-      {result && showReport && <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} onClose={() => setShowReport(false)} />}
+      {result && showReport && (
+        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} onClose={() => setShowReport(false)}
+          onDetails={() => { setShowReport(false); setPanels({ inspector: true, results: true }); setSelected(result.bottleneck?.componentId ?? null); }} />
+      )}
     </div>
   );
 }

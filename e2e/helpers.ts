@@ -35,8 +35,8 @@ export async function playAndSkip(page: Page, how: 'button' | 'space' = 'button'
   await page.getByRole('button', { name: 'Skip to results' }).click();
 }
 
-/** Builds Clients → Load balancer → App server (2 instances) → Database on level 2. */
-export async function buildScaledOut(page: Page) {
+/** Builds Clients → Load balancer → App server (n instances) → Database on level 2. */
+export async function buildScaledOut(page: Page, instances = 2) {
   await page.keyboard.press('1');
   await page.keyboard.press('2');
   await page.keyboard.press('3');
@@ -44,5 +44,5 @@ export async function buildScaledOut(page: Page) {
   await connect(page, { label: 'Load balancer' }, { label: 'App server' });
   await connect(page, { label: 'App server' }, { label: 'Database' });
   await select(page, 'App server');
-  await page.getByRole('complementary', { name: 'Inspector' }).getByRole('button', { name: 'Add instance' }).click();
+  for (let i = 1; i < instances; i++) await page.getByRole('complementary', { name: 'Inspector' }).getByRole('button', { name: 'Add instance' }).click();
 }

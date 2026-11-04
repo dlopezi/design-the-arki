@@ -17,7 +17,7 @@ export type PersonData = { title: string };
 export type BoundaryData = { title: string; kind: string; system: boolean };
 export type ComponentData = {
   componentId: string; title: string; technology: string; detail: string;
-  container: boolean; selected: boolean; problem: boolean;
+  container: boolean; selected: boolean; problem: boolean; bottleneck: boolean;
   /** Share of capacity in use during playback (0–1); null when not playing or hidden. */
   load: number | null;
 };
@@ -56,9 +56,9 @@ function BoundaryNode({ data }: NodeProps<Node<BoundaryData>>) {
 
 function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
   return (
-    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''}`}>
+    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''}`}>
       <Handle type="target" position={Position.Left} />
-      <strong>{data.title}</strong>
+      <strong>{data.title}{data.bottleneck && <span className="badge">{t.bottleneck}</span>}</strong>
       <span className="c4-kind">[{data.technology}]</span>
       <span className="c4-detail">{data.detail}</span>
       {!data.container && <Load value={data.load} />}
@@ -111,13 +111,32 @@ export type DiagramState = {
   problemIds: string[];
   /** During playback: the run and the bucket being shown. */
   live?: { result: Result; bucket: number; animate: boolean } | null;
+  /** After a failed run: the component that held requests back. */
+  bottleneckId?: string | null;
 };
+
+/** Display names of every instance (app-1, app-2…), numbered per prefix across the design. */
+export function instanceNames(design: Design): Map<string, string[]> {
+  const counters = new Map<string, number>();
+  const names = new Map<string, string[]>();
+  for (const c of design.components) {
+    const spec = catalog[c.type]!;
+    if (!spec.scalesOut) continue;
+    const prefix = spec.presentation?.instancePrefix ?? c.type;
+    names.set(c.id, Array.from({ length: instanceCountOf(c.params) }, () => {
+      const n = (counters.get(prefix) ?? 0) + 1;
+      counters.set(prefix, n);
+      return `${prefix}-${n}`;
+    }));
+  }
+  return names;
+}
 
 /** Turns a design into C4-style nodes: a person, the system boundary, zones, components and one node per instance. */
 export function layoutDiagram(design: Design, state: DiagramState): { nodes: Node[]; edges: Edge[] } {
   const live = state.live ?? null;
   const liveOf = (id: string) => live?.result.components.find(c => c.id === id) ?? null;
-  const prefixCounters = new Map<string, number>();
+  const names = instanceNames(design);
   type Placed = { id: string; type: string; params?: Record<string, unknown>; height: number; instances: number; container: boolean };
   const zones = ZONES.map(zone => {
     const members: Placed[] = design.components
@@ -163,15 +182,13 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
         position: { x: ZONE.pad, y }, selected: state.selected === member.id,
         data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
           detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id),
+          bottleneck: state.bottleneckId === member.id,
           load: live && !spec.presentation?.hideCapacity ? (liveOf(member.id)?.bucketUtilization[live.bucket] ?? null) : null } }, BOX.w, member.height));
       if (member.container) {
-        const prefix = spec.presentation?.instancePrefix ?? member.type;
         for (let k = 0; k < member.instances; k++) {
-          const n = (prefixCounters.get(prefix) ?? 0) + 1;
-          prefixCounters.set(prefix, n);
           nodes.push(sized<InstanceData>({ id: `${member.id}#${k}`, type: 'instance', parentId: member.id, extent: 'parent',
             position: { x: (BOX.w - INSTANCE.w) / 2, y: CONTAINER_HEAD + k * (INSTANCE.h + INSTANCE.gap) },
-            data: { name: `${prefix}-${n}`, detail: `${workers} workers`,
+            data: { name: names.get(member.id)![k]!, detail: `${workers} workers`,
               load: live ? (liveOf(member.id)?.instances[k]?.bucketUtilization[live.bucket] ?? null) : null }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
         }
       }

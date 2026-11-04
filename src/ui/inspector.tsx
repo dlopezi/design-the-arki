@@ -1,9 +1,9 @@
 import { catalog } from '../catalog/catalog';
 import { DEFAULT_QUEUE_SIZE, TIMEOUT_MS } from '../engine/simulate';
-import type { DesignComponent } from '../engine/types';
-import { en as t } from '../i18n/en';
+import type { ComponentResult, DesignComponent } from '../engine/types';
+import { en as t, percent } from '../i18n/en';
 import type { ComponentOptions } from '../levels/levels';
-import { instanceCountOf, sizeOf } from './diagram';
+import { instanceCountOf, loadLevel, sizeOf } from './diagram';
 
 const MAX_INSTANCES = 8;
 const QUEUE_STEP = 10;
@@ -13,6 +13,9 @@ type Props = {
   options: ComponentOptions | undefined;
   onChange: (params: Record<string, unknown>) => void;
   onRemove: () => void;
+  /** This component's stats from the last finished run, if any. */
+  lastRun: ComponentResult | null;
+  instanceNames: string[] | undefined;
 };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -20,7 +23,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /** Configuration of the selected component: deployment, advanced settings, capacity and cost. */
-export function Inspector({ component, options, onChange, onRemove }: Props) {
+export function Inspector({ component, options, onChange, onRemove, lastRun, instanceNames }: Props) {
   if (!component) {
     return <aside className="hud inspector" aria-label={t.inspector.title}><h2 className="eyebrow">{t.inspector.title}</h2><p className="muted">{t.inspector.empty}</p></aside>;
   }
@@ -93,6 +96,32 @@ export function Inspector({ component, options, onChange, onRemove }: Props) {
         {!spec.presentation?.hideCapacity && <p>{t.inspector.capacity(capacity)}</p>}
         <p>{t.inspector.cost(instances, each.monthlyCost)}</p>
       </section>
+
+      {lastRun && (
+        <section>
+          <h4>{t.lastRun.title}</h4>
+          <Row label={t.lastRun.peak}>{percent(lastRun.peakUtilization)}</Row>
+          <Row label={t.lastRun.avgWait}>{Math.round(lastRun.avgWaitMs)} ms</Row>
+          <Row label={t.lastRun.rejectedTimedOut}>{lastRun.rejected} · {lastRun.timedOut}</Row>
+          {instanceNames && (
+            <table className="instances">
+              <caption className="visually-hidden">{t.lastRun.instances}</caption>
+              <thead><tr>{t.lastRun.columns.map(c => <th key={c} scope="col">{c}</th>)}</tr></thead>
+              <tbody>
+                {lastRun.instances.map((i, k) => (
+                  <tr key={k}>
+                    <td>{instanceNames[k]}</td>
+                    <td className={loadLevel(i.peakUtilization)}>{Math.round(i.peakUtilization * 100)}%</td>
+                    <td>{i.served}</td>
+                    <td className={i.rejected ? 'bad' : ''}>{i.rejected}</td>
+                    <td>{i.maxQueue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
 
       <button className="danger" onClick={onRemove}>{t.inspector.remove}</button>
     </aside>

@@ -113,3 +113,37 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .c4-instance.medium { border-color: var(--warn); }
 .c4-instance { justify-content: flex-start; gap: 0; }
 @media (prefers-reduced-motion: reduce) { .load-bar span { transition: none; } }
+
+/* Panels: toggles, results drawer, bottleneck */
+.panel-toggles { top: 112px; right: 16px; padding: 4px; display: flex; gap: 4px; }
+.panel-toggles button { background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 10px; color: var(--muted); font-size: 12.5px; }
+.panel-toggles button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--line); color: var(--fg); }
+.inspector { top: 160px; }
+.controls.above-results { bottom: 236px; }
+.problem { bottom: 330px; }
+.results { left: 16px; right: 16px; bottom: 16px; height: 204px; padding: 14px 16px; display: grid; grid-template-columns: 220px repeat(3, minmax(0, 1fr)) 240px; gap: 20px; align-items: start; overflow: hidden; }
+.results .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.results .verdict strong { display: block; font-size: 20px; }
+.results .verdict .stars { font-size: 22px; letter-spacing: 2px; }
+.results .hint-text { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+.chart { margin: 0; position: relative; min-width: 0; }
+.chart figcaption { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .axis { stroke: var(--line); } .chart .limit { stroke: var(--bad); stroke-dasharray: 4 4; opacity: .7; }
+.chart .line { fill: none; stroke-width: 2; } .chart .area { opacity: .15; stroke: none; }
+.chart .accent { stroke: var(--accent); fill: var(--accent); } .chart .warn { stroke: var(--warn); fill: var(--warn); } .chart .bad { stroke: var(--bad); fill: var(--bad); }
+.chart polyline.accent, .chart polyline.warn, .chart polyline.bad { fill: none; }
+.chart .cursor { stroke: var(--fg); opacity: .4; }
+.chart .peak { position: absolute; top: 0; right: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.loads ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; max-height: 150px; overflow: auto; }
+.loads li { display: grid; grid-template-columns: 90px 1fr 40px; align-items: center; gap: 8px; font-size: 12.5px; }
+.loads .value { text-align: right; font-variant-numeric: tabular-nums; }
+.loads li.medium .load-bar span { background: var(--warn); } .loads li.high .load-bar span { background: var(--bad); }
+.c4-component.bottleneck { border-color: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 40%, transparent); }
+.badge { margin-left: 8px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--bad); color: #160406; vertical-align: middle; }
+.report .actions { display: flex; gap: 8px; justify-content: center; }
+.instances { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.instances th, .instances td { text-align: left; padding: 4px 3px; border-bottom: 1px solid var(--line); }
+.instances th { color: var(--muted); font-weight: 500; }
+.instances td.medium { color: var(--warn); } .instances td.high { color: var(--bad); }
+.game[data-results="true"] .inspector { max-height: calc(100% - 400px); }

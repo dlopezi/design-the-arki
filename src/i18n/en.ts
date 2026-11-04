@@ -3,6 +3,33 @@ const stars = (n: number) => '★'.repeat(n);
 
 export const en = {
   play: 'Play',
+  hints: {
+    appServer: 'The app servers are saturated: add instances (scale out) or use bigger ones (scale up).',
+    database: 'The database is saturated: give it a bigger tier or take load off it.',
+    loadBalancer: 'The load balancer is saturated.',
+  } as Record<string, string>,
+  genericHint: (label: string) => `${label} is the bottleneck: give it more capacity.`,
+  hintLabel: 'Hint:',
+  viewDetails: 'View details',
+  bottleneck: 'Bottleneck',
+  panels: { inspector: 'Inspector', results: 'Results' },
+  results: {
+    title: 'Results',
+    empty: 'Press Play to send traffic through your design.',
+    rps: 'Requests per second',
+    p95: 'p95 latency',
+    errorRate: 'Error rate',
+    chartLabel: (title: string, peak: string, limit?: string) => `${title} chart: peak ${peak}${limit ? `, limit ${limit}` : ''}`,
+    loadPerResource: 'Peak load per resource',
+  },
+  lastRun: {
+    title: 'Last run',
+    instances: 'Instances in the last run',
+    columns: ['Instance', 'Peak', 'Served', 'Rejected', 'Max queue'],
+    avgWait: 'Average wait in queue',
+    peak: 'Peak load',
+    rejectedTimedOut: 'Rejected · timed out',
+  },
   skip: 'Skip to results',
   clock: 'Simulation clock',
   errorsWord: 'errors',
