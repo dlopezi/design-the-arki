@@ -22,11 +22,19 @@ export type Design = {
 };
 
 /** A station: a pool of workers with a bounded FIFO queue. */
-export type StationPrimitive = { primitive: 'station'; workers: number; meanServiceMs: number; monthlyCost: number };
+export type StationPrimitive = {
+  primitive: 'station'; workers: number; meanServiceMs: number; monthlyCost: number;
+  /** Whether a request can finish here; otherwise the component must forward it. */
+  endsRequests: boolean;
+};
 
 export type ComponentSpec = StationPrimitive;
 
 export type Catalog = Record<string, ComponentSpec>;
+
+/** Why a design cannot serve traffic. */
+export type DesignProblem = { kind: 'noEntry' } | { kind: 'deadEnd'; componentId: string }
+  | { kind: 'loop'; componentIds: string[] };
 
 export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: number; actual: number; ok: boolean };
 

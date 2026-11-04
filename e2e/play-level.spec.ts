@@ -1,36 +1,86 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('a player opens level 1, presses Play and passes it', async ({ page }) => {
+const node = (page: Page, label: string, nth = 0) => page.locator('.react-flow__node', { hasText: label }).nth(nth);
+
+async function connect(page: Page, from: { label: string; nth?: number }, to: { label: string; nth?: number }) {
+  await node(page, from.label, from.nth).locator('.react-flow__handle.source')
+    .dragTo(node(page, to.label, to.nth).locator('.react-flow__handle.target'));
+}
+
+/** Builds Clients → App server → Database from the hotbar. */
+async function buildServerAndDatabase(page: Page) {
+  await page.keyboard.press('1');
+  await page.getByRole('toolbar', { name: 'Components' }).getByRole('button', { name: /Database/ }).click();
+  await connect(page, { label: 'Clients' }, { label: 'App server' });
+  await connect(page, { label: 'App server' }, { label: 'Database' });
+}
+
+test.beforeEach(async ({ page }) => {
   await page.goto('/');
-
   await expect(page.getByRole('heading', { name: 'Hello world' })).toBeVisible();
-  await expect(page.getByText('App server', { exact: true })).toBeVisible();
-  await expect(page.getByText('Database', { exact: true })).toBeVisible();
-
-  await page.getByRole('button', { name: 'Play' }).click();
-
-  const report = page.getByRole('dialog', { name: 'Level passed' });
-  await expect(report).toBeVisible();
-  await expect(report).toContainText(/p95\s*\d+ ms/);
-  await expect(report).toContainText(/Errors\s*0\.0%/);
 });
 
-test('cost, objectives and stars', async ({ page }) => {
-  await page.goto('/');
-  const objectives = page.getByRole('list', { name: 'Objectives' });
+test('a player builds level 1 from an empty canvas and passes it', async ({ page }) => {
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await expect(page.getByRole('toolbar', { name: 'Components' }).getByRole('button')).toHaveText([/App server/, /Database/]);
 
-  // Before running: cost is live, budget is already judged, performance objectives are pending.
-  await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuetext', '$90 of $150; ★★ at $120, ★★★ at $100');
-  await expect(objectives.getByRole('listitem').filter({ hasText: 'Cost' })).toHaveAttribute('data-state', 'met');
-  await expect(objectives.getByRole('listitem').filter({ hasText: 'p95' })).toHaveAttribute('data-state', 'pending');
+  await buildServerAndDatabase(page);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+  await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuenow', '90');
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.keyboard.press('Space');
 
   const report = page.getByRole('dialog', { name: 'Level passed' });
   await expect(report.getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
-  await expect(report).toContainText('$90');
+  await expect(report).toContainText(/p95\s*\d+ ms/);
   await report.getByRole('button', { name: 'Back to design' }).click();
-  await expect(report).toBeHidden();
+  const objectives = page.getByRole('list', { name: 'Objectives' });
   await expect(objectives.getByRole('listitem').filter({ hasText: 'p95' })).toHaveAttribute('data-state', 'met');
-  await expect(objectives.getByRole('listitem').filter({ hasText: 'Errors' })).toHaveAttribute('data-state', 'met');
+});
+
+test('a component can be dragged from the bar onto the canvas', async ({ page }) => {
+  await page.getByRole('toolbar', { name: 'Components' }).getByRole('button', { name: /Database/ })
+    .dragTo(page.locator('.react-flow__pane'), { targetPosition: { x: 900, y: 420 } });
+  await expect(node(page, 'Database')).toHaveCount(1);
+});
+
+test('a design that cannot serve traffic is explained instead of run', async ({ page }) => {
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect(page.getByRole('alert')).toContainText('Connect Clients to a component');
+
+  await page.keyboard.press('1');
+  await connect(page, { label: 'Clients' }, { label: 'App server' });
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect(page.getByRole('alert')).toContainText('App server has nowhere to send requests');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('components and connections can be removed', async ({ page }) => {
+  await buildServerAndDatabase(page);
+
+  await node(page, 'Database').click();
+  await page.keyboard.press('Delete');
+  await expect(node(page, 'Database')).toHaveCount(0);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuenow', '40');
+
+  await page.locator('.react-flow__edge').first().click({ force: true });
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  await expect(node(page, 'Clients')).toHaveCount(1);
+});
+
+test('a passing design that is too expensive for 3 stars says what cost to aim for', async ({ page }) => {
+  await page.keyboard.press('1');
+  await page.keyboard.press('1');
+  await page.keyboard.press('2');
+  await connect(page, { label: 'Clients' }, { label: 'App server', nth: 0 });
+  await connect(page, { label: 'App server', nth: 0 }, { label: 'App server', nth: 1 });
+  await connect(page, { label: 'App server', nth: 1 }, { label: 'Database' });
+
+  await page.getByRole('button', { name: 'Play' }).click();
+
+  const report = page.getByRole('dialog', { name: 'Level passed' });
+  await expect(report.getByRole('img', { name: '1 of 3 stars' })).toBeVisible();
+  await expect(report).toContainText('Get the cost down to $120/month for ★★.');
 });

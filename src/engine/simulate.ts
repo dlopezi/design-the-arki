@@ -1,7 +1,15 @@
 import { catalog as defaultCatalog } from '../catalog/catalog';
 import { EventQueue } from './eventQueue';
 import { seededRandom } from './random';
-import type { Catalog, ComponentResult, Design, Level, Result } from './types';
+import type { Catalog, ComponentResult, Design, DesignProblem, Level, Result } from './types';
+
+/** Thrown by `simulate` when the design cannot serve traffic at all. */
+export class DesignError extends Error {
+  constructor(readonly problem: DesignProblem) {
+    super(`Design cannot serve traffic: ${JSON.stringify(problem)}`);
+    this.name = 'DesignError';
+  }
+}
 
 const QUEUE_CAPACITY = 100;
 const TIMEOUT_MS = 1000;
@@ -47,7 +55,16 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     });
   }
   const entry = nextOf('client');
-  if (!entry || !stations.has(entry)) throw new Error('Design has no entry point connected to the client');
+  if (!entry || !stations.has(entry)) throw new DesignError({ kind: 'noEntry' });
+  const path: string[] = [];
+  for (let id: string | null = entry; id; id = stations.get(id)!.next) {
+    if (path.includes(id)) throw new DesignError({ kind: 'loop', componentIds: path.slice(path.indexOf(id)) });
+    path.push(id);
+    const station = stations.get(id)!;
+    if (!station.next && !catalog[design.components.find(c => c.id === id)!.type]!.endsRequests) {
+      throw new DesignError({ kind: 'deadEnd', componentId: id });
+    }
+  }
 
   const events = new EventQueue<SimEvent>();
   let totalRequests = 0;

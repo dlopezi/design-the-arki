@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { simulate } from './simulate';
+import { DesignError, simulate } from './simulate';
 import type { Design, Level } from './types';
 
 // An app server (4 workers, 20 ms) serves ~200 req/s; a small database (8 connections, 20 ms) ~400 req/s.
@@ -95,6 +95,31 @@ describe('simulate', () => {
     it('has no next-star cost when all stars are earned or the level is failed', () => {
       expect(simulate(levelAt(50, { starCostThresholds: [100, 95] }), serverAndDatabase, 1).nextStarCost).toBeNull();
       expect(simulate(levelAt(300, { starCostThresholds: [100, 95] }), serverAndDatabase, 1).nextStarCost).toBeNull();
+    });
+  });
+
+  describe('designs that cannot serve traffic', () => {
+    const problemOf = (design: Design) => {
+      try { simulate(levelAt(50), design, 1); } catch (e) { if (e instanceof DesignError) return e.problem; throw e; }
+      return null;
+    };
+
+    it('rejects a design where nothing is connected to the clients', () => {
+      expect(problemOf({ components: [{ id: 'api', type: 'appServer' }], connections: [] })).toEqual({ kind: 'noEntry' });
+    });
+
+    it('rejects a design where a component that cannot answer requests has nowhere to send them', () => {
+      // An app server needs its data; only a database can end a request in this catalogue.
+      const design: Design = { components: [{ id: 'api', type: 'appServer' }], connections: [['client', 'api']] };
+      expect(problemOf(design)).toEqual({ kind: 'deadEnd', componentId: 'api' });
+    });
+
+    it('rejects a design whose connections send requests round in a loop', () => {
+      const design: Design = {
+        components: [{ id: 'api', type: 'appServer' }, { id: 'api2', type: 'appServer' }],
+        connections: [['client', 'api'], ['api', 'api2'], ['api2', 'api']],
+      };
+      expect(problemOf(design)).toEqual({ kind: 'loop', componentIds: ['api', 'api2'] });
     });
   });
 });

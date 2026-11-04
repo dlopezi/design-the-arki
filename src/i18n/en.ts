@@ -21,6 +21,14 @@ export const en = {
   nextStar: (cost: number, starCount: number) => `Get the cost down to $${cost}/month for ${stars(starCount)}.`,
   failedObjectives: 'Not met:',
   backToDesign: 'Back to design',
+  components: 'Components',
+  hotbarItem: (key: number, label: string, cost: number) => `${key} ${label} $${cost}`,
+  canvasHint: 'Add components from the bar below, then drag from one handle to another to connect them. Delete removes the selection.',
+  problems: {
+    noEntry: 'Connect Clients to a component first: drag from the Clients handle to an app server.',
+    deadEnd: (label: string) => `${label} has nowhere to send requests. Connect it to a component that can answer them.`,
+    loop: (labels: string[]) => `Requests would go round in a loop between ${labels.join(' and ')}. Remove one of those connections.`,
+  },
   clients: 'Clients',
   componentTypes: { appServer: 'App server', database: 'Database' } as Record<string, string>,
 };

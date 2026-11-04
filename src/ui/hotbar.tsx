@@ -1,0 +1,24 @@
+import { catalog } from '../catalog/catalog';
+import { en as t } from '../i18n/en';
+
+export const DRAG_TYPE = 'application/x-archi-component';
+
+/** Components the level allows, in order: click, drag onto the canvas, or press 1–n. */
+export function Hotbar({ types, onAdd }: { types: string[]; onAdd: (type: string) => void }) {
+  return (
+    <div className="hotbar" role="toolbar" aria-label={t.components}>
+      {types.map((type, i) => {
+        const label = t.componentTypes[type] ?? type;
+        const cost = catalog[type]!.monthlyCost;
+        return (
+          <button key={type} className="hot-tile" aria-label={t.hotbarItem(i + 1, label, cost)} draggable
+            onClick={() => onAdd(type)} onDragStart={e => { e.dataTransfer.setData(DRAG_TYPE, type); e.dataTransfer.effectAllowed = 'copy'; }}>
+            <kbd aria-hidden="true">{i + 1}</kbd>
+            <span>{label}</span>
+            <small aria-hidden="true">${cost}</small>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

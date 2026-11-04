@@ -46,3 +46,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .stats dt { color: var(--muted); font-size: 13px; } .stats dd { margin: 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .note { margin: 0; text-align: left; background: var(--panel-2); border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 13.5px; }
 .secondary { justify-self: center; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 16px; }
+
+.mission .hint { font-size: 12px; }
+.controls { display: flex; align-items: center; gap: 8px; }
+.hotbar { display: flex; gap: 8px; }
+.hot-tile { position: relative; width: 84px; height: 74px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); color: var(--fg);
+  display: grid; place-items: center; align-content: center; gap: 2px; font-size: 12px; }
+.hot-tile:hover { border-color: var(--accent); }
+.hot-tile kbd { position: absolute; top: 4px; left: 7px; font: 10px ui-monospace, monospace; color: var(--muted); }
+.hot-tile small { color: var(--muted); }
+.problem { bottom: 110px; left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); padding: 10px 14px; border-color: var(--warn); color: var(--fg); font-size: 14px; }
+.react-flow .node.selected, .react-flow .node:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.react-flow .node.problem-node { border-color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 40%, transparent); }

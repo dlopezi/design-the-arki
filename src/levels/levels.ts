@@ -18,10 +18,11 @@ const levelSchema = z.object({
   requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1) }),
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
+  allowedComponents: z.array(componentType).min(1),
   referenceDesign: designSchema,
 });
 
-export type LevelDefinition = Level & { id: string; title: string; brief: string; referenceDesign: Design };
+export type LevelDefinition = Level & { id: string; title: string; brief: string; allowedComponents: string[]; referenceDesign: Design };
 
 /** Validates raw level data; throws with every problem listed (path and message). */
 export function parseLevel(raw: unknown): LevelDefinition {

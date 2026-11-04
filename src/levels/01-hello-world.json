@@ -7,6 +7,7 @@
   "requirements": { "p95Ms": 200, "maxErrorRate": 0.01 },
   "budget": 150,
   "starCostThresholds": [120, 100],
+  "allowedComponents": ["appServer", "database"],
   "referenceDesign": {
     "components": [
       { "id": "api", "type": "appServer" },

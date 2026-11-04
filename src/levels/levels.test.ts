@@ -12,6 +12,11 @@ describe('level files', () => {
       const result = simulate(level, level.referenceDesign, 1);
       expect(result.checks.filter(c => !c.ok)).toEqual([]);
     });
+
+    it(`${level.id}: its reference design only uses the level's allowed components`, () => {
+      const used = level.referenceDesign.components.map(c => c.type);
+      expect(used.filter(type => !level.allowedComponents.includes(type))).toEqual([]);
+    });
   }
 
   it('rejects a level file without requirements', () => {
