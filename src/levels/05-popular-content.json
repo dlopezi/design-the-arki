@@ -54,6 +54,117 @@
       }
     }
   },
+  "guidedHint": "With a 10 s TTL most requests still reach the database. Select the cache and raise its TTL.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 4
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 10
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 10
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    }
+  },
   "referenceDesign": {
     "components": [
       {

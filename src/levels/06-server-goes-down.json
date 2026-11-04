@@ -40,6 +40,76 @@
       "maxInstances": 4
     }
   },
+  "guidedHint": "When one instance goes down, the others must carry its traffic. Add one more instance than you need.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    }
+  },
   "referenceDesign": {
     "components": [
       {

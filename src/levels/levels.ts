@@ -28,6 +28,10 @@ const levelSchema = z.object({
     /** Upper bounds for numeric params, e.g. { ttlS: 60 }. */
     limits: z.record(z.number().positive()).optional(),
   })).default({}),
+  /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
+  startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
+  /** Shown from the start in guided mode: the one idea this level teaches. */
+  guidedHint: z.string().min(1),
   referenceDesign: designSchema,
 });
 
@@ -36,6 +40,7 @@ export type ComponentOptions = { sizes?: string[]; maxInstances?: number; limits
 export type LevelDefinition = Level & {
   id: string; chapter: string; title: string; brief: string; allowedComponents: string[];
   componentOptions: Record<string, ComponentOptions>; referenceDesign: Design;
+  startingDesigns: { guided: Design; normal: Design; hard: Design }; guidedHint: string;
 };
 
 /** Validates raw level data; throws with every problem listed (path and message). */

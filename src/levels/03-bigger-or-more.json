@@ -35,6 +35,74 @@
       "maxInstances": 4
     }
   },
+  "guidedHint": "A medium instance is too small for 250 req/s. Select the app server and try the Large size.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2,
+            "size": "small"
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    }
+  },
   "referenceDesign": {
     "components": [
       {

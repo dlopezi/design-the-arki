@@ -24,6 +24,62 @@
     "appServer",
     "database"
   ],
+  "guidedHint": "Connect the app server to the database so it can answer requests, then press Play.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "api2",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "api2"
+        ]
+      ]
+    }
+  },
   "referenceDesign": {
     "components": [
       {

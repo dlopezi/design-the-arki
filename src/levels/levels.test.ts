@@ -19,6 +19,19 @@ describe('level files', () => {
       expect(used.filter(type => !level.allowedComponents.includes(type))).toEqual([]);
     });
 
+    for (const mode of ['guided', 'normal', 'hard'] as const) {
+      it(`${level.id}: its ${mode} starting design does not already pass the level`, () => {
+        const start = level.startingDesigns[mode];
+        let passed = false;
+        try { passed = simulate(level, start, 1).passed; } catch { passed = false; } // an unrunnable design does not pass either
+        expect(passed).toBe(false);
+      });
+    }
+
+    it(`${level.id}: has a hint for guided mode`, () => {
+      expect(level.guidedHint.length).toBeGreaterThan(10);
+    });
+
     it(`${level.id}: its reference design respects the level's component options`, () => {
       for (const component of level.referenceDesign.components) {
         const options = level.componentOptions[component.type];

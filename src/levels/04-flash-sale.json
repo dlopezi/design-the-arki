@@ -44,6 +44,106 @@
       "maxInstances": 4
     }
   },
+  "guidedHint": "The small database cannot take the spike alone. Put the cache between the app servers and the database.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    }
+  },
   "referenceDesign": {
     "components": [
       {
