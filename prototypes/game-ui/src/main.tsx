@@ -1,0 +1,31 @@
+// PROTOTYPE: three radically different game-screen layouts, switchable via ?variant=A|B|C.
+import { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ReactFlowProvider } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import './styles.css';
+import { useGame } from './game';
+import { PrototypeSwitcher } from './PrototypeSwitcher';
+import { VariantA } from './variants/A';
+import { VariantB } from './variants/B';
+import { VariantC } from './variants/C';
+
+const VARIANTS = [
+  { key: 'A', name: 'Estudio (herramienta de arquitectura)', C: VariantA },
+  { key: 'B', name: 'Misión (HUD de juego)', C: VariantB },
+  { key: 'C', name: 'Entrevista (conversación guiada)', C: VariantC },
+];
+
+function App() {
+  const [variant, setVariant] = useState(new URLSearchParams(location.search).get('variant') ?? 'A');
+  const game = useGame();
+  const change = (k: string) => { const u = new URL(location.href); u.searchParams.set('variant', k); history.replaceState(null, '', u); setVariant(k); };
+  const V = (VARIANTS.find(v => v.key === variant) ?? VARIANTS[0]).C;
+  return (
+    <>
+      <ReactFlowProvider key={variant}><V g={game} /></ReactFlowProvider>
+      <PrototypeSwitcher variants={VARIANTS} current={variant} onChange={change} />
+    </>
+  );
+}
+createRoot(document.getElementById('root')!).render(<App />);
