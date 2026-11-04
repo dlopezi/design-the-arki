@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { buildScaledOut, node, playAndSkip, openLevel } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openLevel(page, '06-server-goes-down');
+  await openLevel(page, '06-server-goes-down', 'normal');
   await expect(page.getByRole('heading', { name: 'A server goes down' })).toBeVisible();
 });
 
@@ -11,7 +11,7 @@ test('the incident is announced before playing', async ({ page }) => {
 });
 
 test('two instances fail when one goes down: redundancy hint, and the instance shows as down', async ({ page }) => {
-  await buildScaledOut(page, 2);
+  await buildScaledOut(page, 2, { databasePlaced: true });
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(node(page, 'app-1')).toContainText('Down', { timeout: 10_000 });
   await page.getByRole('button', { name: 'Skip to results' }).click();
@@ -25,7 +25,7 @@ test('two instances fail when one goes down: redundancy hint, and the instance s
 });
 
 test('three instances survive the failure', async ({ page }) => {
-  await buildScaledOut(page, 3);
+  await buildScaledOut(page, 3, { databasePlaced: true });
   await playAndSkip(page);
   await expect(page.getByRole('dialog', { name: 'Level passed' }).getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
 });

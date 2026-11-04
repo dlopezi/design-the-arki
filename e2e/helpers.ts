@@ -15,8 +15,8 @@ export async function canvasSettled(page: Page) {
 
 export async function connect(page: Page, from: { label: string; nth?: number }, to: { label: string; nth?: number }) {
   const edges = page.locator('.react-flow__edge');
-  const before = await edges.count();
   await canvasSettled(page);
+  const before = await edges.count();
   await node(page, from.label, from.nth).locator('.react-flow__handle.source')
     .dragTo(node(page, to.label, to.nth).locator('.react-flow__handle.target'));
   await expect(edges).toHaveCount(before + 1);
@@ -36,11 +36,11 @@ export async function playAndSkip(page: Page, how: 'button' | 'space' = 'button'
   await page.getByRole('button', { name: 'Skip to results' }).click();
 }
 
-/** Builds Clients → Load balancer → App server (n instances) → Database on level 2. */
-export async function buildScaledOut(page: Page, instances = 2) {
+/** Builds Clients → Load balancer → App server (n instances) → Database (adds the database unless the mode placed it). */
+export async function buildScaledOut(page: Page, instances = 2, { databasePlaced = false } = {}) {
   await page.keyboard.press('1');
   await page.keyboard.press('2');
-  await page.keyboard.press('3');
+  if (!databasePlaced) await page.keyboard.press('3');
   await connect(page, { label: 'Clients' }, { label: 'Load balancer' });
   await connect(page, { label: 'Load balancer' }, { label: 'App server' });
   await connect(page, { label: 'App server' }, { label: 'Database' });
@@ -50,10 +50,10 @@ export async function buildScaledOut(page: Page, instances = 2) {
 
 const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
 
-/** Opens a level directly, with every level unlocked (for tests that are not about progress). */
-export async function openLevel(page: Page, id: string) {
+/** Opens a level in a mode (God, the empty canvas, by default) with every level unlocked, for tests not about progress. */
+export async function openLevel(page: Page, id: string, mode: 'guided' | 'normal' | 'hard' | 'god' = 'god') {
   await page.addInitScript(ids => {
     localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, levels: Object.fromEntries(ids.map(i => [i, { bestStars: 1 }])) }));
   }, levelIds);
-  await page.goto(`/#${id}`);
+  await page.goto(`/#${id}/${mode}`);
 }

@@ -17,6 +17,17 @@ export const en = {
     cancel: 'Cancel',
     reset: 'Reset',
   },
+  modes: {
+    choose: 'Choose a mode',
+    listLabel: 'Modes',
+    current: (name: string) => `Mode: ${name}`,
+    change: 'Change mode',
+    badge: (name: string) => `Hardest mode passed: ${name}`,
+    guided: { name: 'Guided', description: 'The design is almost complete and a hint tells you what to look at.' },
+    normal: { name: 'Normal', description: 'Some components are placed for you. Hints appear after a failed run.' },
+    hard: { name: 'Hard', description: 'You inherit a broken design. Find what is wrong and fix it.' },
+    god: { name: 'God', description: 'An empty canvas and no hints, like a real interview.' },
+  },
   levels: 'Levels',
   nextLevel: 'Next level',
   hints: {

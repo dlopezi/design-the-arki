@@ -1,9 +1,16 @@
 import type { Design } from '../engine/types';
+import { modeRank, type Mode } from '../levels/modes';
 
 // Player progress lives only in this browser (ADR-0003). Every read and write tolerates storage
 // being unavailable (private windows, blocked site data): the game still works, it just forgets.
 
-export type LevelProgress = { bestStars: number; lastDesign?: Design };
+export type LevelProgress = {
+  bestStars: number;
+  /** Hardest mode the level was passed in (the badge). */
+  bestMode?: Mode;
+  /** Last design per mode, so each mode resumes where the player left it. */
+  designs?: Partial<Record<Mode, Design>>;
+};
 export type Progress = { version: 1; levels: Record<string, LevelProgress> };
 
 const KEY = 'archi-game:progress';
@@ -43,13 +50,16 @@ export function isUnlocked(levelIds: string[], id: string, progress: Progress): 
   return (progress.levels[levelIds[index - 1]!]?.bestStars ?? 0) > 0;
 }
 
-export function withStars(progress: Progress, id: string, stars: number): Progress {
-  const current = progress.levels[id];
-  if ((current?.bestStars ?? 0) >= stars) return progress;
-  return { ...progress, levels: { ...progress.levels, [id]: { ...current, bestStars: stars } } };
+/** Records a pass: keeps the best stars and the hardest mode. */
+export function withPass(progress: Progress, id: string, stars: number, mode: Mode): Progress {
+  const current = progress.levels[id] ?? { bestStars: 0 };
+  const bestStars = Math.max(current.bestStars, stars);
+  const bestMode = !current.bestMode || modeRank(mode) > modeRank(current.bestMode) ? mode : current.bestMode;
+  if (bestStars === current.bestStars && bestMode === current.bestMode) return progress;
+  return { ...progress, levels: { ...progress.levels, [id]: { ...current, bestStars, bestMode } } };
 }
 
-export function withDesign(progress: Progress, id: string, design: Design): Progress {
-  const current = progress.levels[id];
-  return { ...progress, levels: { ...progress.levels, [id]: { bestStars: current?.bestStars ?? 0, ...current, lastDesign: design } } };
+export function withDesign(progress: Progress, id: string, mode: Mode, design: Design): Progress {
+  const current = progress.levels[id] ?? { bestStars: 0 };
+  return { ...progress, levels: { ...progress.levels, [id]: { ...current, designs: { ...current.designs, [mode]: design } } } };
 }

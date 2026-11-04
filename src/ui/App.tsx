@@ -12,7 +12,9 @@ import { Objectives } from './objectives';
 import { ReportCard } from './reportCard';
 import { ResultsDrawer } from './resultsDrawer';
 import { LevelSelect } from './levelSelect';
-import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withStars, type Progress } from '../progress/progress';
+import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, type Progress } from '../progress/progress';
+import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
+import { ModePicker } from './modePicker';
 
 const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
@@ -56,6 +58,7 @@ const problemComponents = (problem: DesignProblem): string[] =>
 
 type GameProps = {
   level: LevelDefinition;
+  mode: Mode;
   initialDesign: Design | null;
   nextLevelId: string | null;
   onDesignChange: (design: Design) => void;
@@ -65,7 +68,7 @@ type GameProps = {
 /** Highest numeric suffix among component ids, so new ids never clash with a restored design. */
 const lastIdNumber = (design: Design) => Math.max(0, ...design.components.map(c => Number(c.id.split('-').pop()) || 0));
 
-function Game({ level, initialDesign, nextLevelId, onDesignChange, onPassed }: GameProps) {
+function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPassed }: GameProps) {
   const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -83,6 +86,7 @@ function Game({ level, initialDesign, nextLevelId, onDesignChange, onPassed }: G
   const togglePanel = useCallback((panel: 'inspector' | 'results') => setPanels(p => ({ ...p, [panel]: !p[panel] })), []);
   const bottleneckId = result && !running && !result.passed ? (result.bottleneck?.componentId ?? null) : null;
   const hintFor = (r: Result | null): string | null => {
+    if (!r || !hintAllowed(mode, !r.passed)) return null;
     if (r && !r.passed && (level.failureEvents?.length ?? 0) > 0 && r.errors.lost + r.errors.unavailable > 0) return t.redundancyHint;
     const id = r?.bottleneck?.componentId;
     const component = id ? design.components.find(c => c.id === id) : undefined;
@@ -201,7 +205,9 @@ function Game({ level, initialDesign, nextLevelId, onDesignChange, onPassed }: G
       <section className="hud mission">
         <a className="back" href="#">← {t.levels}</a>
         <h1>{level.title}</h1>
+        <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
         <p>{level.brief}</p>
+        {mode === 'guided' && <p role="note" className="guided-hint">{level.guidedHint}</p>}
         <Objectives level={level} cost={cost} result={running ? null : result} />
         <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
         {(level.failureEvents?.length ?? 0) > 0 && (
@@ -250,25 +256,28 @@ function Game({ level, initialDesign, nextLevelId, onDesignChange, onPassed }: G
       {problem && <div className="hud problem" role="alert">{problem.message}</div>}
 
       {result && showReport && (
-        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}` : null} onClose={() => setShowReport(false)}
+        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
           onDetails={() => { setShowReport(false); setPanels({ inspector: true, results: true }); setSelected(result.bottleneck?.componentId ?? null); }} />
       )}
     </div>
   );
 }
 
-const levelIdFromHash = () => decodeURIComponent(location.hash.slice(1));
+/** `#` is the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
+const routeFromHash = () => {
+  const [levelId = '', mode = ''] = decodeURIComponent(location.hash.slice(1)).split('/');
+  return { levelId, mode: isMode(mode) ? mode : null };
+};
 
-/** `#` (or nothing) is the level select; `#<level id>` opens that level if it is unlocked. */
 export function App() {
   const levels = useMemo(() => allLevels(), []);
   const ids = useMemo(() => levels.map(l => l.id), [levels]);
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const [storageWorks, setStorageWorks] = useState(true);
-  const [route, setRoute] = useState(levelIdFromHash);
+  const [route, setRoute] = useState(routeFromHash);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    const onHash = () => setRoute(levelIdFromHash());
+    const onHash = () => setRoute(routeFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -281,13 +290,13 @@ export function App() {
     });
   }, []);
 
-  const level = levels.find(l => l.id === route);
+  const level = levels.find(l => l.id === route.levelId);
   const locked = !!level && !isUnlocked(ids, level.id, progress);
   useEffect(() => {
     if (level && locked) {
       setNotice(t.levelSelect.lockedNotice(level.title));
       history.replaceState(null, '', location.pathname);
-      setRoute('');
+      setRoute({ levelId: '', mode: null });
     } else if (level) {
       setNotice(null);
     }
@@ -297,12 +306,15 @@ export function App() {
     return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
       onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
   }
+  if (!route.mode) return <ModePicker level={level} />;
+  const mode = route.mode;
   const next = ids[ids.indexOf(level.id) + 1];
   return (
-    <ReactFlowProvider key={level.id}>
-      <Game level={level} initialDesign={progress.levels[level.id]?.lastDesign ?? null} nextLevelId={next ?? null}
-        onDesignChange={design => update(p => withDesign(p, level.id, design))}
-        onPassed={stars => update(p => withStars(p, level.id, stars))} />
+    <ReactFlowProvider key={`${level.id}/${mode}`}>
+      <Game level={level} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
+        nextLevelId={next ?? null}
+        onDesignChange={design => update(p => withDesign(p, level.id, mode, design))}
+        onPassed={stars => update(p => withPass(p, level.id, stars, mode))} />
     </ReactFlowProvider>
   );
 }

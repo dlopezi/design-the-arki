@@ -3,9 +3,14 @@ import { connect, node, playAndSkip } from './helpers';
 
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
+async function play(page: Page, title: string, mode = 'God') {
+  await levelCard(page, title).getByRole('link', { name: /Play/ }).click();
+  await page.getByRole('list', { name: 'Modes' }).getByRole('link', { name: new RegExp(mode) }).click();
+}
+
 async function passLevel1(page: Page) {
-  await levelCard(page, 'Hello world').getByRole('link', { name: /Play/ }).click();
-  await expect(page.getByRole('heading', { name: 'Hello world', level: 1 })).toBeVisible();
+  await play(page, 'Hello world');
+  await expect(page.getByText('Mode: God')).toBeVisible();
   await page.keyboard.press('1');
   await page.keyboard.press('2');
   await connect(page, { label: 'Clients' }, { label: 'App server' });
@@ -36,7 +41,7 @@ test('passing a level saves its stars, unlocks the next one and keeps the design
   await expect(levelCard(page, 'Hello world').getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
   await expect(levelCard(page, 'First spike').getByRole('link', { name: /Play/ })).toBeVisible();
 
-  await levelCard(page, 'Hello world').getByRole('link', { name: /Play/ }).click();
+  await play(page, 'Hello world');
   await expect(node(page, 'App server')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
 });

@@ -50,11 +50,15 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
             {levels.filter(l => l.chapter === chapter).map(level => {
               const unlocked = isUnlocked(ids, level.id, progress);
               const stars = progress.levels[level.id]?.bestStars ?? 0;
+              const bestMode = progress.levels[level.id]?.bestMode;
               return (
                 <li key={level.id} className={unlocked ? '' : 'locked'}>
                   <span className="number">{ids.indexOf(level.id) + 1}</span>
                   <h3>{level.title}</h3>
-                  <Stars earned={stars} max={1 + level.starCostThresholds.length} />
+                  <span className="card-meta">
+                    <Stars earned={stars} max={1 + level.starCostThresholds.length} />
+                    {bestMode && <span className={`badge mode ${bestMode}`} aria-label={t.modes.badge(t.modes[bestMode].name)}>{t.modes[bestMode].name}</span>}
+                  </span>
                   {unlocked
                     ? <a className="play-link" href={`#${level.id}`}>{t.levelSelect.play}</a>
                     : <span className="muted">{t.levelSelect.locked}</span>}

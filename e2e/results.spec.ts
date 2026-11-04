@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 import { buildScaledOut, node, playAndSkip, openLevel } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openLevel(page, '02-first-spike');
+  await openLevel(page, '02-first-spike', 'normal');
   await expect(page.getByRole('heading', { name: 'First spike' })).toBeVisible();
 });
 
 test('a failed run explains itself: hint, highlighted bottleneck, results drawer and per-instance stats', async ({ page }) => {
-  await buildScaledOut(page, 1);
+  await buildScaledOut(page, 1, { databasePlaced: true });
   await playAndSkip(page);
 
   const report = page.getByRole('dialog', { name: 'Level failed' });
@@ -49,7 +49,7 @@ test('inspector and results can be hidden and shown with buttons or the I and R 
 });
 
 test('a healthy run has no bottleneck', async ({ page }) => {
-  await buildScaledOut(page, 2);
+  await buildScaledOut(page, 2, { databasePlaced: true });
   await playAndSkip(page);
   await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
   await expect(page.getByText('Bottleneck', { exact: true })).toHaveCount(0);
