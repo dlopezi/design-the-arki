@@ -170,3 +170,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .c4-pct { position: absolute; right: 8px; bottom: 1px; font-size: 10px; color: var(--load); }
 .c4-person { display: flex; flex-direction: column; align-items: center; text-align: center; width: 150px; background: #0f2a4a; border: 1.5px solid #2f5a8f; border-radius: 40px 40px 10px 10px; padding: 10px 10px 12px; color: #eaf2ff; }
 .c4-person .head { width: 40px; height: 40px; border-radius: 50%; background: #2f5a8f; display: grid; place-items: center; margin-bottom: 4px; }
+.d-root .d-bottom { grid-column: 1 / -1; }
+.d-toggles { top: 112px; right: 16px; padding: 6px; display: flex; gap: 6px; }
+.d-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid transparent; border-radius: 8px; padding: 5px 9px; color: var(--muted); font-size: 12.5px; }
+.d-toggle.on { background: var(--panel-2); border-color: var(--line); color: var(--fg); }
+.d-toggle:hover { color: var(--fg); }
+.d-incident { margin-top: 8px; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); font-size: 12px; }
+.hot-tile small { font-size: 9.5px; color: var(--muted); margin-top: -3px; }
+.hot-tile.armed { border-color: var(--warn); } .hot-tile.armed small { color: var(--warn); font-weight: 700; }

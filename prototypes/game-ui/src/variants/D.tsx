@@ -2,7 +2,7 @@
 // diagram grouped as C4-style boundaries (system → containers) with every server instance drawn as its own node.
 import { useEffect, useState } from 'react';
 import { Background, BackgroundVariant, Handle, Position, ReactFlow, useReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
-import { User } from 'lucide-react';
+import { PanelBottom, PanelRight, User } from 'lucide-react';
 import { Engine, LEVEL, META, PALETTE, Spark, Stars, TIER_LABEL, edgeTypes, fmtMs, fmtPct, loadColor, useFlowNodes, type CompType, type Game, type Size, type Tier } from '../game';
 
 // ---------- C4 nodes ----------
@@ -128,8 +128,19 @@ export function VariantD({ g }: { g: Game }) {
   const { nodes, onNodesChange } = useFlowNodes(flow.nodes as any);
   const rf = useReactFlow();
   const [report, setReport] = useState(false);
+  const [showInsp, setShowInsp] = useState(true);
+  const [showRes, setShowRes] = useState(true);
   const r = g.result;
   useEffect(() => { if (g.done) setReport(true); }, [g.done]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest('input, textarea')) return;
+      if (e.key === 'i' || e.key === 'I') setShowInsp(v => !v);
+      if (e.key === 'r' || e.key === 'R') setShowRes(v => !v);
+    };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, []);
+  useEffect(() => { const t = setTimeout(() => rf.fitView({ padding: 0.12, duration: 250 }), 80); return () => clearTimeout(t); }, [showInsp, showRes]); // eslint-disable-line
   useEffect(() => { const t = setTimeout(() => rf.fitView({ padding: 0.12, duration: 250 }), 60); return () => clearTimeout(t); }, [g.design.servers, g.design.cacheOn]); // eslint-disable-line
   const idx = g.running ? Math.min(11, Math.floor(g.playT! / 5)) : null;
   const cursor = g.running ? g.playT! / LEVEL.durationS : null;
@@ -138,7 +149,7 @@ export function VariantD({ g }: { g: Game }) {
   const pick = (n: Node) => { const d: any = n.data; if (d.comp) g.setSelected(d.comp); else if (n.id === 'g-app') g.setSelected('app'); else if (n.id === 'client') g.setSelected('client'); };
 
   return (
-    <div className="d-root">
+    <div className="d-root" style={{ gridTemplateColumns: showInsp ? '1fr 330px' : '1fr', gridTemplateRows: showRes ? '1fr 210px' : '1fr' }}>
       <div className="d-canvas">
         <ReactFlow nodes={nodes} edges={flow.edges} onNodesChange={onNodesChange} nodeTypes={nodeTypesD as any} edgeTypes={edgeTypes} colorMode="dark"
           fitView fitViewOptions={{ padding: 0.12 }} onNodeClick={(_, n) => pick(n)} onPaneClick={() => g.setSelected(null)} proOptions={{ hideAttribution: true }}>
@@ -152,6 +163,12 @@ export function VariantD({ g }: { g: Game }) {
             [`Menos de ${fmtPct(LEVEL.requirements.maxErrorRate)} de errores`, g.done ? r!.checks[1].ok : undefined],
             [`No superar $${LEVEL.budget}/mes`, g.cost <= LEVEL.budget]].map(([t, ok]) => (
             <div className="obj" key={t as string}><span className={`box ${status(ok as boolean | undefined)}`}>{ok == null ? '' : ok ? '✓' : '✕'}</span>{t as string}</div>))}
+          {g.design.failure && <div className="d-incident">⚡ Incidente activo: <b>api-1</b> se cae a los 20 s</div>}
+        </div>
+
+        <div className="hud d-toggles">
+          <button className={`d-toggle ${showInsp ? 'on' : ''}`} onClick={() => setShowInsp(v => !v)} title="Mostrar u ocultar el inspector (tecla I)"><PanelRight size={16} /> Inspector</button>
+          <button className={`d-toggle ${showRes ? 'on' : ''}`} onClick={() => setShowRes(v => !v)} title="Mostrar u ocultar los resultados (tecla R)"><PanelBottom size={16} /> Resultados</button>
         </div>
 
         <div className="hud d-cost">
@@ -170,21 +187,22 @@ export function VariantD({ g }: { g: Game }) {
           </div>
         )}
 
-        <div className="hud d-hotbar">
+        <div className="hud d-hotbar" style={{ bottom: showRes ? 14 : 66 }}>
           {PALETTE.map((p, i) => { const Icon = META[p.type].icon; return (
             <button key={p.type} className="hot-tile" onClick={() => g.actions.addFromPalette(p.type)} title={META[p.type].blurb}>
               <kbd>{i + 1}</kbd><Icon size={20} color="var(--accent)" /><span>{META[p.type].label.split(' ')[0]}</span>
             </button>); })}
-          <button className="hot-tile" onClick={() => g.actions.setFailure(!g.design.failure)} style={{ borderColor: g.design.failure ? 'var(--warn)' : undefined }}>
-            <span style={{ fontSize: 18 }}>⚡</span><span>{g.design.failure ? 'Caída ON' : 'Caída'}</span>
+          <button className={`hot-tile ${g.design.failure ? 'armed' : ''}`} onClick={() => g.actions.setFailure(!g.design.failure)}
+            title="Incidente de prueba: la instancia api-1 se cae a los 20 s de simulación. Púlsalo para activarlo o desactivarlo.">
+            <span style={{ fontSize: 18 }}>⚡</span><span>Incidente</span><small>{g.design.failure ? 'activo' : 'apagado'}</small>
           </button>
           <button className="b-play" onClick={g.run} disabled={g.running}>{g.running ? '…' : '▶ JUGAR'}</button>
         </div>
       </div>
 
-      <aside className="a-insp d-insp"><Inspector g={g} /></aside>
+      {showInsp && <aside className="a-insp d-insp"><Inspector g={g} /></aside>}
 
-      <section className="a-bottom d-bottom">
+      {showRes && <section className="a-bottom d-bottom">
         <div>
           <h4>Resultado</h4>
           {!r ? <div className="muted">Pulsa <b>▶ Jugar</b> para lanzar 60 s de tráfico.</div> : g.running ? <div className="muted">Simulando…</div> : <>
@@ -208,7 +226,7 @@ export function VariantD({ g }: { g: Game }) {
               <div className="meter"><span style={{ width: `${row.dead ? 0 : row.u * 100}%`, background: loadColor(row.u) }} /></div>
               <span className="mono muted">{row.dead ? 'caída' : `${Math.round(row.u * 100)}%`}</span></div>))}
         </div>
-      </section>
+      </section>}
 
       {report && r && (
         <div className="b-modal-bg" onClick={() => setReport(false)}>
@@ -222,7 +240,7 @@ export function VariantD({ g }: { g: Game }) {
             </div>
             {!r.passed && r.hint && <div className="tip"><b>Pista:</b> {r.hint}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18 }}>
-              <button className="btn" onClick={() => { setReport(false); if (r.bottleneck) g.setSelected(r.bottleneck); }}>Ver detalles</button>
+              <button className="btn" onClick={() => { setReport(false); setShowInsp(true); setShowRes(true); if (r.bottleneck) g.setSelected(r.bottleneck); }}>Ver detalles</button>
               <button className="btn primary" disabled={!r.passed}>Siguiente misión →</button>
             </div>
           </div>
