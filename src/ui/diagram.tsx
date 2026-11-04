@@ -1,0 +1,147 @@
+import { Handle, Position, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { catalog } from '../catalog/catalog';
+import type { Design, Presentation } from '../engine/types';
+import { en as t } from '../i18n/en';
+
+// Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
+const PERSON = { w: 150, h: 112 };
+const BOX = { w: 200, h: 76 };
+const INSTANCE = { w: 172, h: 50, gap: 10 };
+const CONTAINER_HEAD = 78;
+const ZONE = { pad: 20, head: 42, gap: 50 };
+const SYSTEM = { head: 54, pad: 30, gapFromPerson: 90 };
+const COMPONENT_GAP = 20;
+const ZONES: Presentation['zone'][] = ['edge', 'application', 'data'];
+
+export type PersonData = { title: string };
+export type BoundaryData = { title: string; kind: string; system: boolean };
+export type ComponentData = {
+  componentId: string; title: string; technology: string; detail: string;
+  container: boolean; selected: boolean; problem: boolean;
+};
+export type InstanceData = { name: string; detail: string };
+
+function PersonNode({ data }: NodeProps<Node<PersonData>>) {
+  return (
+    <div className="c4-person">
+      <div className="c4-head" aria-hidden="true" />
+      <strong>{data.title}</strong>
+      <span className="c4-kind">[{t.person}]</span>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+function BoundaryNode({ data }: NodeProps<Node<BoundaryData>>) {
+  return (
+    <div className={`c4-boundary ${data.system ? 'system' : 'zone'}`}>
+      <strong>{data.title}</strong> <span className="c4-kind">[{data.kind}]</span>
+    </div>
+  );
+}
+
+function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
+  return (
+    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''}`}>
+      <Handle type="target" position={Position.Left} />
+      <strong>{data.title}</strong>
+      <span className="c4-kind">[{data.technology}]</span>
+      <span className="c4-detail">{data.detail}</span>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
+  return (
+    <div className="c4-instance">
+      <strong>{data.name}</strong>
+      <span className="c4-detail">{data.detail}</span>
+    </div>
+  );
+}
+
+export const nodeTypes = { person: PersonNode, boundary: BoundaryNode, component: ComponentNode, instance: InstanceNode };
+
+export const instanceCountOf = (params?: Record<string, unknown>) => Number(params?.instances ?? 1);
+export const sizeOf = (type: string, params?: Record<string, unknown>) => (params?.size as string | undefined) ?? catalog[type]!.defaultSize;
+
+function sized<T extends Record<string, unknown>>(node: Omit<Node<T>, 'width' | 'height'>, w: number, h: number): Node<T> {
+  return { ...node, width: w, height: h, style: { width: w, height: h } } as Node<T>;
+}
+
+export type DiagramState = { selected: string | null; problemIds: string[] };
+
+/** Turns a design into C4-style nodes: a person, the system boundary, zones, components and one node per instance. */
+export function layoutDiagram(design: Design, state: DiagramState): { nodes: Node[]; edges: Edge[] } {
+  const prefixCounters = new Map<string, number>();
+  type Placed = { id: string; type: string; params?: Record<string, unknown>; height: number; instances: number; container: boolean };
+  const zones = ZONES.map(zone => {
+    const members: Placed[] = design.components
+      .filter(c => catalog[c.type]!.presentation?.zone === zone)
+      .map(c => {
+        const container = !!catalog[c.type]!.scalesOut;
+        const instances = instanceCountOf(c.params);
+        const height = container ? CONTAINER_HEAD + instances * (INSTANCE.h + INSTANCE.gap) - INSTANCE.gap + 14 : BOX.h;
+        return { id: c.id, type: c.type, params: c.params, height, instances, container };
+      });
+    const height = ZONE.head + members.reduce((sum, m) => sum + m.height, 0) + COMPONENT_GAP * Math.max(0, members.length - 1) + ZONE.pad;
+    return { zone, members, height, width: BOX.w + 2 * ZONE.pad };
+  }).filter(z => z.members.length);
+
+  const innerHeight = Math.max(0, ...zones.map(z => z.height));
+  const systemW = SYSTEM.pad * 2 + zones.reduce((sum, z) => sum + z.width, 0) + ZONE.gap * Math.max(0, zones.length - 1);
+  const systemH = SYSTEM.head + innerHeight + SYSTEM.pad;
+  const systemX = PERSON.w + SYSTEM.gapFromPerson;
+
+  const nodes: Node[] = [];
+  nodes.push(sized<PersonData>({ id: 'client', type: 'person', position: { x: 0, y: zones.length ? systemH / 2 - PERSON.h / 2 : 0 },
+    data: { title: t.clients }, deletable: false, selectable: false }, PERSON.w, PERSON.h));
+  if (!zones.length) return { nodes, edges: edgesOf(design, state) };
+
+  nodes.push(sized<BoundaryData>({ id: 'system', type: 'boundary', position: { x: systemX, y: 0 },
+    data: { title: t.systemName, kind: t.softwareSystem, system: true }, deletable: false, selectable: false, draggable: false }, systemW, systemH));
+
+  let zoneX = SYSTEM.pad;
+  for (const zone of zones) {
+    const zoneId = `zone-${zone.zone}`;
+    nodes.push(sized<BoundaryData>({ id: zoneId, type: 'boundary', parentId: 'system', extent: 'parent',
+      position: { x: zoneX, y: SYSTEM.head + (innerHeight - zone.height) / 2 },
+      data: { title: t.zones[zone.zone], kind: t.container, system: false }, deletable: false, selectable: false }, zone.width, zone.height));
+    let y = ZONE.head;
+    for (const member of zone.members) {
+      const spec = catalog[member.type]!;
+      const size = sizeOf(member.type, member.params);
+      const workers = size && spec.sizes ? spec.sizes[size]!.workers : spec.workers;
+      const detail = member.container
+        ? `${t.instanceCount(member.instances)}${size ? ` · ${t.inspector.sizes[size]}` : ''}`
+        : spec.presentation?.hideCapacity ? '' : `${workers} connections`;
+      nodes.push(sized<ComponentData>({ id: member.id, type: 'component', parentId: zoneId, extent: 'parent',
+        position: { x: ZONE.pad, y }, selected: state.selected === member.id,
+        data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
+          detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id) } }, BOX.w, member.height));
+      if (member.container) {
+        const prefix = spec.presentation?.instancePrefix ?? member.type;
+        for (let k = 0; k < member.instances; k++) {
+          const n = (prefixCounters.get(prefix) ?? 0) + 1;
+          prefixCounters.set(prefix, n);
+          nodes.push(sized<InstanceData>({ id: `${member.id}#${k}`, type: 'instance', parentId: member.id, extent: 'parent',
+            position: { x: (BOX.w - INSTANCE.w) / 2, y: CONTAINER_HEAD + k * (INSTANCE.h + INSTANCE.gap) },
+            data: { name: `${prefix}-${n}`, detail: `${workers} workers` }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
+        }
+      }
+      y += member.height + COMPONENT_GAP;
+    }
+    zoneX += zone.width + ZONE.gap;
+  }
+  return { nodes, edges: edgesOf(design, state) };
+}
+
+export const edgeId = (from: string, to: string) => `${from}->${to}`;
+
+function edgesOf(design: Design, state: DiagramState): Edge[] {
+  return design.connections.map(([from, to]) => {
+    const id = edgeId(from, to);
+    return { id, source: from, target: to, selected: state.selected === id };
+  });
+}

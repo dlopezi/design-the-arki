@@ -1,25 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const node = (page: Page, label: string, nth = 0) => page.locator('.react-flow__node', { hasText: label }).nth(nth);
-
-/** Waits until the canvas stops reframing (it refits after components are added). */
-async function canvasSettled(page: Page) {
-  const transform = () => page.locator('.react-flow__viewport').evaluate(el => (el as HTMLElement).style.transform);
-  await expect.poll(async () => {
-    const before = await transform();
-    await page.waitForTimeout(100);
-    return before === (await transform());
-  }).toBe(true);
-}
-
-async function connect(page: Page, from: { label: string; nth?: number }, to: { label: string; nth?: number }) {
-  const edges = page.locator('.react-flow__edge');
-  const before = await edges.count();
-  await canvasSettled(page);
-  await node(page, from.label, from.nth).locator('.react-flow__handle.source')
-    .dragTo(node(page, to.label, to.nth).locator('.react-flow__handle.target'));
-  await expect(edges).toHaveCount(before + 1);
-}
+import { canvasSettled, connect, node } from './helpers';
 
 /** Builds Clients → App server → Database from the hotbar. */
 async function buildServerAndDatabase(page: Page) {
@@ -78,7 +58,9 @@ test('components and connections can be removed', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuenow', '40');
 
+  await canvasSettled(page);
   await page.locator('.react-flow__edge').first().click({ force: true });
+  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
   await page.keyboard.press('Delete');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(node(page, 'Clients')).toHaveCount(1);

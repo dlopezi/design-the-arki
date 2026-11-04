@@ -11,29 +11,56 @@ export class DesignError extends Error {
   }
 }
 
-const QUEUE_CAPACITY = 100;
-const TIMEOUT_MS = 1000;
+/** Default queue size per instance; a component's `queueSize` param overrides it. */
+export const DEFAULT_QUEUE_SIZE = 100;
+export const TIMEOUT_MS = 1000;
 const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
+
+type Instance = { busy: number; queue: Request[] };
 
 type Station = {
   id: string;
   workers: number;
   meanServiceMs: number;
-  busy: number;
-  queue: Request[];
+  instances: Instance[];
+  nextInstance: number;
+  queueSize: number;
   next: string | null;
   stats: ComponentResult;
 };
 
 type SimEvent =
   | { kind: 'arrive'; station: string; request: Request }
-  | { kind: 'done'; station: string; request: Request };
+  | { kind: 'done'; station: string; instance: number; request: Request };
+
+/** Workers and monthly cost per instance, after applying the `size` param. */
+function perInstance(component: Design['components'][number], catalog: Catalog): { workers: number; monthlyCost: number } {
+  const spec = catalog[component.type]!;
+  if (!spec.sizes) return { workers: spec.workers, monthlyCost: spec.monthlyCost };
+  const size = component.params?.size ?? spec.defaultSize;
+  const chosen = spec.sizes[size as string];
+  if (!chosen) throw new Error(`Invalid size for ${component.id}: ${String(size)}`);
+  return chosen;
+}
+
+function queueSizeOf(component: Design['components'][number]): number {
+  const value = component.params?.queueSize ?? DEFAULT_QUEUE_SIZE;
+  if (!Number.isInteger(value) || (value as number) < 1) throw new Error(`Invalid queueSize for ${component.id}: ${String(value)}`);
+  return value as number;
+}
+
+function instanceCount(component: Design['components'][number], catalog: Catalog): number {
+  const value = component.params?.instances ?? 1;
+  if (!Number.isInteger(value) || (value as number) < 1) throw new Error(`Invalid instances for ${component.id}: ${String(value)}`);
+  if ((value as number) > 1 && !catalog[component.type]!.scalesOut) throw new Error(`${component.type} cannot run several instances`);
+  return value as number;
+}
 
 /** Monthly cost of a design in dollars, from the catalogue. */
 export function designCost(design: Design, catalog: Catalog = defaultCatalog): number {
-  return design.components.reduce((sum, c) => sum + (catalog[c.type]?.monthlyCost ?? 0), 0);
+  return design.components.reduce((sum, c) => sum + (catalog[c.type] ? perInstance(c, catalog).monthlyCost * instanceCount(c, catalog) : 0), 0);
 }
 
 /**
@@ -50,7 +77,9 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     const spec = catalog[component.type];
     if (!spec) throw new Error(`Unknown component type: ${component.type}`);
     stations.set(component.id, {
-      id: component.id, workers: spec.workers, meanServiceMs: spec.meanServiceMs, busy: 0, queue: [],
+      id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
+      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [] })), nextInstance: 0,
+      queueSize: queueSizeOf(component),
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
   }
@@ -59,8 +88,13 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   const path: string[] = [];
   for (let id: string | null = entry; id; id = stations.get(id)!.next) {
     if (path.includes(id)) throw new DesignError({ kind: 'loop', componentIds: path.slice(path.indexOf(id)) });
+    const previous = path.at(-1);
     path.push(id);
     const station = stations.get(id)!;
+    const typeOf = (componentId: string) => catalog[design.components.find(c => c.id === componentId)!.type]!;
+    if (station.instances.length > 1 && !(previous && typeOf(previous).distributes)) {
+      throw new DesignError({ kind: 'needsBalancer', componentId: id });
+    }
     if (!station.next && !catalog[design.components.find(c => c.id === id)!.type]!.endsRequests) {
       throw new DesignError({ kind: 'deadEnd', componentId: id });
     }
@@ -80,13 +114,13 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   const latencies: number[] = [];
   const errors = { rejected: 0, timedOut: 0 };
 
-  const start = (station: Station, request: Request, now: number) => {
+  const start = (station: Station, instance: number, request: Request, now: number) => {
     if (now - request.createdAt > TIMEOUT_MS) {
       errors.timedOut++; station.stats.timedOut++;
       return;
     }
-    station.busy++;
-    events.push(now + exponential(station.meanServiceMs), { kind: 'done', station: station.id, request });
+    station.instances[instance]!.busy++;
+    events.push(now + exponential(station.meanServiceMs), { kind: 'done', station: station.id, instance, request });
   };
 
   const complete = (request: Request, now: number) => {
@@ -100,11 +134,15 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     const station = stations.get(value.station)!;
     if (value.kind === 'arrive') {
       value.request.enqueuedAt = now;
-      if (station.busy < station.workers) start(station, value.request, now);
-      else if (station.queue.length < QUEUE_CAPACITY) station.queue.push(value.request);
+      const index = station.nextInstance;
+      station.nextInstance = (index + 1) % station.instances.length;
+      const instance = station.instances[index]!;
+      if (instance.busy < station.workers) start(station, index, value.request, now);
+      else if (instance.queue.length < station.queueSize) instance.queue.push(value.request);
       else { errors.rejected++; station.stats.rejected++; }
     } else {
-      station.busy--;
+      const instance = station.instances[value.instance]!;
+      instance.busy--;
       station.stats.served++;
       if (station.next) {
         value.request.hops++;
@@ -112,7 +150,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       } else {
         complete(value.request, now);
       }
-      while (station.busy < station.workers && station.queue.length) start(station, station.queue.shift()!, now);
+      while (instance.busy < station.workers && instance.queue.length) start(station, value.instance, instance.queue.shift()!, now);
     }
   }
 

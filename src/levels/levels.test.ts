@@ -3,8 +3,8 @@ import { simulate } from '../engine/simulate';
 import { allLevels, parseLevel } from './levels';
 
 describe('level files', () => {
-  it('ships at least level 1', () => {
-    expect(allLevels().map(l => l.id)).toContain('01-hello-world');
+  it('ships levels 1 to 3 in order', () => {
+    expect(allLevels().map(l => l.id).slice(0, 3)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more']);
   });
 
   for (const level of allLevels()) {
@@ -16,6 +16,15 @@ describe('level files', () => {
     it(`${level.id}: its reference design only uses the level's allowed components`, () => {
       const used = level.referenceDesign.components.map(c => c.type);
       expect(used.filter(type => !level.allowedComponents.includes(type))).toEqual([]);
+    });
+
+    it(`${level.id}: its reference design respects the level's component options`, () => {
+      for (const component of level.referenceDesign.components) {
+        const options = level.componentOptions[component.type];
+        if (!options) continue;
+        if (options.sizes) expect(options.sizes).toContain(component.params?.size ?? 'medium');
+        if (options.maxInstances) expect(Number(component.params?.instances ?? 1)).toBeLessThanOrEqual(options.maxInstances);
+      }
     });
   }
 

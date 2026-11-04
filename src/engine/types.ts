@@ -26,6 +26,25 @@ export type StationPrimitive = {
   primitive: 'station'; workers: number; meanServiceMs: number; monthlyCost: number;
   /** Whether a request can finish here; otherwise the component must forward it. */
   endsRequests: boolean;
+  /** Whether the player can run several instances (param `instances`); requests are spread round-robin. */
+  scalesOut?: boolean;
+  /** Whether it can spread requests over the instances of the next component. */
+  distributes?: boolean;
+  /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
+  sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
+  defaultSize?: string;
+  /** How the game draws it; the engine ignores this. */
+  presentation?: Presentation;
+};
+
+export type Presentation = {
+  /** C4-style container group the component is drawn in. */
+  zone: 'edge' | 'application' | 'data';
+  technology: string;
+  /** Prefix for instance names (app-1, app-2…). */
+  instancePrefix?: string;
+  /** Hide capacity from players (e.g. the load balancer in early chapters). */
+  hideCapacity?: boolean;
 };
 
 export type ComponentSpec = StationPrimitive;
@@ -34,7 +53,8 @@ export type Catalog = Record<string, ComponentSpec>;
 
 /** Why a design cannot serve traffic. */
 export type DesignProblem = { kind: 'noEntry' } | { kind: 'deadEnd'; componentId: string }
-  | { kind: 'loop'; componentIds: string[] };
+  | { kind: 'loop'; componentIds: string[] }
+  | { kind: 'needsBalancer'; componentId: string };
 
 export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: number; actual: number; ok: boolean };
 

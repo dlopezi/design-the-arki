@@ -2,6 +2,23 @@ import type { Catalog } from '../engine/types';
 
 // Every component type is a combination of engine primitives plus its numbers (ADR-0004).
 export const catalog: Catalog = {
-  appServer: { primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false },
-  database: { primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true },
+  // Capacity (~10 000 req/s) is deliberately far above early-access traffic and not shown to players.
+  loadBalancer: {
+    primitive: 'station', workers: 10, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, distributes: true,
+    presentation: { zone: 'edge', technology: 'L7 · round-robin', hideCapacity: true },
+  },
+  appServer: {
+    primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false, scalesOut: true,
+    sizes: {
+      small: { workers: 2, monthlyCost: 20, vcpu: 1 },
+      medium: { workers: 4, monthlyCost: 40, vcpu: 2 },
+      large: { workers: 8, monthlyCost: 80, vcpu: 4 },
+    },
+    defaultSize: 'medium',
+    presentation: { zone: 'application', technology: 'Node.js', instancePrefix: 'app' },
+  },
+  database: {
+    primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true,
+    presentation: { zone: 'data', technology: 'PostgreSQL' },
+  },
 };

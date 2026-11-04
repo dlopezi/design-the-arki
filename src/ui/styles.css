@@ -56,5 +56,44 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .hot-tile kbd { position: absolute; top: 4px; left: 7px; font: 10px ui-monospace, monospace; color: var(--muted); }
 .hot-tile small { color: var(--muted); }
 .problem { bottom: 110px; left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); padding: 10px 14px; border-color: var(--warn); color: var(--fg); font-size: 14px; }
-.react-flow .node.selected, .react-flow .node:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
-.react-flow .node.problem-node { border-color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 40%, transparent); }
+
+/* C4-style diagram */
+.react-flow__node { cursor: pointer; }
+.react-flow__node-boundary { pointer-events: none; }
+.c4-kind { font-size: 11px; color: var(--muted); }
+.c4-detail { font-size: 11.5px; color: #b9c8de; }
+.c4-person { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background: #0f2a4a; border: 1.5px solid #2f5a8f; border-radius: 48px 48px 12px 12px; color: #eaf2ff; gap: 2px; }
+.c4-person .c4-head { width: 34px; height: 34px; border-radius: 50%; background: #2f5a8f; margin-bottom: 4px; }
+.c4-boundary { width: 100%; height: 100%; border: 1.5px dashed var(--line-strong); border-radius: 12px; padding: 10px 14px; font-size: 13px; color: var(--fg); }
+.c4-boundary.system { border-color: #5b6b8a; background: color-mix(in srgb, var(--accent) 4%, transparent); font-size: 14px; }
+.c4-boundary.zone { background: color-mix(in srgb, var(--panel) 55%, transparent); }
+.c4-component { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: 10px; color: #eaf2ff; }
+.c4-component.box { background: #1e3a5f; border: 1.5px solid #2f5a8f; }
+.c4-component.container { background: color-mix(in srgb, #1e3a5f 35%, transparent); border: 1.5px solid #2f5a8f; }
+.c4-component.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.c4-component.problem { border-color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 40%, transparent); }
+.c4-instance { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 4px 12px; border-radius: 8px;
+  background: #1e3a5f; border: 1px solid #2f5a8f; color: #eaf2ff; font-size: 13px; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.5; }
+
+/* Inspector */
+.inspector { top: 128px; right: 16px; width: 300px; max-height: calc(100% - 260px); overflow: auto; padding: 14px 16px; display: grid; gap: 12px; font-size: 13.5px; }
+.inspector .eyebrow { margin: 0; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.inspector .title h3 { margin: 0; font-size: 17px; }
+.inspector h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.inspector p { margin: 0; }
+.inspector .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; }
+.inspector .row > span:last-child { text-align: right; }
+.muted { color: var(--muted); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper button { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--fg); }
+.stepper button:disabled { opacity: .4; cursor: default; }
+.stepper input { width: 52px; text-align: center; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px; font: inherit; }
+.segmented { display: flex; flex-wrap: wrap; gap: 4px; border: none; padding: 0; margin: 6px 0; }
+.segmented legend { width: 100%; padding: 0 0 4px; font-size: 13px; }
+.segmented label { padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 6px; cursor: pointer; }
+.segmented label.on { background: var(--panel-2); border-color: var(--accent); }
+.segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.segmented label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.danger { justify-self: start; background: none; border: 1px solid color-mix(in srgb, var(--bad) 60%, transparent); color: var(--bad); border-radius: 8px; padding: 6px 12px; }

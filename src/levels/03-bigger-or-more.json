@@ -1,0 +1,62 @@
+{
+  "id": "03-bigger-or-more",
+  "title": "Bigger or more?",
+  "brief": "Traffic settled at 250 people per second. You can now choose the size of each app server instance. Is one bigger machine cheaper than several smaller ones behind a load balancer?",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 250
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 200,
+  "starCostThresholds": [
+    150,
+    135
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "database"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "size": "large"
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ]
+    ]
+  }
+}

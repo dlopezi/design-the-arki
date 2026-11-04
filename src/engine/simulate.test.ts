@@ -121,5 +121,57 @@ describe('simulate', () => {
       };
       expect(problemOf(design)).toEqual({ kind: 'loop', componentIds: ['api', 'api2'] });
     });
+
+    it('rejects several instances of a component with no load balancer in front to spread requests', () => {
+      const design: Design = {
+        components: [{ id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }],
+        connections: [['client', 'api'], ['api', 'db']],
+      };
+      expect(problemOf(design)).toEqual({ kind: 'needsBalancer', componentId: 'api' });
+    });
+  });
+
+  describe('scaling', () => {
+    const behindBalancer = (params: Record<string, unknown>): Design => ({
+      components: [
+        { id: 'lb', type: 'loadBalancer' },
+        { id: 'api', type: 'appServer', params },
+        { id: 'db', type: 'database' },
+      ],
+      connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+    });
+
+    it('scales out: two app server instances behind a load balancer serve traffic that one cannot', () => {
+      expect(simulate(levelAt(300), behindBalancer({ instances: 1 }), 1).passed).toBe(false);
+      expect(simulate(levelAt(300), behindBalancer({ instances: 2 }), 1).passed).toBe(true);
+    });
+
+    it('charges for every instance: load balancer $20 + 2 app servers × $40 + database $50 = $150', () => {
+      expect(simulate(levelAt(50), behindBalancer({ instances: 2 }), 1).cost).toBe(150);
+    });
+
+    it('scales up: one large app server (8 workers, $80) serves 300 req/s without a load balancer', () => {
+      const design = (size: string): Design => ({
+        components: [{ id: 'api', type: 'appServer', params: { size } }, { id: 'db', type: 'database' }],
+        connections: [['client', 'api'], ['api', 'db']],
+      });
+      const large = simulate(levelAt(300), design('large'), 1);
+
+      expect(large.passed).toBe(true);
+      expect(large.cost).toBe(130);
+      expect(simulate(levelAt(300), design('medium'), 1).passed).toBe(false);
+    });
+
+    it('honours a shorter queue: under overload it rejects more requests but the ones it keeps wait less', () => {
+      const withQueue = (queueSize?: number): Design => ({
+        components: [{ id: 'api', type: 'appServer', params: queueSize ? { queueSize } : {} }, { id: 'db', type: 'database' }],
+        connections: [['client', 'api'], ['api', 'db']],
+      });
+      const short = simulate(levelAt(300), withQueue(10), 1);
+      const standard = simulate(levelAt(300), withQueue(), 1);
+
+      expect(short.errors.rejected).toBeGreaterThan(standard.errors.rejected);
+      expect(short.p95).toBeLessThan(standard.p95);
+    });
   });
 });
