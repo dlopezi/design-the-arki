@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { catalog } from '../catalog/catalog';
 import { simulate } from '../engine/simulate';
 import { allLevels, parseLevel } from './levels';
 
@@ -22,7 +23,7 @@ describe('level files', () => {
       for (const component of level.referenceDesign.components) {
         const options = level.componentOptions[component.type];
         if (!options) continue;
-        if (options.sizes) expect(options.sizes).toContain(component.params?.size ?? 'medium');
+        if (options.sizes) expect(options.sizes).toContain(component.params?.size ?? catalog[component.type]!.defaultSize);
         if (options.maxInstances) expect(Number(component.params?.instances ?? 1)).toBeLessThanOrEqual(options.maxInstances);
         for (const [param, max] of Object.entries(options.limits ?? {})) expect(Number(component.params?.[param] ?? 0)).toBeLessThanOrEqual(max);
       }
