@@ -92,8 +92,8 @@ A free, single-player browser puzzle game. Each **Level** describes a system to 
 
 ### Modules
 
-- **Simulation engine** (pure TypeScript, no UI or browser dependencies; ADR-0001). One entry point: `simulate(level, design, seed) → result`. Deep module: it owns arrivals, queueing, routing, failure events, metrics, scoring, bottleneck detection and hints.
-- **Component catalogue**: data describing every component type (parameters, sizes/tiers, workers, mean service time, cost, C4 kind and technology label, the chapter it is introduced in). Read by both the engine and the UI.
+- **Simulation engine** (pure TypeScript, no UI or browser dependencies; ADR-0001). One entry point: `simulate(level, design, seed) → result`. Deep module: it owns arrivals, queueing, routing, failure events, metrics, scoring, bottleneck detection and hints. It is technology-agnostic (ADR-0004): it knows only generic primitives, and every component type is described in the catalogue as a combination of them.
+- **Component catalogue**: data describing every component type as a combination of engine primitives plus its numbers (parameters, sizes/tiers, workers, mean service time, cost, C4 kind and technology label, the chapter it is introduced in). Read by both the engine and the UI.
 - **Level content**: one JSON file per level, validated by a schema (ADR-0002), each with a hand-written **Starting Design** per mode and a **Reference Design**.
 - **Progress store**: small adapter over `localStorage` (ADR-0003) holding unlocked levels, best stars, hardest mode passed (the badge), last design per level and mode, and whether the tutorial is done. Must tolerate storage being unavailable.
 - **Game UI** (React + React Flow): level select, game screen, report card. Builds the C4 diagram from the design and renders playback from the engine result; it never computes metrics itself.

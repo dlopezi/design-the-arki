@@ -60,6 +60,14 @@ _Avoid_: Edge, wire, link
 
 ### Simulation
 
+**Primitive**:
+A generic engine building block (source, station, routing, shortcut, failure, metrics) that component types are described with.
+_Avoid_: Engine component (clashes with Component)
+
+**Technology Pack**:
+A set of component types and levels for one technology area (web core, async, CI) built from existing primitives.
+_Avoid_: Module, plugin, DLC
+
 **Simulation**:
 A deterministic, seeded run of a level's traffic through a design that produces metrics and a pass/fail result.
 _Avoid_: Run, test
