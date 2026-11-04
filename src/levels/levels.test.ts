@@ -4,8 +4,8 @@ import { simulate } from '../engine/simulate';
 import { allLevels, parseLevel } from './levels';
 
 describe('level files', () => {
-  it('ships levels 1 to 5 in order', () => {
-    expect(allLevels().map(l => l.id).slice(0, 5)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content']);
+  it('ships levels 1 to 6 in order', () => {
+    expect(allLevels().map(l => l.id).slice(0, 6)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down']);
   });
 
   for (const level of allLevels()) {

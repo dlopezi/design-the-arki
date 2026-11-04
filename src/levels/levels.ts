@@ -19,6 +19,7 @@ const levelSchema = z.object({
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
+  failureEvents: z.array(z.object({ atS: z.number().min(0), componentType, instance: z.number().int().min(0) })).default([]),
   /** Per component type: which sizes and how many instances the player may choose. */
   componentOptions: z.record(z.object({
     sizes: z.array(z.string()).min(1).optional(),

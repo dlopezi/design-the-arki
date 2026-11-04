@@ -1,0 +1,75 @@
+{
+  "id": "06-server-goes-down",
+  "title": "A server goes down",
+  "brief": "Traffic is a steady 300 people per second, and at 20 s one of your app server instances crashes. Two instances are enough on a good day. Are they enough on a bad one?",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 300
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 250,
+  "starCostThresholds": [
+    230,
+    200
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "database"
+  ],
+  "failureEvents": [
+    {
+      "atS": 20,
+      "componentType": "appServer",
+      "instance": 0
+    }
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ]
+    ]
+  }
+}
