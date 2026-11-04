@@ -16,6 +16,8 @@ const levelSchema = z.object({
   durationS: z.number().positive(),
   traffic: z.array(z.object({ fromS: z.number().min(0), toS: z.number().positive(), rps: z.number().positive() })).min(1),
   requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1) }),
+  budget: z.number().positive(),
+  starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   referenceDesign: designSchema,
 });
 

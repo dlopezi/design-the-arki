@@ -23,6 +23,11 @@ type SimEvent =
   | { kind: 'arrive'; station: string; request: Request }
   | { kind: 'done'; station: string; request: Request };
 
+/** Monthly cost of a design in dollars, from the catalogue. */
+export function designCost(design: Design, catalog: Catalog = defaultCatalog): number {
+  return design.components.reduce((sum, c) => sum + (catalog[c.type]?.monthlyCost ?? 0), 0);
+}
+
 /**
  * Runs a deterministic discrete-event simulation of `level` traffic through `design`.
  * Same inputs and seed always give the same result (ADR-0001).
@@ -98,14 +103,24 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   const percentile = (p: number) => (latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(p * latencies.length))]! : 0);
   const p95 = percentile(0.95);
   const errorRate = totalRequests ? (errors.rejected + errors.timedOut) / totalRequests : 0;
+  const cost = designCost(design, catalog);
   const checks: Result['checks'] = [
     { requirement: 'p95', target: level.requirements.p95Ms, actual: p95, ok: p95 <= level.requirements.p95Ms },
     { requirement: 'errorRate', target: level.requirements.maxErrorRate, actual: errorRate, ok: errorRate <= level.requirements.maxErrorRate },
+    { requirement: 'budget', target: level.budget, actual: cost, ok: cost <= level.budget },
   ];
+
+  const passed = checks.every(c => c.ok);
+  const stars = passed ? 1 + level.starCostThresholds.filter(threshold => cost <= threshold).length : 0;
+
+  const nextStarCost = passed ? (level.starCostThresholds.find(threshold => cost > threshold) ?? null) : null;
 
   return {
     seed, totalRequests, p50: percentile(0.5), p95, p99: percentile(0.99), errorRate, errors, checks,
-    passed: checks.every(c => c.ok),
+    passed,
+    cost,
+    stars,
+    nextStarCost,
     components: [...stations.values()].map(s => s.stats),
   };
 }

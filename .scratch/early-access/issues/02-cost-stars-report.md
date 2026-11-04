@@ -6,8 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] Cost comes from the catalogue and updates as soon as the design changes
-- [ ] Engine tests: pass requires every requirement including cost ≤ budget; stars = 1 + one per cost threshold met
-- [ ] Objectives tick or cross after a run; the budget objective is live
-- [ ] Cost meter shows the 2★ and 3★ thresholds
-- [ ] Report card shows the verdict, stars and the cost needed for the next star
+- [x] Cost comes from the catalogue and updates as soon as the design changes
+- [x] Engine tests: pass requires every requirement including cost ≤ budget; stars = 1 + one per cost threshold met
+- [x] Objectives tick or cross after a run; the budget objective is live
+- [x] Cost meter shows the 2★ and 3★ thresholds
+- [x] Report card shows the verdict, stars and the cost needed for the next star
+
+## Comments
+
+**2026-11-04, implemented.** Engine result now has `cost` (from catalogue `monthlyCost`), a `budget` check, `stars` and `nextStarCost`, all test-first at `simulate`. Level schema requires `budget` and strictly decreasing `starCostThresholds`. UI: objectives HUD (budget judged live, latency/errors after a run), cost meter with star ticks, report card dialog. The next-star message renders from `nextStarCost` but has no E2E yet: level 1's only design earns 3★; cover it once ticket 03 makes the design editable.

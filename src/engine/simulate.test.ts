@@ -8,6 +8,8 @@ function levelAt(rps: number, overrides: Partial<Level> = {}): Level {
     durationS: 30,
     traffic: [{ fromS: 0, toS: 30, rps }],
     requirements: { p95Ms: 200, maxErrorRate: 0.01 },
+    budget: 1000,
+    starCostThresholds: [],
     ...overrides,
   };
 }
@@ -58,5 +60,41 @@ describe('simulate', () => {
     expect(a.totalRequests).not.toBe(b.totalRequests);
     expect(Math.abs(a.p95 - b.p95) / a.p95).toBeLessThan(0.15);
     expect(a.passed).toBe(b.passed);
+  });
+
+  describe('cost and stars', () => {
+    it('prices the design from the catalogue: an app server ($40) and a small database ($50) cost $90/month', () => {
+      expect(simulate(levelAt(50), serverAndDatabase, 1).cost).toBe(90);
+    });
+
+    it('fails a level when the design costs more than the budget, even if it is fast enough', () => {
+      const result = simulate(levelAt(50, { budget: 80 }), serverAndDatabase, 1);
+
+      expect(result.passed).toBe(false);
+      expect(result.checks.find(c => c.requirement === 'budget')).toMatchObject({ target: 80, actual: 90, ok: false });
+      expect(result.checks.filter(c => c.requirement !== 'budget').every(c => c.ok)).toBe(true);
+    });
+
+    it.each([
+      { thresholds: [100, 95], stars: 3 },
+      { thresholds: [100, 85], stars: 2 },
+      { thresholds: [80, 70], stars: 1 },
+    ])('a passing design costing 90 dollars with star thresholds $thresholds earns $stars star(s)', ({ thresholds, stars }) => {
+      expect(simulate(levelAt(50, { starCostThresholds: thresholds }), serverAndDatabase, 1).stars).toBe(stars);
+    });
+
+    it('earns no stars when the level is failed, however cheap the design', () => {
+      expect(simulate(levelAt(300, { starCostThresholds: [100, 95] }), serverAndDatabase, 1).stars).toBe(0);
+    });
+
+    it('tells a passing player the monthly cost to reach for the next star', () => {
+      expect(simulate(levelAt(50, { starCostThresholds: [100, 85] }), serverAndDatabase, 1).nextStarCost).toBe(85);
+      expect(simulate(levelAt(50, { starCostThresholds: [80, 70] }), serverAndDatabase, 1).nextStarCost).toBe(80);
+    });
+
+    it('has no next-star cost when all stars are earned or the level is failed', () => {
+      expect(simulate(levelAt(50, { starCostThresholds: [100, 95] }), serverAndDatabase, 1).nextStarCost).toBeNull();
+      expect(simulate(levelAt(300, { starCostThresholds: [100, 95] }), serverAndDatabase, 1).nextStarCost).toBeNull();
+    });
   });
 });

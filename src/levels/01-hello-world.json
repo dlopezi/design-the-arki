@@ -5,6 +5,8 @@
   "durationS": 60,
   "traffic": [{ "fromS": 0, "toS": 60, "rps": 50 }],
   "requirements": { "p95Ms": 200, "maxErrorRate": 0.01 },
+  "budget": 150,
+  "starCostThresholds": [120, 100],
   "referenceDesign": {
     "components": [
       { "id": "api", "type": "appServer" },

@@ -7,6 +7,10 @@ export type Level = {
   durationS: number;
   traffic: TrafficSegment[];
   requirements: { p95Ms: number; maxErrorRate: number };
+  /** Maximum monthly cost in dollars. */
+  budget: number;
+  /** Monthly costs at or below which the 2nd, 3rd… star is earned. */
+  starCostThresholds: number[];
 };
 
 export type DesignComponent = { id: string; type: string; params?: Record<string, unknown> };
@@ -18,13 +22,13 @@ export type Design = {
 };
 
 /** A station: a pool of workers with a bounded FIFO queue. */
-export type StationPrimitive = { primitive: 'station'; workers: number; meanServiceMs: number };
+export type StationPrimitive = { primitive: 'station'; workers: number; meanServiceMs: number; monthlyCost: number };
 
 export type ComponentSpec = StationPrimitive;
 
 export type Catalog = Record<string, ComponentSpec>;
 
-export type Check = { requirement: 'p95' | 'errorRate'; target: number; actual: number; ok: boolean };
+export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: number; actual: number; ok: boolean };
 
 export type ComponentResult = { id: string; served: number; rejected: number; timedOut: number };
 
@@ -32,6 +36,11 @@ export type Result = {
   seed: number;
   totalRequests: number;
   passed: boolean;
+  cost: number;
+  /** 0 when failed; 1 for passing plus one per star cost threshold met. */
+  stars: number;
+  /** Cost at or below which the next star is earned; null when failed or all stars earned. */
+  nextStarCost: number | null;
   p50: number;
   p95: number;
   p99: number;
