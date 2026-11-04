@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { canvasSettled, connect, hotbarButton, node, select } from './helpers';
+import { canvasSettled, connect, hotbarButton, node, playAndSkip, select } from './helpers';
 
 test.describe('level 2: first spike', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,7 +29,7 @@ test.describe('level 2: first spike', () => {
     await expect(inspector).toContainText('2 × $40 = $80/month');
     await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuenow', '150');
 
-    await page.getByRole('button', { name: 'Play' }).click();
+    await playAndSkip(page);
     await expect(page.getByRole('dialog', { name: 'Level passed' }).getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
   });
 

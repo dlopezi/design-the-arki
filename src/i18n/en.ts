@@ -3,6 +3,9 @@ const stars = (n: number) => '★'.repeat(n);
 
 export const en = {
   play: 'Play',
+  skip: 'Skip to results',
+  clock: 'Simulation clock',
+  errorsWord: 'errors',
   objectives: 'Objectives',
   objectiveP95: (ms: number) => `p95 latency ≤ ${ms} ms`,
   objectiveErrors: (rate: number) => `Errors ≤ ${percent(rate)}`,

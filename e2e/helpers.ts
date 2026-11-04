@@ -27,3 +27,22 @@ export const hotbarButton = (page: Page, name: RegExp) => page.getByRole('toolba
 export async function select(page: Page, label: string, nth = 0) {
   await node(page, label, nth).getByText(label, { exact: true }).click();
 }
+
+/** Presses Play and skips the playback straight to the report. */
+export async function playAndSkip(page: Page, how: 'button' | 'space' = 'button') {
+  if (how === 'space') await page.keyboard.press('Space');
+  else await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Skip to results' }).click();
+}
+
+/** Builds Clients → Load balancer → App server (2 instances) → Database on level 2. */
+export async function buildScaledOut(page: Page) {
+  await page.keyboard.press('1');
+  await page.keyboard.press('2');
+  await page.keyboard.press('3');
+  await connect(page, { label: 'Clients' }, { label: 'Load balancer' });
+  await connect(page, { label: 'Load balancer' }, { label: 'App server' });
+  await connect(page, { label: 'App server' }, { label: 'Database' });
+  await select(page, 'App server');
+  await page.getByRole('complementary', { name: 'Inspector' }).getByRole('button', { name: 'Add instance' }).click();
+}

@@ -1,6 +1,6 @@
-import { Handle, Position, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { BaseEdge, getBezierPath, Handle, Position, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
 import { catalog } from '../catalog/catalog';
-import type { Design, Presentation } from '../engine/types';
+import type { Design, Presentation, Result } from '../engine/types';
 import { en as t } from '../i18n/en';
 
 // Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
@@ -18,8 +18,22 @@ export type BoundaryData = { title: string; kind: string; system: boolean };
 export type ComponentData = {
   componentId: string; title: string; technology: string; detail: string;
   container: boolean; selected: boolean; problem: boolean;
+  /** Share of capacity in use during playback (0–1); null when not playing or hidden. */
+  load: number | null;
 };
-export type InstanceData = { name: string; detail: string };
+export type InstanceData = { name: string; detail: string; load: number | null };
+
+export const loadLevel = (load: number) => (load >= 0.9 ? 'high' : load >= 0.7 ? 'medium' : 'low');
+
+function Load({ value }: { value: number | null }) {
+  if (value === null) return null;
+  return (
+    <span className={`load ${loadLevel(value)}`}>
+      <span className="load-bar"><span style={{ width: `${Math.round(value * 100)}%` }} /></span>
+      <span className="load-value">{Math.round(value * 100)}%</span>
+    </span>
+  );
+}
 
 function PersonNode({ data }: NodeProps<Node<PersonData>>) {
   return (
@@ -47,6 +61,7 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
       <strong>{data.title}</strong>
       <span className="c4-kind">[{data.technology}]</span>
       <span className="c4-detail">{data.detail}</span>
+      {!data.container && <Load value={data.load} />}
       <Handle type="source" position={Position.Right} />
     </div>
   );
@@ -54,14 +69,35 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
 
 function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
   return (
-    <div className="c4-instance">
+    <div className={`c4-instance ${data.load === null ? '' : loadLevel(data.load)}`}>
       <strong>{data.name}</strong>
       <span className="c4-detail">{data.detail}</span>
+      <Load value={data.load} />
     </div>
   );
 }
 
 export const nodeTypes = { person: PersonNode, boundary: BoundaryNode, component: ComponentNode, instance: InstanceNode };
+
+export type FlowEdgeData = { animate: boolean; rps: number };
+
+/** A connection; while the run plays, dots travel along it, more of them for more traffic. */
+function FlowEdge(props: EdgeProps<Edge<FlowEdgeData>>) {
+  const [path] = getBezierPath(props);
+  const dots = props.data?.animate ? Math.max(2, Math.min(8, Math.round(props.data.rps / 60))) : 0;
+  return (
+    <>
+      <BaseEdge id={props.id} path={path} style={props.style} />
+      {Array.from({ length: dots }, (_, i) => (
+        <circle key={i} className="flow-dot" r={3.5}>
+          <animateMotion dur="1.2s" repeatCount="indefinite" begin={`${(i * 1.2) / dots}s`} path={path} />
+        </circle>
+      ))}
+    </>
+  );
+}
+
+export const edgeTypes = { flow: FlowEdge };
 
 export const instanceCountOf = (params?: Record<string, unknown>) => Number(params?.instances ?? 1);
 export const sizeOf = (type: string, params?: Record<string, unknown>) => (params?.size as string | undefined) ?? catalog[type]!.defaultSize;
@@ -70,10 +106,17 @@ function sized<T extends Record<string, unknown>>(node: Omit<Node<T>, 'width' | 
   return { ...node, width: w, height: h, style: { width: w, height: h } } as Node<T>;
 }
 
-export type DiagramState = { selected: string | null; problemIds: string[] };
+export type DiagramState = {
+  selected: string | null;
+  problemIds: string[];
+  /** During playback: the run and the bucket being shown. */
+  live?: { result: Result; bucket: number; animate: boolean } | null;
+};
 
 /** Turns a design into C4-style nodes: a person, the system boundary, zones, components and one node per instance. */
 export function layoutDiagram(design: Design, state: DiagramState): { nodes: Node[]; edges: Edge[] } {
+  const live = state.live ?? null;
+  const liveOf = (id: string) => live?.result.components.find(c => c.id === id) ?? null;
   const prefixCounters = new Map<string, number>();
   type Placed = { id: string; type: string; params?: Record<string, unknown>; height: number; instances: number; container: boolean };
   const zones = ZONES.map(zone => {
@@ -119,7 +162,8 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
       nodes.push(sized<ComponentData>({ id: member.id, type: 'component', parentId: zoneId, extent: 'parent',
         position: { x: ZONE.pad, y }, selected: state.selected === member.id,
         data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
-          detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id) } }, BOX.w, member.height));
+          detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id),
+          load: live && !spec.presentation?.hideCapacity ? (liveOf(member.id)?.bucketUtilization[live.bucket] ?? null) : null } }, BOX.w, member.height));
       if (member.container) {
         const prefix = spec.presentation?.instancePrefix ?? member.type;
         for (let k = 0; k < member.instances; k++) {
@@ -127,7 +171,8 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
           prefixCounters.set(prefix, n);
           nodes.push(sized<InstanceData>({ id: `${member.id}#${k}`, type: 'instance', parentId: member.id, extent: 'parent',
             position: { x: (BOX.w - INSTANCE.w) / 2, y: CONTAINER_HEAD + k * (INSTANCE.h + INSTANCE.gap) },
-            data: { name: `${prefix}-${n}`, detail: `${workers} workers` }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
+            data: { name: `${prefix}-${n}`, detail: `${workers} workers`,
+              load: live ? (liveOf(member.id)?.instances[k]?.bucketUtilization[live.bucket] ?? null) : null }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
         }
       }
       y += member.height + COMPONENT_GAP;
@@ -142,6 +187,8 @@ export const edgeId = (from: string, to: string) => `${from}->${to}`;
 function edgesOf(design: Design, state: DiagramState): Edge[] {
   return design.connections.map(([from, to]) => {
     const id = edgeId(from, to);
-    return { id, source: from, target: to, selected: state.selected === id };
+    const live = state.live;
+    const data: FlowEdgeData = { animate: !!live?.animate, rps: live ? (live.result.buckets[live.bucket]?.rps ?? 0) : 0 };
+    return { id, source: from, target: to, type: 'flow', data, selected: state.selected === id };
   });
 }

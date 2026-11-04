@@ -1,17 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFlow, type Connection, type Edge, type Node } from '@xyflow/react';
-import { DesignError, designCost, simulate } from '../engine/simulate';
+import { BUCKET_S, DesignError, designCost, simulate } from '../engine/simulate';
 import type { Design, DesignProblem, Result } from '../engine/types';
-import { en as t } from '../i18n/en';
+import { en as t, percent } from '../i18n/en';
 import { allLevels, type LevelDefinition } from '../levels/levels';
 import { CostMeter } from './costMeter';
-import { layoutDiagram, nodeTypes } from './diagram';
+import { edgeTypes, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
 import { Inspector } from './inspector';
 import { Objectives } from './objectives';
 import { ReportCard } from './reportCard';
 
 const EMPTY: Design = { components: [], connections: [] };
+/** Real seconds the playback of a whole level takes. */
+const PLAYBACK_MS = 6000;
+
+function usePrefersReducedMotion(): boolean {
+  const query = '(prefers-reduced-motion: reduce)';
+  const [reduce, setReduce] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setReduce(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+  return reduce;
+}
 // Keep the diagram clear of the floating panels: mission (left), inspector (right), controls (bottom).
 const FIT = { maxZoom: 1.1, padding: { top: '40px', left: '340px', right: '340px', bottom: '140px' } } as const;
 const labelOf = (design: Design, id: string) => {
@@ -38,14 +52,22 @@ function Game({ level }: { level: LevelDefinition }) {
   const [result, setResult] = useState<Result | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [problem, setProblem] = useState<{ message: string; componentIds: string[] } | null>(null);
+  const [playT, setPlayT] = useState<number | null>(null);
+  const frame = useRef(0);
   const counter = useRef(0);
   const { fitView } = useReactFlow();
+  const reduceMotion = usePrefersReducedMotion();
+  const running = playT !== null;
+  const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
+  const live = running && result ? { result, bucket, animate: !reduceMotion } : null;
 
-  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [] }), [design, selected, problem]);
+  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live }),
+    [design, selected, problem, live?.result, live?.bucket, live?.animate]); // eslint-disable-line react-hooks/exhaustive-deps
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
   // Any change to the design invalidates the last run.
-  useEffect(() => { setResult(null); setShowReport(false); setProblem(null); }, [designKey]);
+  useEffect(() => { cancelAnimationFrame(frame.current); setPlayT(null); setResult(null); setShowReport(false); setProblem(null); }, [designKey]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
   const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
   useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView]);
@@ -84,18 +106,32 @@ function Game({ level }: { level: LevelDefinition }) {
   const play = useCallback(() => {
     try {
       setResult(simulate(level, design, 1));
-      setShowReport(true);
+      setShowReport(false);
       setProblem(null);
+      // Replay the run: the whole level in PLAYBACK_MS, then the report.
+      const started = performance.now();
+      setPlayT(0);
+      const tick = (now: number) => {
+        // A frame's timestamp can be slightly earlier than `started`.
+        const progress = Math.max(0, (now - started) / PLAYBACK_MS);
+        if (progress >= 1) { setPlayT(null); setShowReport(true); return; }
+        setPlayT(progress * level.durationS);
+        frame.current = requestAnimationFrame(tick);
+      };
+      cancelAnimationFrame(frame.current);
+      frame.current = requestAnimationFrame(tick);
     } catch (e) {
       if (!(e instanceof DesignError)) throw e;
       setProblem({ message: describeProblem(e.problem, design), componentIds: problemComponents(e.problem) });
     }
   }, [level, design]);
 
+  const skip = useCallback(() => { cancelAnimationFrame(frame.current); setPlayT(null); setShowReport(true); }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (showReport || target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (showReport || running || target.closest('input, textarea, select, [contenteditable="true"]')) return;
       const index = Number(e.key) - 1;
       if (Number.isInteger(index) && level.allowedComponents[index]) {
         addComponent(level.allowedComponents[index]!);
@@ -107,13 +143,13 @@ function Game({ level }: { level: LevelDefinition }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addComponent, play, level.allowedComponents, showReport]);
+  }, [addComponent, play, level.allowedComponents, showReport, running]);
 
   const selectedComponent = design.components.find(c => c.id === selected) ?? null;
 
   return (
     <div className="game">
-      <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} onConnect={onConnect}
+      <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
         onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
         onNodeClick={(_, n) => setSelected(n.type === 'component' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
         onEdgeClick={(_, e) => setSelected(e.id)} onPaneClick={() => setSelected(null)}
@@ -127,7 +163,7 @@ function Game({ level }: { level: LevelDefinition }) {
       <section className="hud mission">
         <h1>{level.title}</h1>
         <p>{level.brief}</p>
-        <Objectives level={level} cost={cost} result={result} />
+        <Objectives level={level} cost={cost} result={running ? null : result} />
         <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
         <p className="hint">{t.canvasHint}</p>
       </section>
@@ -142,8 +178,20 @@ function Game({ level }: { level: LevelDefinition }) {
 
       <div className="hud controls">
         <Hotbar types={level.allowedComponents} onAdd={addComponent} />
-        <button className="play" onClick={play}>{t.play}</button>
+        <button className="play" onClick={play} disabled={running}>{t.play}</button>
+        {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
       </div>
+      {running && result && (() => {
+        const b = result.buckets[bucket]!;
+        return (
+          <div className="hud clock" role="timer" aria-label={t.clock}>
+            <strong>t = {Math.floor(playT)} s</strong>
+            <span>{Math.round(b.rps)} req/s</span>
+            <span className={b.p95 > level.requirements.p95Ms ? 'bad' : 'ok'}>p95 {Math.round(b.p95)} ms</span>
+            <span className={b.errorRate > level.requirements.maxErrorRate ? 'bad' : ''}>{percent(b.errorRate)} {t.errorsWord}</span>
+          </div>
+        );
+      })()}
       {problem && <div className="hud problem" role="alert">{problem.message}</div>}
 
       {result && showReport && <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} onClose={() => setShowReport(false)} />}

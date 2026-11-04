@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { canvasSettled, connect, node } from './helpers';
+import { canvasSettled, connect, node, playAndSkip } from './helpers';
 
 /** Builds Clients → App server → Database from the hotbar. */
 async function buildServerAndDatabase(page: Page) {
@@ -22,7 +22,7 @@ test('a player builds level 1 from an empty canvas and passes it', async ({ page
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
   await expect(page.getByRole('meter', { name: 'Monthly cost' })).toHaveAttribute('aria-valuenow', '90');
 
-  await page.keyboard.press('Space');
+  await playAndSkip(page, 'space');
 
   const report = page.getByRole('dialog', { name: 'Level passed' });
   await expect(report.getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
@@ -74,7 +74,7 @@ test('a passing design that is too expensive for 3 stars says what cost to aim f
   await connect(page, { label: 'App server', nth: 0 }, { label: 'App server', nth: 1 });
   await connect(page, { label: 'App server', nth: 1 }, { label: 'Database' });
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await playAndSkip(page);
 
   const report = page.getByRole('dialog', { name: 'Level passed' });
   await expect(report.getByRole('img', { name: '1 of 3 stars' })).toBeVisible();

@@ -97,3 +97,19 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .segmented label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .danger { justify-self: start; background: none; border: 1px solid color-mix(in srgb, var(--bad) 60%, transparent); color: var(--bad); border-radius: 8px; padding: 6px 12px; }
+
+/* Playback */
+.clock { top: 16px; left: 50%; transform: translateX(-50%); padding: 8px 18px; display: flex; gap: 14px; align-items: baseline; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.clock strong { font-size: 20px; }
+.play:disabled { background: var(--line-strong); color: var(--muted); box-shadow: none; cursor: default; }
+.flow-dot { fill: var(--accent); }
+.load { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.load-bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
+.load-bar span { display: block; height: 100%; background: var(--ok); transition: width .2s; }
+.load.medium .load-bar span { background: var(--warn); } .load.high .load-bar span { background: var(--bad); }
+.load-value { font-size: 11px; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+.load.high .load-value { color: var(--bad); }
+.c4-instance.high { border-color: var(--bad); box-shadow: 0 0 12px color-mix(in srgb, var(--bad) 35%, transparent); }
+.c4-instance.medium { border-color: var(--warn); }
+.c4-instance { justify-content: flex-start; gap: 0; }
+@media (prefers-reduced-motion: reduce) { .load-bar span { transition: none; } }
