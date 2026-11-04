@@ -14,6 +14,7 @@ export class DesignError extends Error {
 /** Default queue size per instance; a component's `queueSize` param overrides it. */
 export const DEFAULT_QUEUE_SIZE = 100;
 export const TIMEOUT_MS = 1000;
+export const BUCKET_S = 5;
 const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
@@ -102,12 +103,16 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
 
   const events = new EventQueue<SimEvent>();
   let totalRequests = 0;
+  const bucketCount = Math.ceil(level.durationS / BUCKET_S);
+  const bucketOf = (timeMs: number) => Math.min(bucketCount - 1, Math.floor(timeMs / (BUCKET_S * 1000)));
+  const bucketRequests = new Array<number>(bucketCount).fill(0);
   for (const segment of level.traffic) {
     const end = segment.toS * 1000;
     const meanGap = 1000 / segment.rps;
     for (let t = segment.fromS * 1000 + exponential(meanGap); t < end; t += exponential(meanGap)) {
       events.push(t, { kind: 'arrive', station: entry, request: { createdAt: t, enqueuedAt: t, hops: 1 } });
       totalRequests++;
+      bucketRequests[bucketOf(t)]!++;
     }
   }
 
@@ -177,5 +182,6 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stars,
     nextStarCost,
     components: [...stations.values()].map(s => s.stats),
+    buckets: bucketRequests.map((count, i) => ({ fromS: i * BUCKET_S, rps: count / BUCKET_S })),
   };
 }

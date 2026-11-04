@@ -174,4 +174,16 @@ describe('simulate', () => {
       expect(short.p95).toBeLessThan(standard.p95);
     });
   });
+
+  describe('timeline in 5-second buckets', () => {
+    const rising = levelAt(0, { durationS: 30, traffic: [{ fromS: 0, toS: 15, rps: 50 }, { fromS: 15, toS: 30, rps: 150 }] });
+
+    it('reports requests per second for each 5-second bucket, following the traffic profile', () => {
+      const { buckets } = simulate(rising, serverAndDatabase, 3);
+
+      expect(buckets.map(b => b.fromS)).toEqual([0, 5, 10, 15, 20, 25]);
+      for (const b of buckets.slice(0, 3)) expect(b.rps).toBeGreaterThan(40), expect(b.rps).toBeLessThan(60);
+      for (const b of buckets.slice(3)) expect(b.rps).toBeGreaterThan(130), expect(b.rps).toBeLessThan(170);
+    });
+  });
 });
