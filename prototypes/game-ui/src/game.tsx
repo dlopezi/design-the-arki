@@ -16,7 +16,8 @@ export const LEVEL = {
 };
 
 export type Tier = 'small' | 'medium' | 'large';
-export type DesignState = { servers: number; dbTier: Tier; cacheOn: boolean; ttlS: number; failure: boolean };
+export type Size = 'small' | 'medium' | 'large';
+export type DesignState = { servers: number; serverSize: Size; serverQueueCap: number; dbTier: Tier; cacheOn: boolean; ttlS: number; failure: boolean };
 export type CompType = 'client' | 'lb' | 'server' | 'cache' | 'db';
 
 export const META: Record<CompType, { label: string; icon: LucideIcon; blurb: string }> = {
@@ -32,7 +33,7 @@ export const PALETTE: { type: CompType; cost: string }[] = [
 ];
 
 function buildDesign(s: DesignState) {
-  const components: any[] = [{ id: 'lb', type: 'lb' }, { id: 'app', type: 'server', params: { instances: s.servers } }, { id: 'db', type: 'db', params: { tier: s.dbTier } }];
+  const components: any[] = [{ id: 'lb', type: 'lb' }, { id: 'app', type: 'server', params: { instances: s.servers, size: s.serverSize, queueCap: s.serverQueueCap } }, { id: 'db', type: 'db', params: { tier: s.dbTier } }];
   const connections: [string, string][] = [['client', 'lb'], ['lb', 'app']];
   if (s.cacheOn) { components.push({ id: 'cache', type: 'cache', params: { ttlS: s.ttlS } }); connections.push(['app', 'cache'], ['cache', 'db']); }
   else connections.push(['app', 'db']);
@@ -43,7 +44,7 @@ export type Result = ReturnType<typeof Engine.simulate>;
 const PLAY_MS = 6000;
 
 export function useGame() {
-  const [design, setDesign] = useState<DesignState>({ servers: 3, dbTier: 'small', cacheOn: true, ttlS: 60, failure: false });
+  const [design, setDesign] = useState<DesignState>({ servers: 3, serverSize: 'medium', serverQueueCap: 100, dbTier: 'small', cacheOn: true, ttlS: 60, failure: false });
   const [selected, setSelected] = useState<string | null>('app');
   const [result, setResult] = useState<Result | null>(null);
   const [playT, setPlayT] = useState<number | null>(null); // simulated seconds while animating
@@ -57,6 +58,8 @@ export function useGame() {
     addServer: () => update({ servers: Math.min(8, design.servers + 1) }),
     removeServer: () => update({ servers: Math.max(1, design.servers - 1) }),
     setTier: (dbTier: Tier) => update({ dbTier }),
+    setServerSize: (serverSize: Size) => update({ serverSize }),
+    queueCap: (delta: number) => update({ serverQueueCap: Math.max(10, Math.min(500, design.serverQueueCap + delta)) }),
     addCache: () => update({ cacheOn: true }),
     removeCache: () => { update({ cacheOn: false }); setSelected(null); },
     ttl: (delta: number) => update({ ttlS: Math.max(0, Math.min(600, design.ttlS + delta)) }),
@@ -136,6 +139,8 @@ export function FlowEdge(props: EdgeProps<Edge<{ running: boolean; hot: boolean;
 export const nodeTypes = { arch: ArchNode };
 export const edgeTypes = { flow: FlowEdge };
 
+export { Engine };
+
 export function buildFlow(g: Game, skin: ArchNodeData['skin'], gap = 230) {
   const { design, result, running, bucket, selected } = g;
   const comp = (id: string) => result?.components.find((c: any) => c.id === id);
@@ -192,7 +197,7 @@ export function useFlowNodes(built: Node<ArchNodeData>[]) {
   const [nodes, setNodes] = useState(built);
   const key = JSON.stringify(built.map(n => [n.id, n.data, n.position]));
   useEffect(() => {
-    setNodes(prev => built.map(n => { const p = prev.find(x => x.id === n.id); return p ? { ...p, data: n.data, position: n.position } : n; }));
+    setNodes(prev => built.map(n => { const p = prev.find(x => x.id === n.id); return p ? { ...p, ...n } : n; }));
   }, [key]); // eslint-disable-line
   const onNodesChange = useCallback((ch: NodeChange<Node<ArchNodeData>>[]) => setNodes(ns => applyNodeChanges(ch, ns)), []);
   return { nodes, onNodesChange };

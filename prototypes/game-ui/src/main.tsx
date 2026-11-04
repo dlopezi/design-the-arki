@@ -1,4 +1,4 @@
-// PROTOTYPE: three radically different game-screen layouts, switchable via ?variant=A|B|C (or #a|#b|#c).
+// PROTOTYPE: three radically different game-screen layouts, switchable via ?variant=A|B|C|D (or #a…#d).
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -9,11 +9,13 @@ import { PrototypeSwitcher } from './PrototypeSwitcher';
 import { VariantA } from './variants/A';
 import { VariantB } from './variants/B';
 import { VariantC } from './variants/C';
+import { VariantD } from './variants/D';
 
 const VARIANTS = [
   { key: 'A', name: 'Estudio (herramienta de arquitectura)', C: VariantA },
   { key: 'B', name: 'Misión (HUD de juego)', C: VariantB },
   { key: 'C', name: 'Entrevista (conversación guiada)', C: VariantC },
+  { key: 'D', name: 'Misión + C4 (B con resultados e inspector)', C: VariantD },
 ];
 
 function App() {

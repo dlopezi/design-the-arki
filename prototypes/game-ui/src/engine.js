@@ -4,7 +4,9 @@ const Engine = (() => {
 
   const CATALOG = {
     lb:     { label: 'Balanceador',     serviceMs: 1,  workers: 500, cost: () => 20 },
-    server: { label: 'Servidor de app', serviceMs: 20, workers: 4,   cost: p => 40 * p.instances },
+    server: { label: 'Servidor de app', serviceMs: 20, workers: 4,
+              sizes: { small: { workers: 2, cost: 20 }, medium: { workers: 4, cost: 40 }, large: { workers: 8, cost: 80 } },
+              cost: p => CATALOG.server.sizes[p.size || 'medium'].cost * p.instances },
     cache:  { label: 'Caché',           serviceMs: 2,  workers: 50,  cost: () => 30 },
     db:     { label: 'Base de datos',   serviceMs: 20,
               tiers: { small: { workers: 8, cost: 50 }, medium: { workers: 16, cost: 150 }, large: { workers: 32, cost: 400 } },
@@ -44,10 +46,11 @@ const Engine = (() => {
     const comps = {};
     for (const c of design.components) {
       const spec = CATALOG[c.type], p = c.params || {};
-      const workers = c.type === 'db' ? spec.tiers[p.tier].workers : spec.workers;
+      const workers = c.type === 'db' ? spec.tiers[p.tier].workers : c.type === 'server' ? spec.sizes[p.size || 'medium'].workers : spec.workers;
+      const queueCap = p.queueCap ?? QUEUE_CAP;
       const n = c.type === 'server' ? p.instances : 1;
-      comps[c.id] = { id: c.id, type: c.type, label: spec.label, params: p, workers, serviceMs: spec.serviceMs, rr: 0,
-        instances: Array.from({ length: n }, () => ({ busy: 0, queue: [], alive: true })),
+      comps[c.id] = { id: c.id, type: c.type, label: spec.label, params: p, workers, queueCap, serviceMs: spec.serviceMs, rr: 0,
+        instances: Array.from({ length: n }, () => ({ busy: 0, queue: [], alive: true, busyBuckets: new Array(nB).fill(0), served: 0, rejected: 0, maxQueue: 0, killedAtS: null })),
         busyBuckets: new Array(nB).fill(0),
         stats: { arrived: 0, served: 0, waitMs: 0, busyMs: 0, maxQueue: 0, rejected: 0, timedOut: 0, lost: 0, hits: 0, misses: 0 } };
     }
@@ -73,15 +76,15 @@ const Engine = (() => {
       if (lat > TIMEOUT_MS) return fail(req, 'timedOut', null);
       latencies.push(lat); const b = bucketOf(req.created); b.requests++; b.ok++; b.lat.push(lat);
     };
-    const addBusy = (c, t0, d) => {
+    const addBusy = (c, inst, t0, d) => {
       c.stats.busyMs += d; let t = t0; const t1 = t0 + d, bMs = BUCKET_S * 1000;
-      while (t < t1) { const i = Math.floor(t / bMs); if (i >= nB) break; const e = Math.min(t1, (i + 1) * bMs); c.busyBuckets[i] += e - t; t = e; }
+      while (t < t1) { const i = Math.floor(t / bMs); if (i >= nB) break; const e = Math.min(t1, (i + 1) * bMs); c.busyBuckets[i] += e - t; inst.busyBuckets[i] += e - t; t = e; }
     };
     const start = (c, i, req, t) => {
       if (t - req.created > TIMEOUT_MS) return fail(req, 'timedOut', c);
       c.stats.waitMs += t - req.enq;
       c.instances[i].busy++;
-      const svc = exp(rng, c.serviceMs); addBusy(c, t, svc);
+      const svc = exp(rng, c.serviceMs); addBusy(c, c.instances[i], t, svc);
       at(t + svc, 'done', { comp: c.id, inst: i, req });
     };
     const route = (c, req, t) => {
@@ -103,17 +106,17 @@ const Engine = (() => {
         const i = alive[c.rr++ % alive.length], inst = c.instances[i];
         e.req.enq = e.t;
         if (inst.busy < c.workers) start(c, i, e.req, e.t);
-        else if (inst.queue.length < QUEUE_CAP) { inst.queue.push(e.req); c.stats.maxQueue = Math.max(c.stats.maxQueue, inst.queue.length); }
-        else fail(e.req, 'rejected', c);
+        else if (inst.queue.length < c.queueCap) { inst.queue.push(e.req); inst.maxQueue = Math.max(inst.maxQueue, inst.queue.length); c.stats.maxQueue = Math.max(c.stats.maxQueue, inst.queue.length); }
+        else { inst.rejected++; fail(e.req, 'rejected', c); }
       } else if (e.type === 'done') {
         const inst = c.instances[e.inst]; inst.busy--;
         if (!inst.alive) { fail(e.req, 'lost', c); continue; }
-        c.stats.served++;
+        c.stats.served++; inst.served++;
         route(c, e.req, e.t);
         while (inst.busy < c.workers && inst.queue.length) start(c, e.inst, inst.queue.shift(), e.t);
       } else if (e.type === 'kill') {
         const inst = c.instances[e.inst]; if (!inst || !inst.alive) continue;
-        inst.alive = false; for (const r of inst.queue) fail(r, 'lost', c); inst.queue = [];
+        inst.alive = false; inst.killedAtS = e.t / 1000; for (const r of inst.queue) fail(r, 'lost', c); inst.queue = [];
       }
     }
 
@@ -130,6 +133,10 @@ const Engine = (() => {
         utilization: s.busyMs / (cap * durMs),
         peakUtilization: Math.max(...c.busyBuckets.map(b => b / (cap * BUCKET_S * 1000))),
         bucketUtilization: c.busyBuckets.map(b => Math.min(1, b / (cap * BUCKET_S * 1000))),
+        workers: c.workers, queueCap: c.queueCap, serviceMs: c.serviceMs,
+        instances: c.instances.map((x, k) => ({ index: k, served: x.served, rejected: x.rejected, maxQueue: x.maxQueue, killedAtS: x.killedAtS,
+          bucketUtilization: x.busyBuckets.map(b => Math.min(1, b / (c.workers * BUCKET_S * 1000))),
+          peakUtilization: Math.max(...x.busyBuckets.map(b => Math.min(1, b / (c.workers * BUCKET_S * 1000)))) })),
         avgWaitMs: s.arrived ? s.waitMs / s.arrived : 0, ...s,
         hitRate: c.type === 'cache' ? s.hits / Math.max(1, s.hits + s.misses) : null,
         pressure: s.waitMs + overload * TIMEOUT_MS };
