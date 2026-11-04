@@ -311,5 +311,24 @@ describe('simulate', () => {
       expect(api.instances[0]!.bucketUtilization.slice(3).every(u => u === 0)).toBe(true);
       expect(api.instances[1]!.served).toBeGreaterThan(api.instances[0]!.served);
     });
+
+    it('measures utilisation against the capacity still alive: 300 req/s on 3 instances goes from 0.5 to 0.75 when one fails', () => {
+      const api = simulate(failingAt(300, 10), scaledOut(3), 1).components.find(c => c.id === 'api')!;
+      for (const u of api.bucketUtilization.slice(0, 2)) expect(u).toBeGreaterThan(0.4), expect(u).toBeLessThan(0.6);
+      for (const u of api.bucketUtilization.slice(3)) expect(u).toBeGreaterThan(0.65), expect(u).toBeLessThan(0.85);
+    });
+
+    it('needs one spare instance (N+1): two instances that just fit 300 req/s fail when one goes down, three pass', () => {
+      expect(simulate(levelAt(300), scaledOut(2), 1).passed).toBe(true);
+      expect(simulate(failingAt(300, 10), scaledOut(2), 1).passed).toBe(false);
+      expect(simulate(failingAt(300, 10), scaledOut(3), 1).passed).toBe(true);
+    });
+
+    it('turns requests away as unavailable when no instance is left alive', () => {
+      const lonely = levelAt(50, { failureEvents: [{ atS: 10, componentType: 'appServer', instance: 0 }] });
+      const result = simulate(lonely, serverAndDatabase, 1);
+      expect(result.errors.unavailable).toBeGreaterThan(900);
+      expect(result.passed).toBe(false);
+    });
   });
 });
