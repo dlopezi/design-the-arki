@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de módulos de archi-game</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one reading column; wide figures scroll inside their own container. */
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --fg: #1a1f2b; --muted: #5d6576; --line: #d5d9e2;
+    --accent: #2f6fe0; --accent-soft: #e6eefc; --new: #c2410c; --new-soft: #fdeee4;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #11141a; --panel: #181c24; --fg: #e6e9ef; --muted: #98a0b0; --line: #2d3340;
+    --accent: #6ea2ff; --accent-soft: #1b2638; --new: #fb923c; --new-soft: #2c1d12; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #11141a; --panel: #181c24; --fg: #e6e9ef; --muted: #98a0b0; --line: #2d3340;
+    --accent: #6ea2ff; --accent-soft: #1b2638; --new: #fb923c; --new-soft: #2c1d12; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--sans); }
+  main { max-width: 1040px; margin: 0 auto; padding-block: 32px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0; text-wrap: balance; }
+  h2 { font-size: 19px; margin: 0 0 8px; text-wrap: balance; }
+  p { margin: 0; max-width: 68ch; }
+  .lede { color: var(--muted); }
+  .eyebrow { font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  section { display: grid; gap: 12px; min-width: 0; }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .scroll { overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--fg); font-family: var(--sans); }
+  figcaption { color: var(--muted); font-size: 13.5px; margin-top: 10px; max-width: 80ch; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  td.c { text-align: center; font-family: var(--mono); }
+  .yes { color: var(--accent); font-weight: 600; } .new { color: var(--new); font-weight: 600; } .no { color: var(--muted); }
+  code { font-family: var(--mono); font-size: .92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 14px; border-radius: 6px; }
+  .callout p + p { margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<main>
+  <header style="display:grid;gap:8px">
+    <div class="eyebrow">archi-game · acceso anticipado</div>
+    <h1>Mapa de módulos</h1>
+    <p class="lede">Cómo se reparten las piezas del juego, por dónde pasan los datos y dónde se prueban. Debajo, cómo encajaría más adelante un pack de tecnología como GitLab CI.</p>
+  </header>
+
+  <section>
+    <h2>1 · Módulos y flujo de datos</h2>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 1000 540" role="img" aria-label="La interfaz carga un nivel, llama al motor con simulate(nivel, diseño, semilla) y pinta el resultado; el catálogo alimenta al motor y a la interfaz; el progreso y la analítica cuelgan de la interfaz.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        </defs>
+
+        <!-- Column headers -->
+        <g font-size="11" fill="var(--muted)" font-family="var(--mono)" letter-spacing=".06em">
+          <text x="20" y="52">CONTENIDO (DATOS)</text>
+          <text x="300" y="52">LÓGICA</text>
+          <text x="780" y="52">PRESENTACIÓN</text>
+        </g>
+
+        <!-- Content column -->
+        <g font-size="13">
+          <rect x="20" y="64" width="210" height="84" rx="8" fill="var(--panel)" stroke="currentColor"/>
+          <text x="34" y="88" font-weight="600" fill="currentColor">Archivos de nivel</text>
+          <text x="34" y="107" fill="var(--muted)" font-size="12">JSON validado por esquema</text>
+          <text x="34" y="124" fill="var(--muted)" font-size="12">tráfico · SLA · presupuesto · fallos</text>
+          <text x="34" y="140" fill="var(--muted)" font-size="12">diseños iniciales + referencia</text>
+
+          <rect x="20" y="190" width="210" height="76" rx="8" fill="var(--panel)" stroke="currentColor"/>
+          <text x="34" y="214" font-weight="600" fill="currentColor">Catálogo de componentes</text>
+          <text x="34" y="233" fill="var(--muted)" font-size="12">workers · tiempo de servicio</text>
+          <text x="34" y="250" fill="var(--muted)" font-size="12">tamaños · costes · etiqueta C4</text>
+
+          <rect x="20" y="320" width="210" height="64" rx="8" fill="none" stroke="var(--new)" stroke-dasharray="5 4"/>
+          <text x="34" y="344" font-weight="600" fill="var(--new)">Packs de tecnología</text>
+          <text x="34" y="363" fill="var(--muted)" font-size="12">futuro: Asíncrono, GitLab CI…</text>
+          <line x1="125" y1="320" x2="125" y2="270" stroke="var(--new)" stroke-dasharray="5 4" marker-end="url(#ar)" color="var(--new)"/>
+          <text x="117" y="300" text-anchor="end" font-size="11" fill="var(--new)">añaden tipos</text>
+        </g>
+
+        <!-- Engine -->
+        <rect x="300" y="64" width="360" height="350" rx="12" fill="none" stroke="currentColor" stroke-dasharray="6 4"/>
+        <text x="316" y="88" font-size="14" font-weight="700" fill="currentColor">Motor de simulación</text>
+        <text x="316" y="106" font-size="12" fill="var(--muted)">TypeScript puro · sin UI · determinista</text>
+        <g font-size="12.5">
+          <rect x="320" y="122" width="240" height="38" rx="6" fill="var(--panel)" stroke="currentColor"/>
+          <text x="334" y="146" fill="currentColor">Tráfico · llegadas Poisson con semilla</text>
+          <rect x="320" y="184" width="240" height="38" rx="6" fill="var(--panel)" stroke="currentColor"/>
+          <text x="334" y="208" fill="currentColor">Bucle de eventos (cola de prioridad)</text>
+          <rect x="320" y="246" width="240" height="38" rx="6" fill="var(--panel)" stroke="currentColor"/>
+          <text x="334" y="270" fill="currentColor">Instancias · workers + cola acotada</text>
+          <rect x="320" y="308" width="240" height="38" rx="6" fill="var(--panel)" stroke="currentColor"/>
+          <text x="334" y="332" fill="currentColor">Enrutado → siguiente salto · hit/miss</text>
+          <rect x="320" y="364" width="320" height="38" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="334" y="388" fill="currentColor">Métricas → puntuación · cuello de botella · pista</text>
+
+          <rect x="574" y="246" width="80" height="38" rx="6" fill="var(--panel)" stroke="currentColor"/>
+          <text x="614" y="263" text-anchor="middle" fill="currentColor">Fallos</text>
+          <text x="614" y="277" text-anchor="middle" fill="var(--muted)" font-size="11">guionizados</text>
+        </g>
+        <g stroke="currentColor" fill="none">
+          <line x1="440" y1="160" x2="440" y2="182" marker-end="url(#ar)"/>
+          <line x1="440" y1="222" x2="440" y2="244" marker-end="url(#ar)"/>
+          <line x1="440" y1="284" x2="440" y2="306" marker-end="url(#ar)"/>
+          <line x1="574" y1="265" x2="562" y2="265" marker-end="url(#ar)"/>
+          <path d="M320 327 H308 V203 H318" marker-end="url(#ar)"/>
+        </g>
+                <line x1="440" y1="346" x2="440" y2="362" stroke="currentColor" marker-end="url(#ar)"/>
+
+        <!-- UI -->
+        <rect x="780" y="64" width="200" height="350" rx="12" fill="none" stroke="currentColor" stroke-dasharray="6 4"/>
+        <text x="796" y="88" font-size="14" font-weight="700" fill="currentColor">Interfaz</text>
+        <text x="796" y="106" font-size="12" fill="var(--muted)">React + React Flow</text>
+        <g font-size="12.5" fill="currentColor">
+          <rect x="794" y="120" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="140">Selector de niveles y modo</text>
+          <rect x="794" y="158" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="178">Lienzo C4 + HUD + barra</text>
+          <rect x="794" y="196" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="216">Reproducción animada</text>
+          <rect x="794" y="234" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="254">Inspector (tecla I)</text>
+          <rect x="794" y="272" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="292">Resultados (tecla R)</text>
+          <rect x="794" y="310" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="330">Informe final</text>
+          <rect x="794" y="348" width="172" height="30" rx="6" fill="var(--panel)" stroke="currentColor"/><text x="806" y="368">Tutorial (nivel 1)</text>
+        </g>
+
+        <!-- Main seam: UI <-> engine -->
+        <line x1="780" y1="172" x2="662" y2="172" stroke="var(--accent)" stroke-width="2" marker-end="url(#arA)"/>
+        <text x="721" y="146" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--accent)">simulate(nivel,</text>
+        <text x="721" y="160" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--accent)">diseño, semilla)</text>
+        <line x1="662" y1="383" x2="780" y2="383" stroke="var(--accent)" stroke-width="2" marker-end="url(#arA)"/>
+        <text x="721" y="374" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--accent)">Result</text>
+
+        <!-- Level files -> UI (over the engine) -->
+        <path d="M230 90 H262 V26 H870 V62" fill="none" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="566" y="20" text-anchor="middle" font-size="11.5" fill="var(--muted)">carga nivel y diseño inicial del modo</text>
+        <!-- Catalogue -> engine -->
+        <line x1="230" y1="228" x2="298" y2="228" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="264" y="220" text-anchor="middle" font-size="11" fill="var(--muted)">define tipos</text>
+        <!-- Catalogue -> UI (under the engine) -->
+        <path d="M200 266 V290 H286 V432 H820 V416" fill="none" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="540" y="448" text-anchor="middle" font-size="11.5" fill="var(--muted)">paleta · campos del inspector · costes · etiquetas C4</text>
+
+        <!-- Progress and analytics -->
+        <rect x="830" y="478" width="150" height="48" rx="8" fill="var(--panel)" stroke="currentColor"/>
+        <text x="844" y="498" font-size="13" font-weight="600" fill="currentColor">Progreso</text>
+        <text x="844" y="515" font-size="11.5" fill="var(--muted)">localStorage</text>
+        <line x1="905" y1="416" x2="905" y2="476" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="912" y="452" font-size="11" fill="var(--muted)">estrellas · insignia</text>
+        <text x="912" y="466" font-size="11" fill="var(--muted)">último diseño</text>
+
+        <rect x="610" y="478" width="150" height="48" rx="8" fill="var(--panel)" stroke="currentColor"/>
+        <text x="624" y="498" font-size="13" font-weight="600" fill="currentColor">Analítica</text>
+        <text x="624" y="515" font-size="11.5" fill="var(--muted)">sin cookies</text>
+        <path d="M830 416 V462 H700 V476" fill="none" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="764" y="474" text-anchor="middle" font-size="11" fill="var(--muted)">eventos</text>
+
+        <!-- Test seams -->
+        <g font-size="11" font-family="var(--mono)" fill="var(--accent)">
+          <text x="644" y="88" text-anchor="end">◆ tests del motor (TDD)</text>
+          <text x="20" y="166">◆ test por nivel: referencia</text>
+          <text x="20" y="180">  pasa, iniciales fallan</text>
+          <text x="796" y="402">◆ E2E en navegador</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>La flecha azul es la única costura de la lógica: la interfaz entrega el nivel, el diseño y una semilla, y recibe un resultado completo que solo pinta. El catálogo es la única fuente de datos sobre cada tipo de componente, para el motor y para la interfaz. Los rombos marcan dónde se prueba cada cosa.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>2 · ¿Podría el motor entender GitLab CI?</h2>
+    <p>En gran parte, sí. El motor no sabe qué es un servidor o una base de datos: simula <strong>trabajo que llega, espera en una cola y lo atiende un grupo de workers</strong>. Eso es justo un runner de CI. Lo específico de cada tecnología vive en el catálogo y en los niveles, no en el motor.</p>
+    <figure>
+      <div class="scroll">
+      <table>
+        <thead><tr><th>Concepto de GitLab CI</th><th>Lo que ya existe en el motor</th><th>Qué falta</th></tr></thead>
+        <tbody>
+          <tr><td>Pushes y merge requests</td><td>Fuente de tráfico con perfil temporal (picos a las 10:00, viernes…)</td><td class="no">—</td></tr>
+          <tr><td>Runners y su concurrencia</td><td>Instancias con workers y cola; tamaño y coste por instancia</td><td class="no">—</td></tr>
+          <tr><td>Caída de un runner</td><td>Eventos de fallo guionizados</td><td class="no">—</td></tr>
+          <tr><td>Cola de jobs pendientes, tiempo de espera</td><td>Cola acotada, espera media, métricas por tramo</td><td class="no">—</td></tr>
+          <tr><td>Pipeline con etapas en paralelo (build → test ×3 → deploy)</td><td>Solo recorridos en línea</td><td class="new">Fork/join: un trabajo genera varios y se espera a todos</td></tr>
+          <tr><td>Jobs distintos (lint 30 s, tests 5 min)</td><td>Un tiempo de servicio por componente</td><td class="new">Clases de trabajo con su propia duración</td></tr>
+          <tr><td>Tags de runner (docker, gpu)</td><td>Round-robin entre instancias vivas</td><td class="new">Enrutado por etiquetas</td></tr>
+          <tr><td>Autoescalado de runners</td><td>Número de instancias fijo</td><td class="new">Instancias que cambian durante la simulación</td></tr>
+          <tr><td>Duración en minutos y horas</td><td>Escala de milisegundos</td><td class="new">Unidad de tiempo por nivel (ya es un número; solo cambia la presentación)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <figcaption>En naranja, las primitivas nuevas que necesitaría un pack de CI. Las cuatro son genéricas y servirían también a otros packs; el capítulo Asíncrono, por ejemplo, ya usaría las clases de trabajo.</figcaption>
+    </figure>
+    <div class="callout">
+      <p><strong>Qué conviene decidir ya:</strong> que el motor sea agnóstico de la tecnología. Cada tipo de componente se describe en el catálogo combinando primitivas (estación, enrutado, atajo, fuente…), y un pack nuevo añade entradas al catálogo y niveles. Solo toca el motor cuando necesita una primitiva que no existe.</p>
+      <p>Cuesta poco hacerlo desde la primera tarea y evita reescribir el motor después. Un pack de CI también amplía el público más allá de las entrevistas de system design: eso es una decisión de producto para más adelante.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>
