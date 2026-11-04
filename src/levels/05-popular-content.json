@@ -1,0 +1,100 @@
+{
+  "id": "05-popular-content",
+  "title": "Popular content",
+  "brief": "A viral post sends 600 people per second for 40 seconds. Your database plan is fixed at the small tier and product data may be at most 60 seconds stale. How long should the cache keep answers?",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 10,
+      "rps": 300
+    },
+    {
+      "fromS": 10,
+      "toS": 50,
+      "rps": 600
+    },
+    {
+      "fromS": 50,
+      "toS": 60,
+      "rps": 300
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 300,
+  "starCostThresholds": [
+    280,
+    260
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "cache": {
+      "limits": {
+        "ttlS": 60
+      }
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 4
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 60
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ]
+    ]
+  }
+}

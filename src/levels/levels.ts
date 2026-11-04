@@ -20,11 +20,16 @@ const levelSchema = z.object({
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
   /** Per component type: which sizes and how many instances the player may choose. */
-  componentOptions: z.record(z.object({ sizes: z.array(z.string()).min(1).optional(), maxInstances: z.number().int().min(1).optional() })).default({}),
+  componentOptions: z.record(z.object({
+    sizes: z.array(z.string()).min(1).optional(),
+    maxInstances: z.number().int().min(1).optional(),
+    /** Upper bounds for numeric params, e.g. { ttlS: 60 }. */
+    limits: z.record(z.number().positive()).optional(),
+  })).default({}),
   referenceDesign: designSchema,
 });
 
-export type ComponentOptions = { sizes?: string[]; maxInstances?: number };
+export type ComponentOptions = { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> };
 
 export type LevelDefinition = Level & {
   id: string; title: string; brief: string; allowedComponents: string[];

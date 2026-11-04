@@ -1,0 +1,90 @@
+{
+  "id": "04-flash-sale",
+  "title": "Flash sale",
+  "brief": "A 10-second flash sale starts at 30 s and traffic jumps from 200 to 500 people per second. Most of them load the same product pages. A bigger database would cope, but is there a cheaper way?",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 200
+    },
+    {
+      "fromS": 30,
+      "toS": 40,
+      "rps": 500
+    },
+    {
+      "fromS": 40,
+      "toS": 60,
+      "rps": 200
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 400,
+  "starCostThresholds": [
+    300,
+    230
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 60
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ]
+    ]
+  }
+}
