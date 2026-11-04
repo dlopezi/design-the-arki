@@ -35,6 +35,11 @@ export type StationPrimitive = {
   defaultSize?: string;
   /** How the game draws it; the engine ignores this. */
   presentation?: Presentation;
+  /**
+   * Shortcut primitive: a share of requests completes here (a hit) and the rest continue (a miss).
+   * Hit rate = value / (value + halfAt), capped at `max`, where value is the `param` (default `defaultValue`).
+   */
+  shortcut?: { param: string; defaultValue: number; halfAt: number; max: number };
 };
 
 export type Presentation = {

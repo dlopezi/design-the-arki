@@ -245,4 +245,19 @@ describe('simulate', () => {
       expect(overloaded.avgWaitMs).toBeGreaterThan(100);
     });
   });
+
+  describe('cache and database tiers', () => {
+    const withCache = (ttlS: number, instances = 3): Design => ({
+      components: [
+        { id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances } },
+        { id: 'cache', type: 'cache', params: { ttlS } }, { id: 'db', type: 'database' },
+      ],
+      connections: [['client', 'lb'], ['lb', 'api'], ['api', 'cache'], ['cache', 'db']],
+    });
+    const dbServed = (design: Design) => simulate(levelAt(200), design, 1).components.find(c => c.id === 'db')!.served;
+
+    it('sends fewer requests to the database the longer the cache keeps answers (TTL)', () => {
+      expect(dbServed(withCache(60))).toBeLessThan(dbServed(withCache(10)));
+    });
+  });
 });

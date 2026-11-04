@@ -35,6 +35,8 @@ type Station = {
   /** Total time requests spent queued here, and how many requests started service. */
   waitMs: number;
   started: number;
+  /** Share of requests that complete here early (shortcut primitive); 0 for plain stations. */
+  hitRate: number;
 };
 
 type SimEvent =
@@ -49,6 +51,15 @@ function perInstance(component: Design['components'][number], catalog: Catalog):
   const chosen = spec.sizes[size as string];
   if (!chosen) throw new Error(`Invalid size for ${component.id}: ${String(size)}`);
   return chosen;
+}
+
+/** Hit rate of a shortcut component (e.g. a cache), from its parameter; 0 if it has no shortcut. */
+export function hitRateOf(component: Design['components'][number], catalog: Catalog = defaultCatalog): number {
+  const shortcut = catalog[component.type]?.shortcut;
+  if (!shortcut) return 0;
+  const value = Number(component.params?.[shortcut.param] ?? shortcut.defaultValue);
+  if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid ${shortcut.param} for ${component.id}: ${String(value)}`);
+  return Math.min(shortcut.max, value / (value + shortcut.halfAt));
 }
 
 function queueSizeOf(component: Design['components'][number]): number {
@@ -85,7 +96,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
       instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0), served: 0, rejected: 0, maxQueue: 0 })), nextInstance: 0,
-      queueSize: queueSizeOf(component), waitMs: 0, started: 0,
+      queueSize: queueSizeOf(component), waitMs: 0, started: 0, hitRate: hitRateOf(component, catalog),
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
   }
@@ -171,7 +182,8 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       instance.busy--;
       instance.served++;
       station.stats.served++;
-      if (station.next) {
+      const hit = station.hitRate > 0 && random() < station.hitRate;
+      if (station.next && !hit) {
         value.request.hops++;
         events.push(now + HOP_MS, { kind: 'arrive', station: station.next, request: value.request });
       } else {

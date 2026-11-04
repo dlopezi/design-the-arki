@@ -17,6 +17,11 @@ export const catalog: Catalog = {
     defaultSize: 'medium',
     presentation: { zone: 'application', technology: 'Node.js', instancePrefix: 'app' },
   },
+  cache: {
+    primitive: 'station', workers: 50, meanServiceMs: 2, monthlyCost: 30, endsRequests: false,
+    shortcut: { param: 'ttlS', defaultValue: 10, halfAt: 30, max: 0.95 },
+    presentation: { zone: 'data', technology: 'Redis' },
+  },
   database: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true,
     presentation: { zone: 'data', technology: 'PostgreSQL' },
