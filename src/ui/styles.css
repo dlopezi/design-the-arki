@@ -147,3 +147,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .instances th { color: var(--muted); font-weight: 500; }
 .instances td.medium { color: var(--warn); } .instances td.high { color: var(--bad); }
 .game[data-results="true"] .inspector { max-height: calc(100% - 400px); }
+
+/* Failures */
+.incidents { list-style: none; margin: 0; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); font-size: 12.5px; }
+.c4-instance.down { background: #262a33; border-color: #3a3f4a; color: var(--muted); }
+.badge.down { background: var(--muted); color: #111; }
+.loads li.down { color: var(--muted); } .loads li.down .load-bar span { width: 0 !important; }

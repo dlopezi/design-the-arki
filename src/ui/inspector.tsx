@@ -140,7 +140,7 @@ export function Inspector({ component, options, onChange, onRemove, lastRun, ins
               <tbody>
                 {lastRun.instances.map((i, k) => (
                   <tr key={k}>
-                    <td>{instanceNames[k]}</td>
+                    <td>{instanceNames[k]}{i.killedAtS !== null && <span className="bad"> · {t.downAt(i.killedAtS)}</span>}</td>
                     <td className={loadLevel(i.peakUtilization)}>{Math.round(i.peakUtilization * 100)}%</td>
                     <td>{i.served}</td>
                     <td className={i.rejected ? 'bad' : ''}>{i.rejected}</td>

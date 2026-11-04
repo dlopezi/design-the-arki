@@ -64,11 +64,12 @@ function Game({ level }: { level: LevelDefinition }) {
   const reduceMotion = usePrefersReducedMotion();
   const running = playT !== null;
   const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
-  const live = running && result ? { result, bucket, animate: !reduceMotion } : null;
+  const live = running && result ? { result, bucket, animate: !reduceMotion, t: playT } : null;
   const [panels, setPanels] = useState({ inspector: true, results: true });
   const togglePanel = useCallback((panel: 'inspector' | 'results') => setPanels(p => ({ ...p, [panel]: !p[panel] })), []);
   const bottleneckId = result && !running && !result.passed ? (result.bottleneck?.componentId ?? null) : null;
   const hintFor = (r: Result | null): string | null => {
+    if (r && !r.passed && (level.failureEvents?.length ?? 0) > 0 && r.errors.lost + r.errors.unavailable > 0) return t.redundancyHint;
     const id = r?.bottleneck?.componentId;
     const component = id ? design.components.find(c => c.id === id) : undefined;
     if (!component) return null;
@@ -77,7 +78,7 @@ function Game({ level }: { level: LevelDefinition }) {
   const hint = hintFor(result);
 
   const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId }),
-    [design, selected, problem, live?.result, live?.bucket, live?.animate, bottleneckId]); // eslint-disable-line react-hooks/exhaustive-deps
+    [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId]); // eslint-disable-line react-hooks/exhaustive-deps
   const FIT = fitOptions(panels.inspector, panels.results);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
@@ -185,6 +186,11 @@ function Game({ level }: { level: LevelDefinition }) {
         <p>{level.brief}</p>
         <Objectives level={level} cost={cost} result={running ? null : result} />
         <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
+        {(level.failureEvents?.length ?? 0) > 0 && (
+          <ul className="incidents" aria-label={t.incidents}>
+            {level.failureEvents!.map(f => <li key={`${f.atS}-${f.componentType}-${f.instance}`}>⚡ {t.incident(t.componentTypes[f.componentType] ?? f.componentType, f.instance + 1, f.atS)}</li>)}
+          </ul>
+        )}
         <p className="hint">{t.canvasHint}</p>
       </section>
 

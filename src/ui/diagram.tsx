@@ -22,7 +22,7 @@ export type ComponentData = {
   /** Share of capacity in use during playback (0–1); null when not playing or hidden. */
   load: number | null;
 };
-export type InstanceData = { name: string; detail: string; load: number | null };
+export type InstanceData = { name: string; detail: string; load: number | null; down: boolean };
 
 export const loadLevel = (load: number) => (load >= 0.9 ? 'high' : load >= 0.7 ? 'medium' : 'low');
 
@@ -70,10 +70,10 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
 
 function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
   return (
-    <div className={`c4-instance ${data.load === null ? '' : loadLevel(data.load)}`}>
-      <strong>{data.name}</strong>
+    <div className={`c4-instance ${data.down ? 'down' : data.load === null ? '' : loadLevel(data.load)}`}>
+      <strong>{data.name}{data.down && <span className="badge down">{t.down}</span>}</strong>
       <span className="c4-detail">{data.detail}</span>
-      <Load value={data.load} />
+      {!data.down && <Load value={data.load} />}
     </div>
   );
 }
@@ -111,7 +111,7 @@ export type DiagramState = {
   selected: string | null;
   problemIds: string[];
   /** During playback: the run and the bucket being shown. */
-  live?: { result: Result; bucket: number; animate: boolean } | null;
+  live?: { result: Result; bucket: number; animate: boolean; t: number } | null;
   /** After a failed run: the component that held requests back. */
   bottleneckId?: string | null;
 };
@@ -193,7 +193,8 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
           nodes.push(sized<InstanceData>({ id: `${member.id}#${k}`, type: 'instance', parentId: member.id, extent: 'parent',
             position: { x: (BOX.w - INSTANCE.w) / 2, y: CONTAINER_HEAD + k * (INSTANCE.h + INSTANCE.gap) },
             data: { name: names.get(member.id)![k]!, detail: `${workers} workers`,
-              load: live ? (liveOf(member.id)?.instances[k]?.bucketUtilization[live.bucket] ?? null) : null }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
+              load: live ? (liveOf(member.id)?.instances[k]?.bucketUtilization[live.bucket] ?? null) : null,
+              down: !!live && (liveOf(member.id)?.instances[k]?.killedAtS ?? Infinity) <= live.t }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
         }
       }
       y += member.height + COMPONENT_GAP;

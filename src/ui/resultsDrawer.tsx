@@ -47,8 +47,9 @@ export function ResultsDrawer({ level, design, result, running, bucket, hint }: 
     if (!component || catalog[component.type]?.presentation?.hideCapacity) return [];
     const at = (series: number[], peak: number) => (running ? (series[bucket] ?? 0) : peak);
     const instanceNamesFor = names.get(c.id);
-    if (instanceNamesFor) return c.instances.map((i, k) => ({ key: `${c.id}#${k}`, label: instanceNamesFor[k]!, load: at(i.bucketUtilization, i.peakUtilization) }));
-    return [{ key: c.id, label: t.componentTypes[component.type] ?? component.type, load: at(c.bucketUtilization, c.peakUtilization) }];
+    const nowS = running ? (bucket + 1) * 5 : Infinity;
+    if (instanceNamesFor) return c.instances.map((i, k) => ({ key: `${c.id}#${k}`, label: instanceNamesFor[k]!, load: at(i.bucketUtilization, i.peakUtilization), down: i.killedAtS !== null && i.killedAtS < nowS }));
+    return [{ key: c.id, label: t.componentTypes[component.type] ?? component.type, load: at(c.bucketUtilization, c.peakUtilization), down: false }];
   });
 
   return (
@@ -68,10 +69,10 @@ export function ResultsDrawer({ level, design, result, running, bucket, hint }: 
         <h3 className="eyebrow">{t.results.loadPerResource}</h3>
         <ul>
           {loads.map(l => (
-            <li key={l.key} className={loadLevel(l.load)}>
+            <li key={l.key} className={l.down ? 'down' : loadLevel(l.load)}>
               <span>{l.label}</span>
               <span className="load-bar"><span style={{ width: `${Math.round(l.load * 100)}%` }} /></span>
-              <span className="value">{Math.round(l.load * 100)}%</span>
+              <span className="value">{l.down ? t.down : `${Math.round(l.load * 100)}%`}</span>
             </li>
           ))}
         </ul>
