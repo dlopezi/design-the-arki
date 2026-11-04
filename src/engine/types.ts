@@ -58,7 +58,12 @@ export type DesignProblem = { kind: 'noEntry' } | { kind: 'deadEnd'; componentId
 
 export type Check = { requirement: 'p95' | 'errorRate' | 'budget'; target: number; actual: number; ok: boolean };
 
-export type ComponentResult = { id: string; served: number; rejected: number; timedOut: number };
+export type ComponentResult = {
+  id: string; served: number; rejected: number; timedOut: number;
+  /** Share of worker time busy in each 5-second bucket, 0–1, across all instances. */
+  bucketUtilization: number[];
+  instances: { bucketUtilization: number[] }[];
+};
 
 /** Metrics for one slice of the run, used for charts and playback. */
 export type Bucket = { fromS: number; rps: number; p95: number; errorRate: number };

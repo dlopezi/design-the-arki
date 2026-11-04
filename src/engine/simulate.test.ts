@@ -194,5 +194,22 @@ describe('simulate', () => {
       expect(buckets[5]!.errorRate).toBeGreaterThan(0.1);
       expect(buckets[5]!.p95).toBeGreaterThan(300);
     });
+
+    it('reports utilisation per bucket for each component and each instance (arrivals × service time / workers)', () => {
+      const design: Design = {
+        components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }],
+        connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+      };
+      // 200 req/s × 20 ms over 2 × 4 workers = 0.5; each instance gets 100 req/s × 20 ms / 4 = 0.5; database 200 × 20 ms / 8 = 0.5.
+      const result = simulate(levelAt(200), design, 5);
+      const api = result.components.find(c => c.id === 'api')!;
+      const db = result.components.find(c => c.id === 'db')!;
+      const middle = (series: number[]) => series.slice(1, -1);
+
+      for (const u of middle(api.bucketUtilization)) expect(u).toBeGreaterThan(0.4), expect(u).toBeLessThan(0.6);
+      for (const u of middle(db.bucketUtilization)) expect(u).toBeGreaterThan(0.4), expect(u).toBeLessThan(0.6);
+      expect(api.instances).toHaveLength(2);
+      for (const instance of api.instances) for (const u of middle(instance.bucketUtilization)) expect(u).toBeGreaterThan(0.4), expect(u).toBeLessThan(0.6);
+    });
   });
 });

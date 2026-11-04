@@ -1,7 +1,7 @@
 import { catalog as defaultCatalog } from '../catalog/catalog';
 import { EventQueue } from './eventQueue';
 import { seededRandom } from './random';
-import type { Catalog, ComponentResult, Design, DesignProblem, Level, Result } from './types';
+import type { Catalog, Design, DesignProblem, Level, Result } from './types';
 
 /** Thrown by `simulate` when the design cannot serve traffic at all. */
 export class DesignError extends Error {
@@ -19,7 +19,7 @@ const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
 
-type Instance = { busy: number; queue: Request[] };
+type Instance = { busy: number; queue: Request[]; busyMs: number[] };
 
 type Station = {
   id: string;
@@ -29,7 +29,7 @@ type Station = {
   nextInstance: number;
   queueSize: number;
   next: string | null;
-  stats: ComponentResult;
+  stats: { id: string; served: number; rejected: number; timedOut: number };
 };
 
 type SimEvent =
@@ -79,7 +79,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     if (!spec) throw new Error(`Unknown component type: ${component.type}`);
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
-      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [] })), nextInstance: 0,
+      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0) })), nextInstance: 0,
       queueSize: queueSizeOf(component),
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
@@ -127,8 +127,18 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       errors.timedOut++; station.stats.timedOut++; fail(request);
       return;
     }
-    station.instances[instance]!.busy++;
-    events.push(now + exponential(station.meanServiceMs), { kind: 'done', station: station.id, instance, request });
+    const worker = station.instances[instance]!;
+    worker.busy++;
+    const serviceMs = exponential(station.meanServiceMs);
+    // Spread the busy time over the buckets it covers.
+    for (let t = now, end = now + serviceMs; t < end;) {
+      const b = Math.floor(t / (BUCKET_S * 1000));
+      if (b >= bucketCount) break;
+      const sliceEnd = Math.min(end, (b + 1) * BUCKET_S * 1000);
+      worker.busyMs[b]! += sliceEnd - t;
+      t = sliceEnd;
+    }
+    events.push(now + serviceMs, { kind: 'done', station: station.id, instance, request });
   };
 
   const complete = (request: Request, now: number) => {
@@ -185,7 +195,13 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     cost,
     stars,
     nextStarCost,
-    components: [...stations.values()].map(s => s.stats),
+    components: [...stations.values()].map(s => {
+      const bucketMs = BUCKET_S * 1000 * s.workers;
+      const instances = s.instances.map(i => ({ bucketUtilization: i.busyMs.map(ms => Math.min(1, ms / bucketMs)) }));
+      const bucketUtilization = Array.from({ length: bucketCount }, (_, b) =>
+        Math.min(1, s.instances.reduce((sum, i) => sum + i.busyMs[b]!, 0) / (bucketMs * s.instances.length)));
+      return { ...s.stats, bucketUtilization, instances };
+    }),
     buckets: bucketRequests.map((count, i) => ({
       fromS: i * BUCKET_S, rps: count / BUCKET_S,
       p95: percentile(0.95, bucketLatencies[i]!.sort((a, b) => a - b)),
