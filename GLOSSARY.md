@@ -38,6 +38,10 @@ _Avoid_: Solution, diagram, blueprint
 A placeable architecture building block (e.g. load balancer, cache, queue) with a few parameters and a cost.
 _Avoid_: Node, block, service
 
+**Instance**:
+One running copy of a component inside a design (e.g. `api-1`); it has its own load and can fail on its own.
+_Avoid_: Replica (reserved for database read replicas), node, server
+
 **Connection**:
 A directed link along which requests flow from one component to another.
 _Avoid_: Edge, wire, link

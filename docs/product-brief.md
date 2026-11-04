@@ -22,7 +22,18 @@ Decisions settled in the initial design grilling session (2026-11-04).
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
 - **Visual style**: clean, modern architecture-diagram look, dark mode, requests animated along connections.
 
-## Content scope
+## Game screen
+
+Chosen from the UI prototype (variant D in `prototypes/game-ui`, 2026-11-04): the mission-style HUD combined with the studio tool's detail panels.
+
+- **Canvas first**: full-bleed diagram with floating HUD: objectives as checkboxes (top-left), cost meter with star thresholds (top-right), simulation clock with live rps / p95 / errors while it runs, and a bottom hotbar of components plus a big Play button.
+- **C4-style grouping**: players appear as a C4 *person* outside the system boundary; inside it, components sit in container boundaries (edge, application, data) labelled with name, type and technology.
+- **Real resources**: every **Instance** is drawn as its own node (`api-1`, `api-2`, …) with its own load, and a failed instance turns grey and stops receiving traffic. No "×N" badges.
+- **Inspector** (right, collapsible with `I`): deployment settings (instances, instance size), an *Advanced* section (queue size, service time, timeout), capacity and cost breakdown, and per-instance stats after a run.
+- **Results drawer** (bottom, collapsible with `R`): verdict, stars, hint, rps / p95 / error charts, and load per resource.
+- **Report card** after each run, with "View details" opening the inspector on the bottleneck.
+
+
 
 Target 20+ levels covering four component groups:
 
