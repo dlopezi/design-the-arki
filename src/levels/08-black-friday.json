@@ -1,0 +1,224 @@
+{
+  "id": "08-black-friday",
+  "chapter": "Core",
+  "title": "Black Friday",
+  "brief": "Everything at once: traffic doubles to 500 people per second for 15 seconds, an app server instance crashes in the middle of the peak, and the budget is tight. This is the chapter's final exam.",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 250
+    },
+    {
+      "fromS": 30,
+      "toS": 45,
+      "rps": 500
+    },
+    {
+      "fromS": 45,
+      "toS": 60,
+      "rps": 250
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 280,
+  "starCostThresholds": [
+    260,
+    240
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database"
+  ],
+  "failureEvents": [
+    {
+      "atS": 35,
+      "componentType": "appServer",
+      "instance": 0
+    }
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "maxInstances": 8
+    },
+    "database": {
+      "sizes": [
+        "small",
+        "medium"
+      ]
+    },
+    "cache": {
+      "limits": {
+        "ttlS": 60
+      }
+    }
+  },
+  "guidedHint": "During the peak one app server goes down. Add instances until the others can still carry 500 req/s.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2,
+            "size": "large"
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 7,
+          "size": "small"
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 60
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ]
+    ]
+  }
+}

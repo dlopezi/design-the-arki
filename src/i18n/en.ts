@@ -45,6 +45,13 @@ export const en = {
   } as Record<string, string>,
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
   incidents: 'Incidents',
+  newComponents: 'New components',
+  componentIntros: {
+    appServer: 'runs your application code; each instance handles a limited number of requests at once.',
+    database: 'stores the data every request needs; its tier sets how many queries it serves at once.',
+    loadBalancer: 'spreads requests across the instances behind it.',
+    cache: 'answers repeated reads without asking the database; a longer TTL means more hits.',
+  } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
   downAt: (atS: number) => `down at ${atS} s`,

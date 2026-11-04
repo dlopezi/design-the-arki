@@ -58,6 +58,8 @@ const problemComponents = (problem: DesignProblem): string[] =>
 
 type GameProps = {
   level: LevelDefinition;
+  /** Component types this level offers for the first time. */
+  newTypes: string[];
   mode: Mode;
   initialDesign: Design | null;
   nextLevelId: string | null;
@@ -71,7 +73,7 @@ type GameProps = {
 /** Highest numeric suffix among component ids, so new ids never clash with a restored design. */
 const lastIdNumber = (design: Design) => Math.max(0, ...design.components.map(c => Number(c.id.split('-').pop()) || 0));
 
-function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPassed, tutorial: tutorialAtStart, onTutorialDone }: GameProps) {
+function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChange, onPassed, tutorial: tutorialAtStart, onTutorialDone }: GameProps) {
   // Keep the steps for this session, so the closing message stays after progress records the tutorial as done.
   const [tutorial] = useState(tutorialAtStart);
   const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
@@ -234,6 +236,11 @@ function Game({ level, mode, initialDesign, nextLevelId, onDesignChange, onPasse
         {mode === 'guided' && <p role="note" className="guided-hint">{level.guidedHint}</p>}
         <Objectives level={level} cost={cost} result={running ? null : result} />
         <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
+        {newTypes.length > 0 && (
+          <ul className="new-components" aria-label={t.newComponents}>
+            {newTypes.map(type => <li key={type}><strong>New: {t.componentTypes[type] ?? type}</strong> {t.componentIntros[type]}</li>)}
+          </ul>
+        )}
         {(level.failureEvents?.length ?? 0) > 0 && (
           <ul className="incidents" aria-label={t.incidents}>
             {level.failureEvents!.map(f => <li key={`${f.atS}-${f.componentType}-${f.instance}`}>⚡ {t.incident(t.componentTypes[f.componentType] ?? f.componentType, f.instance + 1, f.atS)}</li>)}
@@ -346,7 +353,7 @@ export function App() {
   const next = ids[ids.indexOf(level.id) + 1];
   return (
     <ReactFlowProvider key={`${level.id}/${mode}`}>
-      <Game level={level} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
+      <Game level={level} newTypes={level.allowedComponents.filter(type => !levels.slice(0, ids.indexOf(level.id)).some(l => l.allowedComponents.includes(type)))} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
         nextLevelId={next ?? null}
         onDesignChange={design => update(p => withDesign(p, level.id, mode, design))}
         onPassed={stars => update(p => withPass(p, level.id, stars, mode))}

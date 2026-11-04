@@ -198,3 +198,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .locked-mode { display: grid; gap: 6px; height: 100%; padding: 16px; border-radius: 12px; border: 1px dashed var(--line-strong); color: var(--muted); }
 .locked-mode strong { font-size: 17px; }
 .results.empty { display: block; }
+
+.new-components { list-style: none; margin: 0; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 12%, transparent); font-size: 12.5px; display: grid; gap: 4px; }
+.new-components strong { color: var(--ok); }

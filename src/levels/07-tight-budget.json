@@ -1,0 +1,198 @@
+{
+  "id": "07-tight-budget",
+  "chapter": "Core",
+  "title": "Tight budget",
+  "brief": "The flash sale is back, and this time finance capped the bill at $230 a month. A bigger database would cope, but it would blow the budget. Find the cheapest design that still holds.",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 200
+    },
+    {
+      "fromS": 30,
+      "toS": 40,
+      "rps": 500
+    },
+    {
+      "fromS": 40,
+      "toS": 60,
+      "rps": 200
+    }
+  ],
+  "requirements": {
+    "p95Ms": 200,
+    "maxErrorRate": 0.01
+  },
+  "budget": 230,
+  "starCostThresholds": [
+    225,
+    220
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database"
+  ],
+  "failureEvents": [],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "maxInstances": 6
+    }
+  },
+  "guidedHint": "Upgrading the database costs too much here. Put the cache in front of the small database instead.",
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "size": "medium"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": []
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 5,
+            "size": "small"
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 60
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ]
+    ]
+  }
+}

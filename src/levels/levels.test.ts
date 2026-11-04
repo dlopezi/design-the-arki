@@ -4,14 +4,17 @@ import { simulate } from '../engine/simulate';
 import { allLevels, parseLevel } from './levels';
 
 describe('level files', () => {
-  it('ships levels 1 to 6 in order', () => {
-    expect(allLevels().map(l => l.id).slice(0, 6)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down']);
+  it('ships the 8 levels of chapter 1 in order', () => {
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday']);
   });
 
   for (const level of allLevels()) {
-    it(`${level.id}: its reference design passes the level`, () => {
-      const result = simulate(level, level.referenceDesign, 1);
-      expect(result.checks.filter(c => !c.ok)).toEqual([]);
+    it(`${level.id}: its reference design passes the level with every star, on several seeds`, () => {
+      for (const seed of [1, 2, 3]) {
+        const result = simulate(level, level.referenceDesign, seed);
+        expect(result.checks.filter(c => !c.ok)).toEqual([]);
+        expect(result.stars).toBe(1 + level.starCostThresholds.length);
+      }
     });
 
     it(`${level.id}: its reference design only uses the level's allowed components`, () => {
