@@ -24,6 +24,9 @@ export const catalog: Catalog = {
   },
   database: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true,
+    // Tiers: connections the database serves at once.
+    sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
+    defaultSize: 'small',
     presentation: { zone: 'data', technology: 'PostgreSQL' },
   },
 };

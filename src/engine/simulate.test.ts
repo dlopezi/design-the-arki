@@ -274,5 +274,24 @@ describe('simulate', () => {
       expect(cache.hitRate).toBeGreaterThan(0.64);
       expect(cache.hitRate).toBeLessThan(0.7);
     });
+
+    it('offers database tiers: a medium database (16 connections, $150) handles 500 req/s without a cache', () => {
+      const design = (tier: string): Design => ({
+        components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 3 } }, { id: 'db', type: 'database', params: { size: tier } }],
+        connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+      });
+      const medium = simulate(levelAt(500), design('medium'), 1);
+      expect(medium.passed).toBe(true);
+      expect(medium.cost).toBe(20 + 3 * 40 + 150);
+      expect(simulate(levelAt(500), design('small'), 1).passed).toBe(false);
+    });
+
+    it('rejects a cache with nothing behind it: its misses would have nowhere to go', () => {
+      const design: Design = {
+        components: [{ id: 'api', type: 'appServer' }, { id: 'cache', type: 'cache', params: { ttlS: 60 } }],
+        connections: [['client', 'api'], ['api', 'cache']],
+      };
+      expect(() => simulate(levelAt(50), design, 1)).toThrow(expect.objectContaining({ problem: { kind: 'deadEnd', componentId: 'cache' } }));
+    });
   });
 });
