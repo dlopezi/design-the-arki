@@ -86,4 +86,6 @@ export type Result = {
   components: ComponentResult[];
   /** The run in 5-second buckets, by request arrival time. */
   buckets: Bucket[];
+  /** The component that held requests back the most, when it mattered; null for a healthy run. */
+  bottleneck: { componentId: string } | null;
 };

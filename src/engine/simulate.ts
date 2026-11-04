@@ -15,6 +15,8 @@ export class DesignError extends Error {
 export const DEFAULT_QUEUE_SIZE = 100;
 export const TIMEOUT_MS = 1000;
 export const BUCKET_S = 5;
+/** Below this much added delay per request on average, no component counts as a bottleneck. */
+const BOTTLENECK_MS_PER_REQUEST = 2;
 const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
@@ -30,6 +32,8 @@ type Station = {
   queueSize: number;
   next: string | null;
   stats: { id: string; served: number; rejected: number; timedOut: number };
+  /** Total time requests spent queued here. */
+  waitMs: number;
 };
 
 type SimEvent =
@@ -80,7 +84,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
       instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0) })), nextInstance: 0,
-      queueSize: queueSizeOf(component),
+      queueSize: queueSizeOf(component), waitMs: 0,
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
   }
@@ -129,6 +133,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     }
     const worker = station.instances[instance]!;
     worker.busy++;
+    station.waitMs += now - request.enqueuedAt;
     const serviceMs = exponential(station.meanServiceMs);
     // Spread the busy time over the buckets it covers.
     for (let t = now, end = now + serviceMs; t < end;) {
@@ -185,6 +190,11 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
   ];
 
   const passed = checks.every(c => c.ok);
+  // Pressure: time requests waited here, plus a full timeout for each one it turned away.
+  const pressureOf = (s: Station) => s.waitMs + (s.stats.rejected + s.stats.timedOut) * TIMEOUT_MS;
+  const worst = [...stations.values()].reduce<Station | null>((a, b) => (!a || pressureOf(b) > pressureOf(a) ? b : a), null);
+  const significant = worst && totalRequests && pressureOf(worst) / totalRequests >= BOTTLENECK_MS_PER_REQUEST;
+  const bottleneck = significant ? { componentId: worst.id } : null;
   const stars = passed ? 1 + level.starCostThresholds.filter(threshold => cost <= threshold).length : 0;
 
   const nextStarCost = passed ? (level.starCostThresholds.find(threshold => cost > threshold) ?? null) : null;
@@ -202,6 +212,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
         Math.min(1, s.instances.reduce((sum, i) => sum + i.busyMs[b]!, 0) / (bucketMs * s.instances.length)));
       return { ...s.stats, bucketUtilization, instances };
     }),
+    bottleneck,
     buckets: bucketRequests.map((count, i) => ({
       fromS: i * BUCKET_S, rps: count / BUCKET_S,
       p95: percentile(0.95, bucketLatencies[i]!.sort((a, b) => a - b)),

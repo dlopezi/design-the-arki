@@ -212,4 +212,23 @@ describe('simulate', () => {
       for (const instance of api.instances) for (const u of middle(instance.bucketUtilization)) expect(u).toBeGreaterThan(0.4), expect(u).toBeLessThan(0.6);
     });
   });
+
+  describe('bottleneck', () => {
+    const scaled = (instances: number): Design => ({
+      components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances } }, { id: 'db', type: 'database' }],
+      connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+    });
+
+    it('names the saturated app server as the bottleneck when it cannot keep up', () => {
+      expect(simulate(levelAt(300), serverAndDatabase, 1).bottleneck).toEqual({ componentId: 'api' });
+    });
+
+    it('moves the bottleneck to the database once the app servers are scaled out (500 req/s vs ~400 for a small database)', () => {
+      expect(simulate(levelAt(500), scaled(3), 1).bottleneck).toEqual({ componentId: 'db' });
+    });
+
+    it('reports no bottleneck when every component has spare capacity', () => {
+      expect(simulate(levelAt(150), scaled(2), 1).bottleneck).toBeNull();
+    });
+  });
 });
