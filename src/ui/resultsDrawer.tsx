@@ -1,3 +1,4 @@
+import { catalog } from '../catalog/catalog';
 import type { Design, Result } from '../engine/types';
 import { en as t, percent } from '../i18n/en';
 import type { LevelDefinition } from '../levels/levels';
@@ -43,7 +44,7 @@ export function ResultsDrawer({ level, design, result, running, bucket, hint }: 
   const names = instanceNames(design);
   const loads = result.components.flatMap(c => {
     const component = design.components.find(d => d.id === c.id);
-    if (!component) return [];
+    if (!component || catalog[component.type]?.presentation?.hideCapacity) return [];
     const at = (series: number[], peak: number) => (running ? (series[bucket] ?? 0) : peak);
     const instanceNamesFor = names.get(c.id);
     if (instanceNamesFor) return c.instances.map((i, k) => ({ key: `${c.id}#${k}`, label: instanceNamesFor[k]!, load: at(i.bucketUtilization, i.peakUtilization) }));
