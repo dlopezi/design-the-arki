@@ -14,6 +14,18 @@ _Avoid_: Stage, mission, puzzle
 An ordered group of levels about one topic that introduces new component types.
 _Avoid_: World, section
 
+**Mode**:
+The difficulty the player picks for a level (Guided, Normal, Hard, God); it sets the starting design and how much help is shown.
+_Avoid_: Difficulty level (clashes with Level), setting
+
+**Starting Design**:
+The design a level opens with in a given mode: almost complete (Guided), partial (Normal), broken (Hard) or empty (God).
+_Avoid_: Template, scaffold
+
+**Badge**:
+The mark on a level showing the hardest mode the player has passed it in.
+_Avoid_: Medal, trophy
+
 **Requirements**:
 The SLA a design must meet to pass a level: latency, availability and throughput targets.
 _Avoid_: Goals, objectives

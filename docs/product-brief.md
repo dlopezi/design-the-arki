@@ -44,7 +44,8 @@ Target 20+ levels covering four component groups:
 
 ## Release
 
-- **Early access** with ~8 levels, then grow to 20+ in updates.
+- **Early access** with the 8 levels of chapter 1 (Core), then grow to 20+ in updates; chapter 2 (Async) is the first update.
+- **Modes**: the player picks Guided, Normal, Hard (fix a broken design) or God (empty canvas) per level; stars depend only on cost, and a badge shows the hardest mode passed.
 - Static hosting (GitHub Pages / Netlify / Cloudflare Pages) on our own domain.
 - Privacy-first, cookieless analytics (Plausible or Umami: levels started/completed, drop-off) plus a feedback form link.
 
