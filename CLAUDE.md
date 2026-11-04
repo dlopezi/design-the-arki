@@ -2,6 +2,13 @@
 
 A browser puzzle game about software architecture for developers preparing for system-design interviews. See `docs/product-brief.md`.
 
+## Commands
+
+- `npm run dev`: start the game locally
+- `npm run check`: typecheck + unit tests (engine and level files)
+- `npm run e2e`: browser tests (builds and serves the game)
+- `prototypes/` holds throwaway prototypes; they are not part of the build
+
 ## Agent skills
 
 ### Issue tracker

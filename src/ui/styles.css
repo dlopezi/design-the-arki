@@ -1,0 +1,21 @@
+:root {
+  --bg: #0e1015; --panel: #161921; --line: #262b36; --fg: #e7e9ee; --muted: #8b93a3;
+  --accent: #5b9dff; --ok: #3ccf8e; --bad: #ff5f6d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.game { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+.brief { padding: 20px; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+.brief h1 { margin: 0; font-size: 22px; }
+.brief h2 { margin: 8px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.brief p { margin: 0; color: var(--muted); }
+.brief ul { margin: 0; padding-left: 18px; }
+.play { align-self: flex-start; font: inherit; font-weight: 700; padding: 10px 24px; border-radius: 99px; border: none; background: var(--ok); color: #04130b; cursor: pointer; }
+.play:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.result { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
+.result.ok strong { color: var(--ok); } .result.bad strong { color: var(--bad); }
+.result span { color: var(--fg); font-variant-numeric: tabular-nums; }
+.canvas { position: relative; }
+.react-flow .node { background: #1e3a5f; border: 1.5px solid #2f5a8f; color: #eaf2ff; border-radius: 8px; font-weight: 600; }
