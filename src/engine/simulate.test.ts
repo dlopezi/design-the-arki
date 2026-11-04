@@ -230,5 +230,19 @@ describe('simulate', () => {
     it('reports no bottleneck when every component has spare capacity', () => {
       expect(simulate(levelAt(150), scaled(2), 1).bottleneck).toBeNull();
     });
+
+    it('gives per-instance stats: round-robin splits the work evenly and an overloaded instance fills its queue', () => {
+      const even = simulate(levelAt(150), scaled(2), 1).components.find(c => c.id === 'api')!;
+      const [a, b] = even.instances;
+      expect(Math.abs(a!.served - b!.served)).toBeLessThanOrEqual(1);
+      expect(a!.served + b!.served).toBe(even.served);
+
+      const overloaded = simulate(levelAt(300), serverAndDatabase, 1).components.find(c => c.id === 'api')!;
+      expect(overloaded.instances[0]!.maxQueue).toBe(100);
+      expect(overloaded.instances[0]!.rejected).toBe(overloaded.rejected);
+      expect(overloaded.instances[0]!.peakUtilization).toBeGreaterThan(0.95);
+      expect(overloaded.peakUtilization).toBeGreaterThan(0.95);
+      expect(overloaded.avgWaitMs).toBeGreaterThan(100);
+    });
   });
 });

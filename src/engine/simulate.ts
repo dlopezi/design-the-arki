@@ -21,7 +21,7 @@ const HOP_MS = 1;
 
 type Request = { createdAt: number; enqueuedAt: number; hops: number };
 
-type Instance = { busy: number; queue: Request[]; busyMs: number[] };
+type Instance = { busy: number; queue: Request[]; busyMs: number[]; served: number; rejected: number; maxQueue: number };
 
 type Station = {
   id: string;
@@ -32,8 +32,9 @@ type Station = {
   queueSize: number;
   next: string | null;
   stats: { id: string; served: number; rejected: number; timedOut: number };
-  /** Total time requests spent queued here. */
+  /** Total time requests spent queued here, and how many requests started service. */
   waitMs: number;
+  started: number;
 };
 
 type SimEvent =
@@ -83,8 +84,8 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     if (!spec) throw new Error(`Unknown component type: ${component.type}`);
     stations.set(component.id, {
       id: component.id, workers: perInstance(component, catalog).workers, meanServiceMs: spec.meanServiceMs,
-      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0) })), nextInstance: 0,
-      queueSize: queueSizeOf(component), waitMs: 0,
+      instances: Array.from({ length: instanceCount(component, catalog) }, () => ({ busy: 0, queue: [], busyMs: new Array<number>(Math.ceil(level.durationS / BUCKET_S)).fill(0), served: 0, rejected: 0, maxQueue: 0 })), nextInstance: 0,
+      queueSize: queueSizeOf(component), waitMs: 0, started: 0,
       next: nextOf(component.id), stats: { id: component.id, served: 0, rejected: 0, timedOut: 0 },
     });
   }
@@ -134,6 +135,7 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     const worker = station.instances[instance]!;
     worker.busy++;
     station.waitMs += now - request.enqueuedAt;
+    station.started++;
     const serviceMs = exponential(station.meanServiceMs);
     // Spread the busy time over the buckets it covers.
     for (let t = now, end = now + serviceMs; t < end;) {
@@ -162,11 +164,12 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
       station.nextInstance = (index + 1) % station.instances.length;
       const instance = station.instances[index]!;
       if (instance.busy < station.workers) start(station, index, value.request, now);
-      else if (instance.queue.length < station.queueSize) instance.queue.push(value.request);
-      else { errors.rejected++; station.stats.rejected++; fail(value.request); }
+      else if (instance.queue.length < station.queueSize) { instance.queue.push(value.request); instance.maxQueue = Math.max(instance.maxQueue, instance.queue.length); }
+      else { errors.rejected++; station.stats.rejected++; instance.rejected++; fail(value.request); }
     } else {
       const instance = station.instances[value.instance]!;
       instance.busy--;
+      instance.served++;
       station.stats.served++;
       if (station.next) {
         value.request.hops++;
@@ -207,10 +210,16 @@ export function simulate(level: Level, design: Design, seed: number, catalog: Ca
     nextStarCost,
     components: [...stations.values()].map(s => {
       const bucketMs = BUCKET_S * 1000 * s.workers;
-      const instances = s.instances.map(i => ({ bucketUtilization: i.busyMs.map(ms => Math.min(1, ms / bucketMs)) }));
+      const instances = s.instances.map(i => {
+        const util = i.busyMs.map(ms => Math.min(1, ms / bucketMs));
+        return { served: i.served, rejected: i.rejected, maxQueue: i.maxQueue, bucketUtilization: util, peakUtilization: Math.max(0, ...util) };
+      });
       const bucketUtilization = Array.from({ length: bucketCount }, (_, b) =>
         Math.min(1, s.instances.reduce((sum, i) => sum + i.busyMs[b]!, 0) / (bucketMs * s.instances.length)));
-      return { ...s.stats, bucketUtilization, instances };
+      return {
+        ...s.stats, bucketUtilization, peakUtilization: Math.max(0, ...bucketUtilization),
+        avgWaitMs: s.started ? s.waitMs / s.started : 0, maxQueue: Math.max(0, ...s.instances.map(i => i.maxQueue)), instances,
+      };
     }),
     bottleneck,
     buckets: bucketRequests.map((count, i) => ({

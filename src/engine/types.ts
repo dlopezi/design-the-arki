@@ -62,8 +62,14 @@ export type ComponentResult = {
   id: string; served: number; rejected: number; timedOut: number;
   /** Share of worker time busy in each 5-second bucket, 0–1, across all instances. */
   bucketUtilization: number[];
-  instances: { bucketUtilization: number[] }[];
+  peakUtilization: number;
+  /** Mean time a request spent queued here, over requests that started service. */
+  avgWaitMs: number;
+  maxQueue: number;
+  instances: InstanceResult[];
 };
+
+export type InstanceResult = { served: number; rejected: number; maxQueue: number; bucketUtilization: number[]; peakUtilization: number };
 
 /** Metrics for one slice of the run, used for charts and playback. */
 export type Bucket = { fromS: number; rps: number; p95: number; errorRate: number };
