@@ -1,4 +1,4 @@
-// PROTOTYPE: three radically different game-screen layouts, switchable via ?variant=A|B|C.
+// PROTOTYPE: three radically different game-screen layouts, switchable via ?variant=A|B|C (or #a|#b|#c).
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -17,9 +17,10 @@ const VARIANTS = [
 ];
 
 function App() {
-  const [variant, setVariant] = useState(new URLSearchParams(location.search).get('variant') ?? 'A');
+  const fromUrl = () => (new URLSearchParams(location.search).get('variant') ?? location.hash.slice(1).toUpperCase()) || 'A';
+  const [variant, setVariant] = useState(fromUrl);
   const game = useGame();
-  const change = (k: string) => { const u = new URL(location.href); u.searchParams.set('variant', k); history.replaceState(null, '', u); setVariant(k); };
+  const change = (k: string) => { history.replaceState(null, '', `#${k.toLowerCase()}`); setVariant(k); };
   const V = (VARIANTS.find(v => v.key === variant) ?? VARIANTS[0]).C;
   return (
     <>

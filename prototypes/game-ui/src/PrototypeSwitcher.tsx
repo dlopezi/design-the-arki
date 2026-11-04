@@ -11,7 +11,7 @@ export function PrototypeSwitcher({ variants, current, onChange }: { variants: {
     };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   });
-  if (!import.meta.env.DEV) return null;
+  if (!import.meta.env.DEV && !import.meta.env.VITE_PROTOTYPE) return null;
   return (
     <div className="proto-switcher">
       <button onClick={() => go(-1)} aria-label="Variante anterior">‹</button>

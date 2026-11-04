@@ -61,7 +61,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .proto-switcher span { padding: 0 4px; white-space: nowrap; }
 
 /* ---------- Variant A: Studio ---------- */
-.a-root { display: grid; height: 100vh; grid-template-columns: 220px 1fr 290px; grid-template-rows: 52px 1fr 230px; }
+.a-root { display: grid; height: 100%; grid-template-columns: 220px 1fr 290px; grid-template-rows: 52px 1fr 230px; }
 .a-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .a-top .title { font-weight: 600; } .a-top .crumb { color: var(--muted); font-size: 12px; }
 .a-budget { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; }
@@ -83,7 +83,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .util-row .meter { width: auto; }
 
 /* ---------- Variant B: Mission HUD ---------- */
-.b-root { position: relative; height: 100vh; background: radial-gradient(ellipse at center, #141a26 0%, var(--bg) 70%); }
+.b-root { position: relative; height: 100%; background: radial-gradient(ellipse at center, #141a26 0%, var(--bg) 70%); }
 .hud { position: absolute; z-index: 5; background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 14px; }
 .b-obj { top: 16px; left: 16px; padding: 14px 16px; width: 290px; }
 .b-obj .lvl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
@@ -112,7 +112,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .b-modal .tip { text-align: left; background: var(--panel-2); border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 13px; }
 
 /* ---------- Variant C: Interview ---------- */
-.c-root { display: grid; grid-template-columns: 400px 1fr; height: 100vh; }
+.c-root { display: grid; grid-template-columns: 400px 1fr; height: 100%; }
 .c-chat { display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--panel); min-height: 0; }
 .c-head { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
 .avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #7c6cff, #5b9dff); display: grid; place-items: center; font-weight: 700; color: #fff; }
