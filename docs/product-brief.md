@@ -42,6 +42,10 @@ Target 20+ levels covering four component groups:
 3. **Data scale**: read replicas, sharding, object storage.
 4. **Edge/network**: CDN, API gateway, rate limiter, DNS / multi-region.
 
+## Home screen
+
+Chosen from a three-variant prototype (path, skyline, mobile hub; kept in commit b671a49): a winding road of big round level buttons, in the spirit of mobile learning and puzzle games but with its own look and no mascot. Passed levels show a tick and are coloured by the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple), with a mode label and a legend; the next level glows with a "Play!" bubble; locked levels are grey with a lock. A top bar shows the stars collected and each chapter has a banner with the next level and a progress bar.
+
 ## Release
 
 - **Early access** with the 8 levels of chapter 1 (Core), then grow to 20+ in updates; chapter 2 (Async) is the first update.
