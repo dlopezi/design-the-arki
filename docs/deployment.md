@@ -5,12 +5,22 @@ The game is a static site: `npm run build` writes everything to `dist/`. There i
 Status: **not published yet.** The owner is play-testing the private build first.
 
 Decisions so far:
-- **Repository stays private.** GitHub Pages would need a paid GitHub plan, so Cloudflare Pages or Netlify (free with private repositories) are the likelier hosts.
+- **Repository stays private.** **Host: Cloudflare Pages** (free with private repositories).
 - **Custom domain:** wanted, not bought yet. Until then the host's free domain works (for example `archi-game.pages.dev`).
 - **No analytics** for now.
-- **Feedback:** players cannot reach a private repository's issues, so `VITE_FEEDBACK_URL` **must** be set to a form or a `mailto:` address before publishing. Still to be chosen.
+- **Feedback: by email.** Players cannot reach a private repository's issues, so before publishing set `VITE_FEEDBACK_URL` to `mailto:<address>?subject=archi-game%20feedback`. The address is not chosen yet; use a dedicated one, because every player will see it.
 
-## What a person has to do
+## Publishing on Cloudflare Pages (the chosen host)
+
+1. Cloudflare dashboard → Workers & Pages → Create → Pages → *Connect to Git* → pick `dlopezi/archi-game` and the branch to publish.
+2. Build settings: framework preset *None*, build command `npm run build`, build output directory `dist`.
+3. Environment variables (Production): `NODE_VERSION` = `22`, and `VITE_FEEDBACK_URL` = `mailto:<address>?subject=archi-game%20feedback`.
+4. Save and deploy. The site goes live at `archi-game.pages.dev` (or a similar name Cloudflare assigns).
+5. Later, with a domain: the project → Custom domains → Set up a domain, and follow the DNS step it shows.
+
+Cloudflare builds on every push to that branch. Pages does not run the tests, so keep the branch's CI green before merging into it.
+
+## Other hosts
 
 1. **Pick the host.** All three work with a custom domain:
    - **GitHub Pages:** free for public repositories; a private repository needs a paid GitHub plan. The workflow `.github/workflows/deploy-pages.yml` is ready. It only runs when started by hand.
