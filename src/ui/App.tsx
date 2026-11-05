@@ -15,6 +15,7 @@ import { LevelSelect } from './levelSelect';
 import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, withTutorialDone, type Progress } from '../progress/progress';
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
+import { HomePrototype, prototypeVariant } from './home/home.prototype';
 import { feedbackUrl, track } from '../analytics/analytics';
 
 const EMPTY: Design = { components: [], connections: [] };
@@ -354,6 +355,10 @@ export function App() {
   }, [level, locked]);
 
   if (!level || locked) {
+    // PROTOTYPE: home-screen variants (?variant=A|B|C, or every prototype build).
+    if (import.meta.env.VITE_PROTOTYPE || prototypeVariant()) {
+      return <HomePrototype levels={levels} progress={progress} onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
+    }
     return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
       onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
   }
