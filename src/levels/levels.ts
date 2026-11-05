@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { catalog } from '../catalog/catalog';
 import type { Design, Level } from '../engine/types';
 
-const componentType = z.string().refine(t => t in catalog, t => ({ message: `Unknown component type: ${t}` }));
+const componentType = z.string().refine(t => t in catalog, { error: issue => `Unknown component type: ${String(issue.input)}` });
 
 const designSchema = z.object({
-  components: z.array(z.object({ id: z.string().min(1), type: componentType, params: z.record(z.unknown()).optional() })),
+  components: z.array(z.object({ id: z.string().min(1), type: componentType, params: z.record(z.string(), z.unknown()).optional() })),
   connections: z.array(z.tuple([z.string(), z.string()])),
 });
 
@@ -22,11 +22,11 @@ const levelSchema = z.object({
   allowedComponents: z.array(componentType).min(1),
   failureEvents: z.array(z.object({ atS: z.number().min(0), componentType, instance: z.number().int().min(0) })).default([]),
   /** Per component type: which sizes and how many instances the player may choose. */
-  componentOptions: z.record(z.object({
+  componentOptions: z.record(z.string(), z.object({
     sizes: z.array(z.string()).min(1).optional(),
     maxInstances: z.number().int().min(1).optional(),
     /** Upper bounds for numeric params, e.g. { ttlS: 60 }. */
-    limits: z.record(z.number().positive()).optional(),
+    limits: z.record(z.string(), z.number().positive()).optional(),
   })).default({}),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
