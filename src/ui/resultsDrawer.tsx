@@ -18,7 +18,7 @@ function Chart({ title, values, max, limit, format, tone, cursor }: ChartProps) 
   const points = values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
   return (
     <figure className="chart">
-      <figcaption>{title}</figcaption>
+      <figcaption><span>{title}</span><span className="peak">{format(peak)}</span></figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t.results.chartLabel(title, format(peak), limit !== undefined ? format(limit) : undefined)}>
         <line x1={PAD} x2={W - PAD} y1={H - PAD} y2={H - PAD} className="axis" />
         {limit !== undefined && <line x1={PAD} x2={W - PAD} y1={y(limit)} y2={y(limit)} className="limit" />}
@@ -26,7 +26,6 @@ function Chart({ title, values, max, limit, format, tone, cursor }: ChartProps) 
         <polyline points={points} className={`line ${tone}`} />
         {cursor !== null && <line x1={cursor * (W - 2 * PAD) + PAD} x2={cursor * (W - 2 * PAD) + PAD} y1={0} y2={H} className="cursor" />}
       </svg>
-      <span className="peak">{format(peak)}</span>
     </figure>
   );
 }

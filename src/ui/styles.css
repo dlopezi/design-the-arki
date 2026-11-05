@@ -76,6 +76,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .c4-instance { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 4px 12px; border-radius: 8px;
   background: #1e3a5f; border: 1px solid #2f5a8f; color: #eaf2ff; font-size: 13px; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.5; }
+/* Connection handles: a visible 12px dot with a 28px area that catches the pointer. */
+.react-flow__handle { width: 12px; height: 12px; background: #8fb4e6; border: 2px solid #0f1f35; transition: transform .12s, background .12s; }
+.react-flow__handle::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
+.react-flow__handle:hover, .react-flow__handle.connectingfrom, .react-flow__handle.valid { background: var(--accent); transform: translate(var(--handle-x, 0), -50%) scale(1.3); }
+.react-flow__handle-left { --handle-x: -50%; }
+.react-flow__handle-right { --handle-x: 50%; }
 
 /* Inspector */
 .inspector { top: 128px; right: 16px; width: 300px; max-height: calc(100% - 260px); overflow: auto; padding: 14px 16px; display: grid; gap: 12px; font-size: 13.5px; }
@@ -127,14 +133,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .results .verdict .stars { font-size: 22px; letter-spacing: 2px; }
 .results .hint-text { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
 .chart { margin: 0; position: relative; min-width: 0; }
-.chart figcaption { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.chart figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
 .chart svg { width: 100%; height: auto; display: block; }
 .chart .axis { stroke: var(--line); } .chart .limit { stroke: var(--bad); stroke-dasharray: 4 4; opacity: .7; }
 .chart .line { fill: none; stroke-width: 2; } .chart .area { opacity: .15; stroke: none; }
 .chart .accent { stroke: var(--accent); fill: var(--accent); } .chart .warn { stroke: var(--warn); fill: var(--warn); } .chart .bad { stroke: var(--bad); fill: var(--bad); }
 .chart polyline.accent, .chart polyline.warn, .chart polyline.bad { fill: none; }
 .chart .cursor { stroke: var(--fg); opacity: .4; }
-.chart .peak { position: absolute; top: 0; right: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart .peak { flex: none; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--fg); font-variant-numeric: tabular-nums; }
 .loads ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; max-height: 150px; overflow: auto; }
 .loads li { display: grid; grid-template-columns: 90px 1fr 40px; align-items: center; gap: 8px; font-size: 12.5px; }
 .loads .value { text-align: right; font-variant-numeric: tabular-nums; }
