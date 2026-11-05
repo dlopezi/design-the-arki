@@ -8,6 +8,7 @@ A browser puzzle game about software architecture for developers preparing for s
 - `npm run check`: typecheck + unit tests (engine and level files)
 - `npm run e2e`: browser tests (builds and serves the game)
 - `prototypes/` holds throwaway prototypes; they are not part of the build
+- Deployment: see `docs/deployment.md` (not published yet; optional build settings in `.env.example`)
 
 ## Agent skills
 
