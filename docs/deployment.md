@@ -2,7 +2,13 @@
 
 The game is a static site: `npm run build` writes everything to `dist/`. There is no backend (ADR-0003).
 
-Status: **not published yet.** The decisions so far are a custom domain, no analytics for now, and feedback going to this repo's GitHub issues. The hosting provider is still open.
+Status: **not published yet.** The owner is play-testing the private build first.
+
+Decisions so far:
+- **Repository stays private.** GitHub Pages would need a paid GitHub plan, so Cloudflare Pages or Netlify (free with private repositories) are the likelier hosts.
+- **Custom domain:** wanted, not bought yet. Until then the host's free domain works (for example `archi-game.pages.dev`).
+- **No analytics** for now.
+- **Feedback:** players cannot reach a private repository's issues, so `VITE_FEEDBACK_URL` **must** be set to a form or a `mailto:` address before publishing. Still to be chosen.
 
 ## What a person has to do
 
