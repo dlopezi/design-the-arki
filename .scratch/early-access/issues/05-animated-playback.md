@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Engine result includes 5-second buckets for rps, p95, error rate, and utilisation per component and per instance
 - [x] Playback lasts a few seconds and can't be started again until it ends
@@ -14,3 +14,5 @@
 ## Comments
 
 **2026-11-04, implemented.** Engine (test-first): `buckets` (5 s: rps, p95, error rate by request arrival time) and per-component and per-instance `bucketUtilization`, checked against arrivals × service time / workers. UI: Play replays the level in 6 s with a clock (t, req/s, p95, errors), load bars and colours on instances and single-instance components (load balancer hidden), dots along connections (none with prefers-reduced-motion), Play disabled meanwhile, "Skip to results", report at the end. Fixed on the way: a rAF timestamp can precede the start time, which produced bucket −1 and crashed the page. E2E tests skip the playback through a helper.
+
+**2026-11-05, resolved.** Implemented in b7e50cf ("Ticket 05: animated playback done").

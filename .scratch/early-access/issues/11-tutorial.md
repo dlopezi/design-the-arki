@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 10
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Tutorial steps highlight the relevant control and advance on the real action
 - [x] Other modes are locked until the tutorial is passed
@@ -14,3 +14,5 @@
 ## Comments
 
 **2026-11-04, implemented.** Level 1 carries `tutorial` steps in its JSON (text, optional target component or the Play control, and the action that completes it: select a component type, connect two types, a run starts, the level is passed). Until `tutorialDone` is set in progress, the mode picker only offers Guided and other modes cannot be opened by link. In guided level 1 a Tutorial panel shows "Step n of 4", outlines the target, advances on the real action and ends with a completion message; Skip tutorial also unlocks every mode. Level 1 now limits the app server to one medium instance and the database to small, so the tutorial inspector stays simple. E2E specs that are not about the tutorial seed `tutorialDone`.
+
+**2026-11-05, resolved.** Implemented in b112c1e ("Ticket 11: guided tutorial on level 1").

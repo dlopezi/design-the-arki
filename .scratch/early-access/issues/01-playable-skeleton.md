@@ -6,7 +6,7 @@ Build the engine around generic primitives from the start (ADR-0004): source, st
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Project builds and runs with one command; unit tests and a lint/type check run in CI on every push
 - [x] `simulate(level, design, seed)` is the only engine entry point and has no UI or browser dependencies
@@ -19,3 +19,5 @@ Build the engine around generic primitives from the start (ADR-0004): source, st
 ## Comments
 
 **2026-11-04, implemented.** Engine (`simulate`) built test-first with generic station primitives; app server and database are catalogue entries. Level 1 file + schema + generated level test; minimal game screen; Playwright E2E; GitHub Actions CI (typecheck, unit tests, E2E). Engine tests written after an implementation that already existed (rejection, latency, determinism) were mutation-checked: each fails when the behaviour it covers is broken.
+
+**2026-11-05, resolved.** Implemented in 2cb769b ("Ticket 01: playable skeleton").

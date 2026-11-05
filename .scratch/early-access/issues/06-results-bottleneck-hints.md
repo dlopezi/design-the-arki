@@ -4,7 +4,7 @@
 
 **Blocked by:** 02, 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Engine tests: bottleneck = highest pressure (queue wait + overloaded requests × timeout) only when significant; hint chosen by bottleneck type
 - [x] Bottleneck highlighted on the diagram after a failed run
@@ -15,3 +15,5 @@
 ## Comments
 
 **2026-11-04, implemented.** Engine (test-first): `bottleneck` = component with the highest pressure (queue wait + a full timeout per rejected or timed-out request) when it adds at least 2 ms per request on average, else null; per-component `peakUtilization`, `avgWaitMs`, `maxQueue` and per-instance `served`, `rejected`, `maxQueue`, `peakUtilization`. The engine returns the bottleneck component only; the UI picks the hint text by component type (`hints` in the string catalogue), which keeps the engine free of player-facing text. UI: bottleneck badge and red outline after a failed run, hint in the report and the results drawer, charts for req/s, p95 and error rate with the level's limits (they grow during playback), peak load per resource (load balancer hidden), last-run table per instance in the inspector, I/R and buttons to toggle panels, "View details" reopens both on the bottleneck.
+
+**2026-11-05, resolved.** Implemented in 7621282 ("Ticket 06 done: hide load balancer from peak load list").
