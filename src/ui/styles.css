@@ -154,21 +154,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .badge.down { background: var(--muted); color: #111; }
 .loads li.down { color: var(--muted); } .loads li.down .load-bar span { width: 0 !important; }
 
-/* Level select */
-.level-select { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 28px; }
-.level-select h1 { margin: 0; font-size: 30px; }
-.level-select header { display: grid; gap: 8px; }
-.level-select h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.notice { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
-.level-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.level-cards li { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; }
-.level-cards li.locked { opacity: .55; }
-.level-cards h3 { margin: 0; font-size: 16px; }
-.level-cards .number { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.level-cards .stars { font-size: 18px; letter-spacing: 2px; }
-.play-link, .primary-link { justify-self: start; padding: 6px 14px; border-radius: 8px; background: var(--ok); color: #04130b; font-weight: 700; text-decoration: none; }
-.play-link:focus-visible, .primary-link:focus-visible, .back:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.reset { justify-self: start; }
 .mission .back { color: var(--muted); font-size: 13px; text-decoration: none; }
 .mission .back:hover { color: var(--fg); }
 
@@ -183,7 +168,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .mode-cards strong { font-size: 17px; } .mode-cards span { color: var(--muted); font-size: 13.5px; }
 .mode-line { font-size: 12.5px; color: var(--muted); } .mode-line a { color: var(--accent); }
 .guided-hint { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 14%, transparent); border-left: 3px solid var(--accent); font-size: 13px; color: var(--fg) !important; }
-.card-meta { display: flex; align-items: center; gap: 8px; }
 .badge.mode { margin: 0; background: var(--accent); color: #06121f; }
 .badge.mode.hard { background: var(--warn); } .badge.mode.god { background: var(--bad); }
 
@@ -205,3 +189,59 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .mission-links { display: flex; justify-content: space-between; }
 .footer-actions { display: flex; gap: 10px; align-items: center; }
 a.secondary { text-decoration: none; }
+
+/* Home: a winding road of levels, coloured by the hardest mode passed */
+.home {
+  --guided: #5b8cff; --guided-dark: #3459c9; --normal: #ffc83d; --normal-dark: #c9921a;
+  --hard: #ff8a3d; --hard-dark: #c95a17; --god: #b26bff; --god-dark: #7b3cc4;
+  --current: #3ddc84; --current-dark: #1f9e58; --locked: #3a4466; --locked-dark: #262e4a;
+  min-height: 100%; display: grid; justify-items: center; gap: 18px; padding-block: 0 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+}
+.home a { text-decoration: none; color: inherit; }
+.home-topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; width: min(880px, 100%); display: flex; align-items: center; gap: 10px; padding: 14px 0; background: var(--bg); }
+.home-brand { margin: 0 auto 0 0; font-size: 24px; font-weight: 900; letter-spacing: -.02em; background: linear-gradient(90deg, var(--current), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.home-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: var(--panel); border: 2px solid var(--line); font-weight: 800; font-variant-numeric: tabular-nums; }
+.home-star { color: var(--star); }
+.home-chapter { display: grid; justify-items: center; gap: 14px; width: min(560px, 100%); }
+.home-banner { width: 100%; display: grid; gap: 8px; padding: 16px 18px; border-radius: 20px; background: linear-gradient(135deg, #22306a, #1b2550); border: 2px solid var(--line); }
+.home-eyebrow { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--current); }
+.home-banner strong { font-size: 20px; }
+.home-progress { height: 12px; border-radius: 99px; background: var(--locked-dark); overflow: hidden; }
+.home-progress span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--current), #8ff0b8); }
+.home-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.home-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.home-dot { width: 12px; height: 12px; border-radius: 50%; }
+.home-dot.mode-guided { background: var(--guided); } .home-dot.mode-normal { background: var(--normal); }
+.home-dot.mode-hard { background: var(--hard); } .home-dot.mode-god { background: var(--god); box-shadow: 0 0 8px var(--god); }
+.home-map { position: relative; max-width: 100%; }
+.home-map ol { list-style: none; margin: 0; padding: 0; }
+.home-road { position: absolute; inset: 0; }
+.road-base { fill: none; stroke: var(--locked-dark); stroke-width: 18; stroke-linecap: round; }
+.road-done { fill: none; stroke: var(--current-dark); stroke-width: 18; stroke-linecap: round; }
+.home-node { position: absolute; transform: translate(-50%, -37px); width: 150px; display: grid; justify-items: center; gap: 4px; text-align: center; }
+.home-node h3 { margin: 6px 0 0; font-size: 13.5px; font-weight: 800; }
+.home-node.locked h3 { color: var(--muted); }
+.home-meta { display: flex; align-items: center; gap: 6px; }
+.home-meta .stars { font-size: 15px; letter-spacing: 1px; }
+.home-meta .badge.mode { font-size: 10px; }
+.home-coin { --c: var(--guided); --c-dark: var(--guided-dark); width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-size: 28px; font-weight: 900;
+  background: var(--c); color: #0b1020; box-shadow: 0 7px 0 var(--c-dark); transition: transform .08s, box-shadow .08s; }
+a.home-coin:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--c-dark); }
+.home-node.mode-guided .home-coin { --c: var(--guided); --c-dark: var(--guided-dark); }
+.home-node.mode-normal .home-coin { --c: var(--normal); --c-dark: var(--normal-dark); color: #4a3200; }
+.home-node.mode-hard .home-coin { --c: var(--hard); --c-dark: var(--hard-dark); color: #3d1600; }
+.home-node.mode-god .home-coin { --c: var(--god); --c-dark: var(--god-dark); color: #fff; box-shadow: 0 7px 0 var(--c-dark), 0 0 22px color-mix(in srgb, var(--god) 70%, transparent); }
+.home-node.current .home-coin { --c: var(--current); --c-dark: var(--current-dark); color: #06331b; box-shadow: 0 7px 0 var(--c-dark), 0 0 0 8px color-mix(in srgb, var(--current) 25%, transparent); animation: home-glow 1.6s ease-in-out infinite; }
+/* The button itself glows but never moves, so it is always easy to press. */
+@keyframes home-glow { 50% { box-shadow: 0 7px 0 var(--current-dark), 0 0 0 14px color-mix(in srgb, var(--current) 12%, transparent); } }
+.home-node.locked .home-coin { --c: var(--locked); --c-dark: var(--locked-dark); font-size: 24px; }
+.badge.mode.guided { background: var(--guided); color: #06121f; } .badge.mode.normal { background: var(--normal); color: #4a3200; }
+.badge.mode.hard { background: var(--hard); color: #3d1600; } .badge.mode.god { background: var(--god); color: #fff; }
+.home-bubble { position: absolute; bottom: calc(100% - 2px); padding: 6px 14px; border-radius: 12px; background: var(--fg); color: #10162b; font-weight: 900; white-space: nowrap; pointer-events: none; animation: home-bob 1.6s ease-in-out infinite; }
+.home-bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: 0; border-top-color: var(--fg); }
+@keyframes home-bob { 50% { transform: translateY(-6px); } }
+.home-footer { display: flex; gap: 16px; align-items: center; }
+.home :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { .home-node.current .home-coin, .home-bubble { animation: none; } }
