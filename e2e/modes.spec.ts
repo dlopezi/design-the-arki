@@ -5,7 +5,7 @@ const levelCard = (page: Page, title: string) => page.getByRole('listitem').filt
 
 test('opening a level asks for a mode', async ({ page }) => {
   await skipTutorial(page);
-  await page.goto('/');
+  await page.goto('/#levels');
   await levelCard(page, 'Hello world').getByRole('link', { name: /Play/ }).click();
   const modes = page.getByRole('list', { name: 'Modes' });
   await expect(modes.getByRole('link')).toHaveText([/Guided/, /Normal/, /Hard/, /God/]);
@@ -58,7 +58,7 @@ test('passing in hard mode earns the Hard badge, and each mode remembers its own
   await playAndSkip(page);
   await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
 
-  await page.goto('/');
+  await page.goto('/#levels');
   await expect(levelCard(page, 'Hello world')).toContainText('Hard');
   await expect(levelCard(page, 'Hello world').getByLabel('Hardest mode passed: Hard')).toBeVisible();
 

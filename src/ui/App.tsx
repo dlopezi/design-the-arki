@@ -15,6 +15,7 @@ import { LevelSelect } from './levelSelect';
 import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, withTutorialDone, type Progress } from '../progress/progress';
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
+import { LEVELS_HASH, levelsHref } from './routes';
 import { feedbackUrl, track } from '../analytics/analytics';
 
 const EMPTY: Design = { components: [], connections: [] };
@@ -240,7 +241,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       </ReactFlow>
 
       <section className="hud mission">
-        <span className="mission-links"><a className="back" href="#">← {t.levels}</a><a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a></span>
+        <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a><a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a></span>
         <h1>{level.title}</h1>
         <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
         <p>{level.brief}</p>
@@ -314,7 +315,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   );
 }
 
-/** `#` is the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
+/** `#levels` (and, until the landing page, `#`) is the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
 const routeFromHash = () => {
   const [levelId = '', mode = ''] = decodeURIComponent(location.hash.slice(1)).split('/');
   return { levelId, mode: isMode(mode) ? mode : null };
@@ -346,8 +347,8 @@ export function App() {
   useEffect(() => {
     if (level && locked) {
       setNotice(t.levelSelect.lockedNotice(level.title));
-      history.replaceState(null, '', location.pathname);
-      setRoute({ levelId: '', mode: null });
+      history.replaceState(null, '', `${location.pathname}${levelsHref}`);
+      setRoute({ levelId: LEVELS_HASH, mode: null });
     } else if (level) {
       setNotice(null);
     }

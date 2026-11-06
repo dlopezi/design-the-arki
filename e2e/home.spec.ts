@@ -7,7 +7,7 @@ test('the home map shows the mode each level was passed in, a legend, the next l
     version: 1, tutorialDone: true,
     levels: { '01-hello-world': { bestStars: 3, bestMode: 'god' }, '02-first-spike': { bestStars: 2, bestMode: 'hard' }, '03-bigger-or-more': { bestStars: 1, bestMode: 'normal' } },
   })));
-  await page.goto('/');
+  await page.goto('/#levels');
 
   await expect(page.getByRole('img', { name: '6 of 24 stars collected' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Coin colour: hardest mode passed' })).toContainText('Guided');
