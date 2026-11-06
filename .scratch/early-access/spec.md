@@ -211,4 +211,4 @@ Canvas-first layout with floating HUD: objectives (top-left), cost meter with st
 ## Further Notes
 
 - The prototypes live in `prototypes/` on this branch: `simulation-engine.prototype.html` (engine logic, free play and guided walkthroughs) and `prototypes/game-ui` (variants A–D; D is the chosen direction). Lift the engine logic, not the page shells.
-- Open question for later: how the game should behave at phone width. The prototypes are desktop-first.
+- Phone width: answered 2026-11-05 in `.scratch/mobile/spec.md` (playable compact layout, plus a tablet layout).
