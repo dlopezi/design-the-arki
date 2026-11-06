@@ -1,6 +1,6 @@
 # Spec: landing page
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
