@@ -4,7 +4,7 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `#levels` opens the level map; empty hash still shows it until 02
 - [x] Every "← Levels" link and the locked-level redirect point to `#levels`
@@ -14,3 +14,5 @@
 ## Comments
 
 **2026-11-05, implemented.** `src/ui/routes.ts` holds the level map address (`#levels`). "← Levels" in the game and the mode picker link there; a locked level opened by link is replaced with `#levels` and its notice. The empty hash still shows the level map until ticket 02. E2E tests open `/#levels`, and a new one checks the mode picker links back to it. Checks: typecheck, 97 unit and 41 E2E tests pass.
+
+**2026-11-05, resolved.** Implemented in 8fb3cf0.
