@@ -17,3 +17,5 @@
 **2026-11-05, update.** The owner will play-test the private build first (published as a private claude.ai page). The repository stays private, so before publishing: pick Cloudflare Pages or Netlify (or pay for GitHub Pages on a private repository), and set `VITE_FEEDBACK_URL` to a form or email (still to be chosen). No domain bought yet; use the host's free domain meanwhile.
 
 **2026-11-05, decided.** Host: Cloudflare Pages (steps in `docs/deployment.md`). Feedback: by email; the address is still to be chosen and must be set as `VITE_FEEDBACK_URL` before publishing. Waiting on the owner's play-test.
+
+**2026-11-05, postponed.** The owner wants a landing page before publishing: see `.scratch/landing-page/`.
