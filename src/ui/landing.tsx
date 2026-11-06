@@ -106,7 +106,7 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
       </section>
       <footer className="landing-foot">
         <a className="landing-play" href={action.href}>▶ {action.label}</a>
-        <span className="muted">{l.computerNote}</span>
+        <span className="muted">{l.deviceNote}</span>
       </footer>
     </div>
   );

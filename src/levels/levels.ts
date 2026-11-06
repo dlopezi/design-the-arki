@@ -36,6 +36,8 @@ const levelSchema = z.object({
   /** Step-by-step tutorial (level 1): each step points at something and waits for the real action. */
   tutorial: z.array(z.object({
     text: z.string().min(1),
+    /** Text for the phone layout, when `text` names something a phone does not have (a drag, a key). */
+    textCompact: z.string().min(1).optional(),
     target: z.union([z.object({ component: componentType }), z.object({ control: z.literal('play') })]).optional(),
     until: z.union([
       z.object({ select: componentType }),
@@ -47,6 +49,7 @@ const levelSchema = z.object({
 
 export type TutorialStep = {
   text: string;
+  textCompact?: string;
   target?: { component: string } | { control: 'play' };
   until: { select: string } | { connect: [string, string] } | { event: 'run' | 'pass' };
 };

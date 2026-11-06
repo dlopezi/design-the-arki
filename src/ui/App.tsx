@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFlow, type Connection, type Edge, type Node } from '@xyflow/react';
+import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type Connection, type Edge, type Node } from '@xyflow/react';
 import { BUCKET_S, DesignError, designCost, simulate } from '../engine/simulate';
 import type { Design, DesignProblem, Result } from '../engine/types';
 import { en as t, percent } from '../i18n/en';
@@ -10,7 +10,8 @@ import { DRAG_TYPE, Hotbar } from './hotbar';
 import { ClientsInspector, Inspector } from './inspector';
 import { CLIENTS, connectionTargets, forwardsRequests, targetOf, withConnection } from './connections';
 import { MissionPanel } from './missionPanel';
-import { COMPACT_QUERY, useMediaQuery } from './useMediaQuery';
+import { viewportInArea, type Margins } from './fit';
+import { COMPACT_QUERY, MEDIUM_QUERY, TALL_QUERY, useMediaQuery } from './useMediaQuery';
 import { ReportCard } from './reportCard';
 import { ResultsDrawer } from './resultsDrawer';
 import { LevelSelect } from './levelSelect';
@@ -26,16 +27,39 @@ const EMPTY: Design = { components: [], connections: [] };
 const PLAYBACK_MS = 6000;
 
 const usePrefersReducedMotion = () => useMediaQuery('(prefers-reduced-motion: reduce)');
-// Keep the diagram clear of the floating panels: mission (left), inspector (right), controls and results (bottom).
-// In the compact layout the diagram has its own area between the bars, so a small margin is enough.
+type Layout = 'compact' | 'medium' | 'wide';
+/** Medium layout sizes (px), kept in step with `.game.medium` in styles.css. */
+const MEDIUM = { side: 282, resultsTall: 270, resultsShort: 204, controls: 84, top: 170, topWithTutorial: 300 };
 const px = (n: number) => `${n}px` as const;
-const fitOptions = (inspector: boolean, results: boolean, compact: boolean) => compact
-  ? { maxZoom: 1.1, minZoom: COMPACT_MIN_ZOOM, padding: px(16) }
-  : { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) } };
+/**
+ * Keep the diagram clear of the floating panels.
+ * Wide: mission (left), inspector (right), controls and results (bottom).
+ * Medium: the side panel (left), cost and tutorial (top), controls and results (bottom).
+ * Compact: the diagram has its own area between the bars, so a small margin is enough.
+ */
+type FitState = { inspector: boolean; results: boolean; tutorial: boolean; tall: boolean };
+const mediumMargins = ({ results, tutorial, tall }: FitState): Margins => ({
+  top: tutorial ? MEDIUM.topWithTutorial : MEDIUM.top,
+  left: MEDIUM.side + 8,
+  right: 24,
+  bottom: 16 + (results ? (tall ? MEDIUM.resultsTall : MEDIUM.resultsShort) + 16 : 0) + MEDIUM.controls + 16,
+});
+const MAX_ZOOM = 1.1;
+const fitOptions = (layout: Layout, state: FitState) => {
+  const { inspector, results } = state;
+  if (layout === 'compact') return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: px(16) };
+  if (layout === 'medium') {
+    const m = mediumMargins(state);
+    return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: { top: px(m.top), right: px(m.right), bottom: px(m.bottom), left: px(m.left) } };
+  }
+  return { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) } };
+};
 /** A phone is narrower than the diagram at React Flow's default minimum zoom (0.5); the player can pinch to zoom in. */
 const COMPACT_MIN_ZOOM = 0.25;
 type SheetTab = 'mission' | 'inspector' | 'results';
 const SHEET_TABS: SheetTab[] = ['mission', 'inspector', 'results'];
+type SideTab = 'mission' | 'inspector';
+const SIDE_TABS: SideTab[] = ['mission', 'inspector'];
 const labelOf = (design: Design, id: string) => {
   const component = design.components.find(c => c.id === id);
   return component ? (t.componentTypes[component.type] ?? component.type) : t.clients;
@@ -88,19 +112,26 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   const [playT, setPlayT] = useState<number | null>(null);
   const frame = useRef(0);
   const counter = useRef(lastIdNumber(initialDesign ?? EMPTY));
-  const { fitView } = useReactFlow();
+  const { fitView, setViewport, getNodes, getNodesBounds } = useReactFlow();
+  const flowWidth = useStore(s => s.width);
+  const flowHeight = useStore(s => s.height);
   const reduceMotion = usePrefersReducedMotion();
   const running = playT !== null;
   const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
   const live = running && result ? { result, bucket, animate: !reduceMotion, t: playT } : null;
   const [panels, setPanels] = useState({ inspector: true, results: true });
   const compact = useMediaQuery(COMPACT_QUERY);
+  const medium = useMediaQuery(MEDIUM_QUERY);
+  const tall = useMediaQuery(TALL_QUERY);
+  const layout: Layout = compact ? 'compact' : medium ? 'medium' : 'wide';
+  const [sideTab, setSideTab] = useState<SideTab>('mission');
   const [sheet, setSheet] = useState<{ tab: SheetTab; open: boolean }>({ tab: 'mission', open: true });
   const openSheet = useCallback((tab: SheetTab) => setSheet({ tab, open: true }), []);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialFinished, setTutorialFinished] = useState(false);
   const [tutorialSkipped, setTutorialSkipped] = useState(false);
   const step = tutorial && !tutorialFinished ? tutorial[tutorialStep] : undefined;
+  const showTutorial = !!tutorial && (!!step || (tutorialFinished && !tutorialSkipped));
   const typeOf = (id: string) => design.components.find(c => c.id === id)?.type;
   // Advance the tutorial when the player does what the current step asks.
   useEffect(() => {
@@ -130,7 +161,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
 
   const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType }),
     [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
-  const FIT = fitOptions(panels.inspector, panels.results, compact);
+  const fitState: FitState = { inspector: panels.inspector, results: panels.results, tutorial: showTutorial, tall };
+  const FIT = fitOptions(layout, fitState);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
   // Any change to the design invalidates the last run.
@@ -139,11 +171,25 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
   const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
-  // In the compact layout the diagram's area also changes size when the sheet opens or closes.
-  useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView, panels.inspector, panels.results, compact, sheet.open]); // eslint-disable-line react-hooks/exhaustive-deps
-  // On a phone, selecting a component shows its settings.
+  // The diagram's free area also changes with the layout, the phone sheet and the tutorial card.
+  // On a tablet the margins differ a lot (side panel, tall results drawer), so centre the diagram in the free area ourselves.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (layout === 'medium' && flowWidth && flowHeight) {
+        setViewport(viewportInArea(getNodesBounds(getNodes()), flowWidth, flowHeight, mediumMargins(fitState), COMPACT_MIN_ZOOM, MAX_ZOOM));
+      } else {
+        fitView(FIT);
+      }
+    }, 30);
+    return () => clearTimeout(timer);
+  }, [shapeKey, fitView, panels.inspector, panels.results, layout, tall, sheet.open, showTutorial, tutorialStep, flowWidth, flowHeight]); // eslint-disable-line react-hooks/exhaustive-deps
+  // On a phone or tablet, selecting a component shows its settings.
   const selectedIsComponent = selected === CLIENTS || design.components.some(c => c.id === selected);
-  useEffect(() => { if (compact && selectedIsComponent) openSheet('inspector'); }, [selected, compact]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!selectedIsComponent) return;
+    if (compact) openSheet('inspector');
+    if (medium) setSideTab('inspector');
+  }, [selected, compact, medium]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addComponent = useCallback((type: string) => {
     const id = `${type}-${++counter.current}`;
@@ -177,6 +223,13 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     setSelected(null);
   }, []);
 
+  /** The playback ended or was skipped: show the report, and on a phone the results tab behind it. */
+  const finishRun = useCallback(() => {
+    setPlayT(null);
+    setShowReport(true);
+    if (compact) openSheet('results');
+  }, [compact, openSheet]);
+
   const play = useCallback(() => {
     try {
       const run = simulate(level, design, 1);
@@ -189,13 +242,15 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       }
       setShowReport(false);
       setProblem(null);
+      // On a phone the sheet would hide most of the diagram: close it to watch the run.
+      if (compact) setSheet(s => ({ ...s, open: false }));
       // Replay the run: the whole level in PLAYBACK_MS, then the report.
       const started = performance.now();
       setPlayT(0);
       const tick = (now: number) => {
         // A frame's timestamp can be slightly earlier than `started`.
         const progress = Math.max(0, (now - started) / PLAYBACK_MS);
-        if (progress >= 1) { setPlayT(null); setShowReport(true); return; }
+        if (progress >= 1) { finishRun(); return; }
         setPlayT(progress * level.durationS);
         frame.current = requestAnimationFrame(tick);
       };
@@ -205,9 +260,9 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       if (!(e instanceof DesignError)) throw e;
       setProblem({ message: describeProblem(e.problem, design), componentIds: problemComponents(e.problem) });
     }
-  }, [level, design, onPassed, mode]);
+  }, [level, design, onPassed, mode, compact, finishRun]);
 
-  const skip = useCallback(() => { cancelAnimationFrame(frame.current); setPlayT(null); setShowReport(true); }, []);
+  const skip = useCallback(() => { cancelAnimationFrame(frame.current); finishRun(); }, [finishRun]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -221,14 +276,14 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         play();
         e.preventDefault();
       } else if (e.key === 'i' || e.key === 'I') {
-        if (compact) openSheet('inspector'); else togglePanel('inspector');
+        if (compact) openSheet('inspector'); else if (medium) setSideTab(tab => (tab === 'inspector' ? 'mission' : 'inspector')); else togglePanel('inspector');
       } else if (e.key === 'r' || e.key === 'R') {
         if (compact) openSheet('results'); else togglePanel('results');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addComponent, play, level.allowedComponents, showReport, running, togglePanel, compact, openSheet]);
+  }, [addComponent, play, level.allowedComponents, showReport, running, togglePanel, compact, medium, openSheet]);
 
   const selectedComponent = design.components.find(c => c.id === selected) ?? null;
 
@@ -244,11 +299,13 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       <Background variant={BackgroundVariant.Dots} gap={26} size={1.5} />
     </ReactFlow>
   );
-  const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} />;
+  const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} compact={compact} />;
   const feedbackLink = <a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>;
   const costMeter = <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />;
   const sendsToFrom = (from: string) => forwardsRequests(design, from)
-    ? { from, targets: connectionTargets(design, from), current: targetOf(design, from), onChange: (to: string | null) => connectTo(from, to) }
+    ? { from, targets: connectionTargets(design, from), current: targetOf(design, from), onChange: (to: string | null) => connectTo(from, to),
+        // On a phone the tutorial's connect step points at this choice instead of a handle.
+        tutorialTarget: compact && !!step && 'connect' in step.until && typeOf(from) === step.until.connect[0] }
     : null;
   const inspector = selected === CLIENTS ? <ClientsInspector sendsTo={sendsToFrom(CLIENTS)!} /> : (
     <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
@@ -260,7 +317,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   );
   const results = <ResultsDrawer level={level} design={design} result={result} running={running} bucket={bucket} hint={hint} />;
   const controls = <>
-    <Hotbar types={level.allowedComponents} onAdd={addComponent} />
+    {/* On a phone or tablet there is no room for both: while a run plays, Skip takes the components' place. */}
+    {!((compact || medium) && running) && <Hotbar types={level.allowedComponents} onAdd={addComponent} />}
     <button className={`play ${tutorialOnPlay ? 'tutorial-target' : ''}`} onClick={play} disabled={running}>{t.play}</button>
     {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
   </>;
@@ -277,16 +335,16 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       );
     })()}
     {problem && <div className="hud problem" role="alert">{problem.message}</div>}
-    {tutorial && (step || (tutorialFinished && !tutorialSkipped)) && (
-      <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
-        {step ? <>
-          <span className="eyebrow">{t.tutorial.step(tutorialStep + 1, tutorial.length)}</span>
-          <p>{step.text}</p>
-          <button className="link-button" onClick={() => { setTutorialSkipped(true); setTutorialFinished(true); onTutorialDone(); }}>{t.tutorial.skip}</button>
-        </> : <p>{t.tutorial.done}</p>}
-      </section>
-    )}
   </>;
+  const tutorialCard = tutorial && showTutorial && (
+    <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
+      {step ? <>
+        <span className="eyebrow">{t.tutorial.step(tutorialStep + 1, tutorial.length)}</span>
+        <p>{compact && step.textCompact ? step.textCompact : step.text}</p>
+        <button className="link-button" onClick={() => { setTutorialSkipped(true); setTutorialFinished(true); onTutorialDone(); }}>{t.tutorial.skip}</button>
+      </> : <p>{t.tutorial.done}</p>}
+    </section>
+  );
   const report = result && showReport && (
     <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
       onDetails={() => {
@@ -294,6 +352,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         setPanels({ inspector: true, results: true });
         setSelected(result.bottleneck?.componentId ?? null);
         if (compact) openSheet('inspector');
+        if (medium) setSideTab('inspector');
       }} />
   );
 
@@ -306,9 +365,10 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
           <h1>{level.title}</h1>
           {costMeter}
         </header>
+        {tutorialCard}
         <div className="canvas-area">
           {canvas}
-          {overlays}
+          <div className="overlay-stack">{overlays}</div>
         </div>
         <section className="sheet" aria-label={t.panels.title} data-open={sheet.open}>
           <div className="sheet-head">
@@ -330,6 +390,37 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
           </div>
         </section>
         <div className="bottom-bar">{controls}</div>
+        {report}
+      </div>
+    );
+  }
+
+  // Tablet: one side panel with Mission and Inspector tabs, the cost top right, results and controls at the bottom.
+  if (medium) {
+    return (
+      <div className="game medium" data-results={panels.results} data-tall={tall}>
+        {canvas}
+        <section className="hud side-panel" aria-label={level.title}>
+          <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a>{feedbackLink}</span>
+          <h1>{level.title}</h1>
+          <div role="tablist" aria-label={t.panels.title} className="side-tabs">
+            {SIDE_TABS.map(tab => (
+              <button key={tab} role="tab" id={`side-tab-${tab}`} aria-selected={sideTab === tab} aria-controls="side-panel-body" onClick={() => setSideTab(tab)}>
+                {t.panels[tab]}
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" id="side-panel-body" aria-labelledby={`side-tab-${sideTab}`} className="side-body">
+            {sideTab === 'mission' ? <div className="mission">{mission}</div> : inspector}
+          </div>
+        </section>
+        <section className="hud cost-hud">{costMeter}</section>
+        <div className="hud panel-toggles">
+          <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
+        </div>
+        {panels.results && results}
+        <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>{controls}</div>
+        <div className="overlay-stack">{tutorialCard}{overlays}</div>
         {report}
       </div>
     );
@@ -357,6 +448,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
 
       <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>{controls}</div>
       {overlays}
+      {tutorialCard}
       {report}
     </div>
   );

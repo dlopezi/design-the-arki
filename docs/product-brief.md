@@ -32,7 +32,7 @@ Chosen from the UI prototype (variant D in `prototypes/game-ui`, 2026-11-04): th
 - **Inspector** (right, collapsible with `I`): deployment settings (instances, instance size), an *Advanced* section (queue size, service time, timeout), capacity and cost breakdown, and per-instance stats after a run.
 - **Results drawer** (bottom, collapsible with `R`): verdict, stars, hint, rps / p95 / error charts, and load per resource.
 - **Report card** after each run, with "View details" opening the inspector on the bottleneck.
-- **Phone and tablet** (planned 2026-11-05, `.scratch/mobile/spec.md`): below 700 px a compact layout with a top bar, the diagram, a bottom sheet with tabs (Mission / Inspector / Results) and the component bar with Play; connections can also be made from the inspector ("Sends requests to"). Between 700 and 1100 px the desktop layout with narrower panels.
+- **Phone and tablet** (planned 2026-11-05, `.scratch/mobile/spec.md`): below 700 px a compact layout with a top bar, the diagram, a bottom sheet with tabs (Mission / Inspector / Results) and the component bar with Play; connections can also be made from the inspector ("Sends requests to"). Between 700 and 1100 px one side panel with Mission / Inspector tabs on the left, the cost top right, and the results drawer (two rows on tall screens) at the bottom (chosen 2026-11-05 over narrower panels, which left the diagram about 250 px wide).
 
 
 

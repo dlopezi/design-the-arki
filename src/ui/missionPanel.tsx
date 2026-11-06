@@ -12,10 +12,12 @@ type Props = {
   cost: number;
   /** The last finished run, or null while running or before the first run. */
   result: Result | null;
+  /** The phone layout: the hint speaks of taps, not drags and keys. */
+  compact: boolean;
 };
 
 /** The level's mission: mode, brief, objectives, traffic, new components, incidents and how to use the canvas. */
-export function MissionPanel({ level, mode, newTypes, cost, result }: Props) {
+export function MissionPanel({ level, mode, newTypes, cost, result, compact }: Props) {
   return (
     <>
       <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
@@ -33,7 +35,7 @@ export function MissionPanel({ level, mode, newTypes, cost, result }: Props) {
           {level.failureEvents!.map(f => <li key={`${f.atS}-${f.componentType}-${f.instance}`}>⚡ {t.incident(t.componentTypes[f.componentType] ?? f.componentType, f.instance + 1, f.atS)}</li>)}
         </ul>
       )}
-      <p className="hint">{t.canvasHint}</p>
+      <p className="hint">{compact ? t.canvasHintCompact : t.canvasHint}</p>
     </>
   );
 }

@@ -33,7 +33,7 @@ export const en = {
     continueAt: (n: number) => `Continue: level ${n}`,
     playAgain: 'Play again',
     freeNote: 'Free · no sign-up · runs in your browser',
-    computerNote: 'Best played on a computer.',
+    deviceNote: 'Plays on a computer, tablet or phone.',
     demo: {
       title: 'Try it here',
       label: 'Try it: a tiny simulation',
@@ -151,8 +151,9 @@ export const en = {
   components: 'Components',
   hotbarItem: (key: number, label: string, cost: number) => `${key} ${label} $${cost}`,
   canvasHint: 'Add components from the bar below, then drag from one handle to another to connect them. Delete removes the selection.',
+  canvasHintCompact: 'Tap a component in the bar below to add it. Tap a component on the diagram to change it, choose where it sends requests ("Sends requests to"), or remove it.',
   problems: {
-    noEntry: 'Connect Clients to a component first: drag from the Clients handle to an app server.',
+    noEntry: 'Connect Clients to a component first: select Clients and choose where they send requests, or drag from the Clients handle to an app server.',
     deadEnd: (label: string) => `${label} has nowhere to send requests. Connect it to a component that can answer them.`,
     needsBalancer: (label: string) => `${label} runs several instances but nothing spreads requests between them. Put a load balancer in front of it.`,
     notPublic: (label: string) => `Clients cannot talk to ${label} directly. Put an app server (or a load balancer) in front of it.`,

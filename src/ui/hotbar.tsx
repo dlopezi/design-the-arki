@@ -3,7 +3,7 @@ import { en as t } from '../i18n/en';
 
 export const DRAG_TYPE = 'application/x-archi-component';
 
-/** Components the level allows, in order: click, drag onto the canvas, or press 1–n. */
+/** Components the level allows, in order: click or tap, drag onto the canvas, or press 1–n (key numbers are hidden on touch screens). */
 export function Hotbar({ types, onAdd }: { types: string[]; onAdd: (type: string) => void }) {
   return (
     <div className="hotbar" role="toolbar" aria-label={t.components}>

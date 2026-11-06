@@ -1,6 +1,6 @@
 # Spec: phone and tablet
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -29,7 +29,7 @@ At widths below 700 px the game screen uses a **compact layout**:
 
 Connecting without a drag: the Inspector gets a **"Sends requests to"** row with one button per possible target and "None". It works at every screen size and with the keyboard.
 
-Between 700 and 1100 px the desktop layout stays, with narrower panels so the diagram has more room.
+Between 700 and 1100 px the mission and the inspector share one side panel with tabs on the left, so the diagram has the rest of the width (changed from "narrower panels" on 2026-11-05, see ticket 06).
 
 ## User Stories
 

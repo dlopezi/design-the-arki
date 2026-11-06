@@ -336,9 +336,50 @@ a.home-coin:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--c-dar
 .compact .bottom-bar .hotbar { flex: 1; min-width: 0; overflow-x: auto; }
 .compact .bottom-bar .hot-tile { flex: none; width: 76px; height: 56px; }
 .compact .bottom-bar .play { flex: none; width: 60px; height: 60px; }
-.compact .clock { top: 8px; max-width: calc(100% - 16px); padding: 6px 12px; gap: 10px; font-size: 12.5px; white-space: nowrap; }
+.compact .clock { padding: 6px 12px; gap: 10px; font-size: 12.5px; white-space: nowrap; }
 .compact .clock strong { font-size: 16px; }
-.compact .problem { bottom: 8px; }
-.compact .tutorial { top: 8px; width: calc(100% - 16px); min-width: 0; }
+.compact .tutorial { flex: none; position: static; transform: none; width: auto; min-width: 0; margin: 8px 8px 0; }
 .c4-person.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .sends-to label { max-width: 100%; }
+/* Touch screens: no keys to press, and every control big enough for a finger. */
+@media (hover: none) { .hot-tile kbd { display: none; } }
+.compact .stepper button { width: 40px; height: 40px; font-size: 18px; }
+.compact .stepper input { width: 56px; height: 40px; }
+.compact .segmented label { min-height: 40px; display: inline-flex; align-items: center; padding: 0 14px; }
+.compact .danger { min-height: 40px; padding: 0 16px; }
+.compact .sheet-body .mission .back { display: inline-flex; align-items: center; min-height: 40px; }
+/* Phone playback and report: Skip fills the bar while a run plays; a tall report card scrolls instead of leaving the screen. */
+.compact .bottom-bar .secondary { flex: 1; min-height: 48px; }
+.compact .backdrop { overflow-y: auto; }
+.compact .report { padding: 20px 16px; margin: auto; }
+.compact .report .stats dd { font-size: 16px; }
+/* Phone: the clock and design problems stack at the top of the diagram area; the tutorial card sits above that area, so the diagram fits below it. */
+.compact .overlay-stack { position: absolute; z-index: 6; top: 8px; left: 8px; right: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.compact .overlay-stack > .hud { position: static; transform: none; pointer-events: auto; }
+.compact .overlay-stack > .problem { width: 100%; }
+.compact .overlay-stack > .clock { max-width: 100%; }
+.sends-to.tutorial-target { outline-offset: 2px; border-radius: 8px; }
+
+/* Medium (tablet) layout: one side panel with tabs on the left. Sizes match MEDIUM in App.tsx. Chosen in JS (MEDIUM_QUERY). */
+.game.medium .side-panel { top: 16px; left: 16px; bottom: 16px; width: 250px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.game.medium[data-results="true"] .side-panel { bottom: 236px; }
+.game.medium[data-results="true"][data-tall="true"] .side-panel { bottom: 302px; }
+.game.medium .side-panel h1 { margin: 0; font-size: 18px; }
+.game.medium .side-tabs { flex: none; display: flex; gap: 4px; }
+.game.medium .side-tabs button { min-height: 36px; background: none; border: 1px solid transparent; border-radius: 8px; padding: 0 12px; color: var(--muted); font-size: 13.5px; }
+.game.medium .side-tabs [aria-selected="true"] { background: var(--panel-2); border-color: var(--line); color: var(--fg); }
+.game.medium .side-body { flex: 1; min-height: 0; overflow: auto; }
+.game.medium .side-body > .hud { position: static; width: auto; max-height: none; padding: 0; background: none; border: none; backdrop-filter: none; border-radius: 0; }
+.game.medium .side-body .mission { display: grid; gap: 8px; width: auto; padding: 0; }
+.game.medium .results { height: 204px; }
+.game.medium[data-tall="true"] .results { height: 270px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; }
+.game.medium[data-tall="true"] .loads ul { max-height: 80px; }
+.game.medium .controls { left: calc(282px + (100% - 282px) / 2); bottom: 16px; }
+.game.medium .controls.above-results { bottom: 236px; }
+.game.medium[data-tall="true"] .controls.above-results { bottom: 302px; }
+.game.medium .hot-tile { width: 72px; height: 64px; }
+.game.medium .play { width: 64px; height: 64px; }
+.game.medium .overlay-stack { position: absolute; z-index: 6; top: 160px; left: 290px; right: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.game.medium .overlay-stack > .hud { position: static; transform: none; pointer-events: auto; }
+.game.medium .overlay-stack > .tutorial { width: min(460px, 100%); min-width: 0; }
+.game.medium .overlay-stack > .problem { width: min(460px, 100%); }

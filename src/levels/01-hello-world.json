@@ -127,6 +127,7 @@
     },
     {
       "text": "Requests reach the app server but go no further. Drag from its right handle to the database to connect them.",
+      "textCompact": "Requests reach the app server but go no further. In the inspector, choose Database under \"Sends requests to\" to connect them.",
       "target": {
         "component": "database"
       },

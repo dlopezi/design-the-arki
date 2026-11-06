@@ -23,7 +23,11 @@ type Props = {
   sendsTo: SendsToProps | null;
 };
 
-type SendsToProps = { from: string; targets: ConnectionTarget[]; current: string | null; onChange: (target: string | null) => void };
+type SendsToProps = {
+  from: string; targets: ConnectionTarget[]; current: string | null; onChange: (target: string | null) => void;
+  /** The tutorial points here (phone layout, connect step). */
+  tutorialTarget?: boolean;
+};
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="row"><span className="muted">{label}</span><span>{children}</span></div>;
@@ -57,10 +61,10 @@ function SizePicker({ label, sizes, value, name, onChange }: { label: string; si
 }
 
 /** Where requests go next: one choice per possible target, or none. Connects without dragging a handle. */
-function SendsTo({ from, targets, current, onChange }: SendsToProps) {
+function SendsTo({ from, targets, current, onChange, tutorialTarget }: SendsToProps) {
   const NONE = '';
   return (
-    <fieldset className="segmented sends-to" aria-label={t.inspector.sendsTo}>
+    <fieldset className={`segmented sends-to ${tutorialTarget ? 'tutorial-target' : ''}`} aria-label={t.inspector.sendsTo}>
       <legend className="muted">{t.inspector.sendsTo}</legend>
       {[{ id: NONE, label: t.inspector.sendsToNone }, ...targets].map(target => (
         <label key={target.id} className={target.id === (current ?? NONE) ? 'on' : ''}>
