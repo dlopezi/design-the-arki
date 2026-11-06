@@ -6,8 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] Empty hash shows the landing; `#levels` the level map
-- [ ] Main button: "Play level 1" → level 1 guided (tutorial); with progress "Continue: level N" → next open level; all passed → "Play again" → `#levels`
-- [ ] "All levels" / "Your levels" link in the top bar
-- [ ] Strings in `src/i18n/en.ts`; reads well at phone width with the computer note
-- [ ] E2E: new visitor sees the pitch and reaches the tutorial; returning player sees Continue
+- [x] Empty hash shows the landing; `#levels` the level map
+- [x] Main button: "Play level 1" → level 1 guided (tutorial); with progress "Continue: level N" → next open level; all passed → "Play again" → `#levels`
+- [x] "All levels" / "Your levels" link in the top bar
+- [x] Strings in `src/i18n/en.ts`; reads well at phone width with the computer note
+- [x] E2E: new visitor sees the pitch and reaches the tutorial; returning player sees Continue
+
+## Comments
+
+**2026-11-05, implemented.** `src/ui/landing.tsx` at the empty hash (`App.tsx`); strings under `landing` in `src/i18n/en.ts`; styles at the end of `styles.css`. The main button comes from `src/landing/mainAction.ts` (unit-tested: new player → `#<level 1>/guided`, returning → "Continue: level N", all passed → "Play again" to `#levels`). The top bar says "All levels", or "Your levels" for a returning player. Checked at phone width (375 px): no sideways scroll. E2E: `e2e/landing.spec.ts`.

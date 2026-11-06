@@ -16,6 +16,7 @@ import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, with
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
 import { LEVELS_HASH, levelsHref } from './routes';
+import { Landing } from './landing';
 import { feedbackUrl, track } from '../analytics/analytics';
 
 const EMPTY: Design = { components: [], connections: [] };
@@ -315,7 +316,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   );
 }
 
-/** `#levels` (and, until the landing page, `#`) is the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
+/** `#` is the landing page, `#levels` the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
 const routeFromHash = () => {
   const [levelId = '', mode = ''] = decodeURIComponent(location.hash.slice(1)).split('/');
   return { levelId, mode: isMode(mode) ? mode : null };
@@ -354,6 +355,7 @@ export function App() {
     }
   }, [level, locked]);
 
+  if (!level && route.levelId === '') return <Landing levels={levels} progress={progress} />;
   if (!level || locked) {
     return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
       onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
