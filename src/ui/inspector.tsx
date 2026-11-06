@@ -3,6 +3,7 @@ import { DEFAULT_QUEUE_SIZE, hitRateOf, TIMEOUT_MS } from '../engine/simulate';
 import type { ComponentResult, DesignComponent } from '../engine/types';
 import { en as t, percent } from '../i18n/en';
 import type { ComponentOptions } from '../levels/levels';
+import type { ConnectionTarget } from './connections';
 import { instanceCountOf, loadLevel, sizeOf } from './diagram';
 
 const MAX_INSTANCES = 8;
@@ -18,7 +19,11 @@ type Props = {
   /** This component's stats from the last finished run, if any. */
   lastRun: ComponentResult | null;
   instanceNames: string[] | undefined;
+  /** Where the component can send requests, or null when it ends them. */
+  sendsTo: SendsToProps | null;
 };
+
+type SendsToProps = { from: string; targets: ConnectionTarget[]; current: string | null; onChange: (target: string | null) => void };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="row"><span className="muted">{label}</span><span>{children}</span></div>;
@@ -51,8 +56,39 @@ function SizePicker({ label, sizes, value, name, onChange }: { label: string; si
   );
 }
 
+/** Where requests go next: one choice per possible target, or none. Connects without dragging a handle. */
+function SendsTo({ from, targets, current, onChange }: SendsToProps) {
+  const NONE = '';
+  return (
+    <fieldset className="segmented sends-to" aria-label={t.inspector.sendsTo}>
+      <legend className="muted">{t.inspector.sendsTo}</legend>
+      {[{ id: NONE, label: t.inspector.sendsToNone }, ...targets].map(target => (
+        <label key={target.id} className={target.id === (current ?? NONE) ? 'on' : ''}>
+          <input type="radio" name={`sends-to-${from}`} value={target.id} checked={target.id === (current ?? NONE)}
+            onChange={() => onChange(target.id === NONE ? null : target.id)} />
+          {target.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/** The clients have nothing to configure except where they send requests. */
+export function ClientsInspector({ sendsTo }: { sendsTo: SendsToProps }) {
+  return (
+    <aside className="hud inspector" aria-label={t.inspector.title}>
+      <h2 className="eyebrow">{t.inspector.title}</h2>
+      <div className="title">
+        <h3>{t.clients}</h3>
+        <span className="muted">[{t.person}]</span>
+      </div>
+      <SendsTo {...sendsTo} />
+    </aside>
+  );
+}
+
 /** Configuration of the selected component: deployment, advanced settings, capacity and cost, and the last run. */
-export function Inspector({ component, options, onChange, onRemove, lastRun, instanceNames }: Props) {
+export function Inspector({ component, options, onChange, onRemove, lastRun, instanceNames, sendsTo }: Props) {
   if (!component) {
     return <aside className="hud inspector" aria-label={t.inspector.title}><h2 className="eyebrow">{t.inspector.title}</h2><p className="muted">{t.inspector.empty}</p></aside>;
   }
@@ -77,6 +113,8 @@ export function Inspector({ component, options, onChange, onRemove, lastRun, ins
         <h3>{t.componentTypes[component.type] ?? component.type}</h3>
         <span className="muted">[{t.container}: {spec.presentation?.technology}]</span>
       </div>
+
+      {sendsTo && <SendsTo {...sendsTo} />}
 
       {spec.scalesOut && (
         <section>

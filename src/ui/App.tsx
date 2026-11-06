@@ -7,7 +7,8 @@ import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/le
 import { CostMeter } from './costMeter';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
-import { Inspector } from './inspector';
+import { ClientsInspector, Inspector } from './inspector';
+import { CLIENTS, connectionTargets, forwardsRequests, targetOf, withConnection } from './connections';
 import { MissionPanel } from './missionPanel';
 import { COMPACT_QUERY, useMediaQuery } from './useMediaQuery';
 import { ReportCard } from './reportCard';
@@ -141,7 +142,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   // In the compact layout the diagram's area also changes size when the sheet opens or closes.
   useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView, panels.inspector, panels.results, compact, sheet.open]); // eslint-disable-line react-hooks/exhaustive-deps
   // On a phone, selecting a component shows its settings.
-  const selectedIsComponent = design.components.some(c => c.id === selected);
+  const selectedIsComponent = selected === CLIENTS || design.components.some(c => c.id === selected);
   useEffect(() => { if (compact && selectedIsComponent) openSheet('inspector'); }, [selected, compact]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addComponent = useCallback((type: string) => {
@@ -160,10 +161,11 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   }, []);
 
   const onConnect = useCallback((c: Connection) => {
-    if (c.target === 'client' || c.source === c.target) return;
-    // A component forwards to one place: a new connection replaces the old one.
-    setDesign(d => ({ ...d, connections: [...d.connections.filter(([from]) => from !== c.source), [c.source, c.target]] }));
+    setDesign(d => withConnection(d, c.source, c.target));
   }, []);
+
+  /** Connects the selected component (or the clients) from the inspector; null disconnects it. */
+  const connectTo = useCallback((from: string, to: string | null) => setDesign(d => withConnection(d, from, to)), []);
 
   const onNodesDelete = useCallback((nodes: Node[]) => {
     for (const n of nodes) if (n.type === 'component') removeComponent(n.id);
@@ -233,7 +235,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   const canvas = (
     <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
       onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
-      onNodeClick={(_, n) => setSelected(n.type === 'component' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
+      onNodeClick={(_, n) => setSelected(n.type === 'component' || n.type === 'person' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
       onEdgeClick={(_, e) => setSelected(e.id)} onPaneClick={() => setSelected(null)}
       nodesDraggable={false} deleteKeyCode={['Backspace', 'Delete']} panActivationKeyCode={null} colorMode="dark"
       fitView fitViewOptions={FIT} minZoom={compact ? COMPACT_MIN_ZOOM : 0.5} proOptions={{ hideAttribution: true }}
@@ -245,12 +247,16 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} />;
   const feedbackLink = <a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>;
   const costMeter = <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />;
-  const inspector = (
+  const sendsToFrom = (from: string) => forwardsRequests(design, from)
+    ? { from, targets: connectionTargets(design, from), current: targetOf(design, from), onChange: (to: string | null) => connectTo(from, to) }
+    : null;
+  const inspector = selected === CLIENTS ? <ClientsInspector sendsTo={sendsToFrom(CLIENTS)!} /> : (
     <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
       onChange={params => selectedComponent && updateParams(selectedComponent.id, params)}
       onRemove={() => selectedComponent && removeComponent(selectedComponent.id)}
       lastRun={result && !running && selectedComponent ? (result.components.find(c => c.id === selectedComponent.id) ?? null) : null}
-      instanceNames={selectedComponent ? instanceNames(design).get(selectedComponent.id) : undefined} />
+      instanceNames={selectedComponent ? instanceNames(design).get(selectedComponent.id) : undefined}
+      sendsTo={selectedComponent ? sendsToFrom(selectedComponent.id) : null} />
   );
   const results = <ResultsDrawer level={level} design={design} result={result} running={running} bucket={bucket} hint={hint} />;
   const controls = <>

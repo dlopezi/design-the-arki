@@ -169,6 +169,8 @@ export const en = {
   inspector: {
     title: 'Inspector',
     empty: 'Select a component on the diagram to see and change its configuration.',
+    sendsTo: 'Sends requests to',
+    sendsToNone: 'None',
     deployment: 'Deployment',
     instances: 'Instances',
     addInstance: 'Add instance',

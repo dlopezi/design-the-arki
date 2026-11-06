@@ -340,3 +340,5 @@ a.home-coin:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--c-dar
 .compact .clock strong { font-size: 16px; }
 .compact .problem { bottom: 8px; }
 .compact .tutorial { top: 8px; width: calc(100% - 16px); min-width: 0; }
+.c4-person.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.sends-to label { max-width: 100%; }

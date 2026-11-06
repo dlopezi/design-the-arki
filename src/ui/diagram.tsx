@@ -14,7 +14,7 @@ const SYSTEM = { head: 54, pad: 30, gapFromPerson: 90 };
 const COMPONENT_GAP = 20;
 const ZONES: Presentation['zone'][] = ['edge', 'application', 'data'];
 
-export type PersonData = { title: string };
+export type PersonData = { title: string; selected: boolean };
 export type BoundaryData = { title: string; kind: string; system: boolean };
 export type ComponentData = {
   componentId: string; title: string; technology: string; detail: string;
@@ -38,7 +38,7 @@ function Load({ value }: { value: number | null }) {
 
 function PersonNode({ data }: NodeProps<Node<PersonData>>) {
   return (
-    <div className="c4-person">
+    <div className={`c4-person ${data.selected ? 'selected' : ''}`}>
       <div className="c4-head" aria-hidden="true" />
       <strong>{data.title}</strong>
       <span className="c4-kind">[{t.person}]</span>
@@ -161,7 +161,7 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
 
   const nodes: Node[] = [];
   nodes.push(sized<PersonData>({ id: 'client', type: 'person', position: { x: 0, y: zones.length ? systemH / 2 - PERSON.h / 2 : 0 },
-    data: { title: t.clients }, deletable: false, selectable: false }, PERSON.w, PERSON.h));
+    data: { title: t.clients, selected: state.selected === 'client' }, deletable: false, selectable: false }, PERSON.w, PERSON.h));
   if (!zones.length) return { nodes, edges: edgesOf(design, state) };
 
   nodes.push(sized<BoundaryData>({ id: 'system', type: 'boundary', position: { x: systemX, y: 0 },

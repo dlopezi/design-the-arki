@@ -67,3 +67,17 @@ test('on a phone tapping a component opens the inspector tab, and the sheet can 
   await sheet.getByRole('tab', { name: 'Mission' }).tap();
   await expect(sheet.getByRole('tabpanel')).toContainText('A small online shop');
 });
+
+test('on a phone a component is connected from the inspector tab and the level passes', async ({ page }) => {
+  await openLevel(page, '01-hello-world', 'guided');
+  const { sheet, bottomBar } = parts(page);
+  await canvasSettled(page);
+
+  await node(page, 'App server').getByText('App server', { exact: true }).tap();
+  await sheet.getByRole('group', { name: 'Sends requests to' }).getByRole('radio', { name: 'Database' }).check();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+
+  await bottomBar.getByRole('button', { name: 'Play' }).tap();
+  await bottomBar.getByRole('button', { name: 'Skip to results' }).tap();
+  await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
+});
