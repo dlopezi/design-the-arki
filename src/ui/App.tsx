@@ -8,7 +8,8 @@ import { CostMeter } from './costMeter';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
 import { Inspector } from './inspector';
-import { Objectives } from './objectives';
+import { MissionPanel } from './missionPanel';
+import { COMPACT_QUERY, useMediaQuery } from './useMediaQuery';
 import { ReportCard } from './reportCard';
 import { ResultsDrawer } from './resultsDrawer';
 import { LevelSelect } from './levelSelect';
@@ -23,23 +24,17 @@ const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
 const PLAYBACK_MS = 6000;
 
-function usePrefersReducedMotion(): boolean {
-  const query = '(prefers-reduced-motion: reduce)';
-  const [reduce, setReduce] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setReduce(media.matches);
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, []);
-  return reduce;
-}
+const usePrefersReducedMotion = () => useMediaQuery('(prefers-reduced-motion: reduce)');
 // Keep the diagram clear of the floating panels: mission (left), inspector (right), controls and results (bottom).
+// In the compact layout the diagram has its own area between the bars, so a small margin is enough.
 const px = (n: number) => `${n}px` as const;
-const fitOptions = (inspector: boolean, results: boolean) => ({
-  maxZoom: 1.1,
-  padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) },
-});
+const fitOptions = (inspector: boolean, results: boolean, compact: boolean) => compact
+  ? { maxZoom: 1.1, minZoom: COMPACT_MIN_ZOOM, padding: px(16) }
+  : { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) } };
+/** A phone is narrower than the diagram at React Flow's default minimum zoom (0.5); the player can pinch to zoom in. */
+const COMPACT_MIN_ZOOM = 0.25;
+type SheetTab = 'mission' | 'inspector' | 'results';
+const SHEET_TABS: SheetTab[] = ['mission', 'inspector', 'results'];
 const labelOf = (design: Design, id: string) => {
   const component = design.components.find(c => c.id === id);
   return component ? (t.componentTypes[component.type] ?? component.type) : t.clients;
@@ -98,6 +93,9 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   const bucket = running && result ? Math.max(0, Math.min(result.buckets.length - 1, Math.floor(playT / BUCKET_S))) : 0;
   const live = running && result ? { result, bucket, animate: !reduceMotion, t: playT } : null;
   const [panels, setPanels] = useState({ inspector: true, results: true });
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const [sheet, setSheet] = useState<{ tab: SheetTab; open: boolean }>({ tab: 'mission', open: true });
+  const openSheet = useCallback((tab: SheetTab) => setSheet({ tab, open: true }), []);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialFinished, setTutorialFinished] = useState(false);
   const [tutorialSkipped, setTutorialSkipped] = useState(false);
@@ -131,7 +129,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
 
   const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType }),
     [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
-  const FIT = fitOptions(panels.inspector, panels.results);
+  const FIT = fitOptions(panels.inspector, panels.results, compact);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
   // Any change to the design invalidates the last run.
@@ -140,7 +138,11 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
   const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
-  useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView, panels.inspector, panels.results]); // eslint-disable-line react-hooks/exhaustive-deps
+  // In the compact layout the diagram's area also changes size when the sheet opens or closes.
+  useEffect(() => { const timer = setTimeout(() => fitView(FIT), 30); return () => clearTimeout(timer); }, [shapeKey, fitView, panels.inspector, panels.results, compact, sheet.open]); // eslint-disable-line react-hooks/exhaustive-deps
+  // On a phone, selecting a component shows its settings.
+  const selectedIsComponent = design.components.some(c => c.id === selected);
+  useEffect(() => { if (compact && selectedIsComponent) openSheet('inspector'); }, [selected, compact]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addComponent = useCallback((type: string) => {
     const id = `${type}-${++counter.current}`;
@@ -217,101 +219,139 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         play();
         e.preventDefault();
       } else if (e.key === 'i' || e.key === 'I') {
-        togglePanel('inspector');
+        if (compact) openSheet('inspector'); else togglePanel('inspector');
       } else if (e.key === 'r' || e.key === 'R') {
-        togglePanel('results');
+        if (compact) openSheet('results'); else togglePanel('results');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addComponent, play, level.allowedComponents, showReport, running, togglePanel]);
+  }, [addComponent, play, level.allowedComponents, showReport, running, togglePanel, compact, openSheet]);
 
   const selectedComponent = design.components.find(c => c.id === selected) ?? null;
 
+  const canvas = (
+    <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
+      onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
+      onNodeClick={(_, n) => setSelected(n.type === 'component' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
+      onEdgeClick={(_, e) => setSelected(e.id)} onPaneClick={() => setSelected(null)}
+      nodesDraggable={false} deleteKeyCode={['Backspace', 'Delete']} panActivationKeyCode={null} colorMode="dark"
+      fitView fitViewOptions={FIT} minZoom={compact ? COMPACT_MIN_ZOOM : 0.5} proOptions={{ hideAttribution: true }}
+      onDragOver={e => { if (e.dataTransfer.types.includes(DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }}
+      onDrop={e => { const type = e.dataTransfer.getData(DRAG_TYPE); if (type) { e.preventDefault(); addComponent(type); } }}>
+      <Background variant={BackgroundVariant.Dots} gap={26} size={1.5} />
+    </ReactFlow>
+  );
+  const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} />;
+  const feedbackLink = <a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>;
+  const costMeter = <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />;
+  const inspector = (
+    <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
+      onChange={params => selectedComponent && updateParams(selectedComponent.id, params)}
+      onRemove={() => selectedComponent && removeComponent(selectedComponent.id)}
+      lastRun={result && !running && selectedComponent ? (result.components.find(c => c.id === selectedComponent.id) ?? null) : null}
+      instanceNames={selectedComponent ? instanceNames(design).get(selectedComponent.id) : undefined} />
+  );
+  const results = <ResultsDrawer level={level} design={design} result={result} running={running} bucket={bucket} hint={hint} />;
+  const controls = <>
+    <Hotbar types={level.allowedComponents} onAdd={addComponent} />
+    <button className={`play ${tutorialOnPlay ? 'tutorial-target' : ''}`} onClick={play} disabled={running}>{t.play}</button>
+    {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
+  </>;
+  const overlays = <>
+    {running && result && (() => {
+      const b = result.buckets[bucket]!;
+      return (
+        <div className="hud clock" role="timer" aria-label={t.clock}>
+          <strong>t = {Math.floor(playT)} s</strong>
+          <span>{Math.round(b.rps)} req/s</span>
+          <span className={b.p95 > level.requirements.p95Ms ? 'bad' : 'ok'}>p95 {Math.round(b.p95)} ms</span>
+          <span className={b.errorRate > level.requirements.maxErrorRate ? 'bad' : ''}>{percent(b.errorRate)} {t.errorsWord}</span>
+        </div>
+      );
+    })()}
+    {problem && <div className="hud problem" role="alert">{problem.message}</div>}
+    {tutorial && (step || (tutorialFinished && !tutorialSkipped)) && (
+      <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
+        {step ? <>
+          <span className="eyebrow">{t.tutorial.step(tutorialStep + 1, tutorial.length)}</span>
+          <p>{step.text}</p>
+          <button className="link-button" onClick={() => { setTutorialSkipped(true); setTutorialFinished(true); onTutorialDone(); }}>{t.tutorial.skip}</button>
+        </> : <p>{t.tutorial.done}</p>}
+      </section>
+    )}
+  </>;
+  const report = result && showReport && (
+    <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
+      onDetails={() => {
+        setShowReport(false);
+        setPanels({ inspector: true, results: true });
+        setSelected(result.bottleneck?.componentId ?? null);
+        if (compact) openSheet('inspector');
+      }} />
+  );
+
+  // Phone: top bar, the diagram in its own area, a bottom sheet with tabs, and the component bar.
+  if (compact) {
+    return (
+      <div className="game compact">
+        <header className="top-bar">
+          <a className="back" href={levelsHref}>← {t.levels}</a>
+          <h1>{level.title}</h1>
+          {costMeter}
+        </header>
+        <div className="canvas-area">
+          {canvas}
+          {overlays}
+        </div>
+        <section className="sheet" aria-label={t.panels.title} data-open={sheet.open}>
+          <div className="sheet-head">
+            <div role="tablist" aria-label={t.panels.title}>
+              {SHEET_TABS.map(tab => (
+                <button key={tab} role="tab" id={`sheet-tab-${tab}`} aria-selected={sheet.tab === tab} aria-controls="sheet-panel" onClick={() => openSheet(tab)}>
+                  {t.panels[tab]}
+                </button>
+              ))}
+            </div>
+            <button className="sheet-toggle" aria-expanded={sheet.open} aria-controls="sheet-panel" onClick={() => setSheet(s => ({ ...s, open: !s.open }))}>
+              {sheet.open ? t.panels.hide : t.panels.show}
+            </button>
+          </div>
+          <div role="tabpanel" id="sheet-panel" aria-labelledby={`sheet-tab-${sheet.tab}`} className="sheet-body" hidden={!sheet.open}>
+            {sheet.tab === 'mission' && <div className="mission">{mission}{feedbackLink}</div>}
+            {sheet.tab === 'inspector' && inspector}
+            {sheet.tab === 'results' && results}
+          </div>
+        </section>
+        <div className="bottom-bar">{controls}</div>
+        {report}
+      </div>
+    );
+  }
+
   return (
     <div className="game" data-results={panels.results}>
-      <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
-        onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
-        onNodeClick={(_, n) => setSelected(n.type === 'component' ? n.id : n.type === 'instance' ? n.parentId ?? null : null)}
-        onEdgeClick={(_, e) => setSelected(e.id)} onPaneClick={() => setSelected(null)}
-        nodesDraggable={false} deleteKeyCode={['Backspace', 'Delete']} panActivationKeyCode={null} colorMode="dark"
-        fitView fitViewOptions={FIT} proOptions={{ hideAttribution: true }}
-        onDragOver={e => { if (e.dataTransfer.types.includes(DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }}
-        onDrop={e => { const type = e.dataTransfer.getData(DRAG_TYPE); if (type) { e.preventDefault(); addComponent(type); } }}>
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.5} />
-      </ReactFlow>
+      {canvas}
 
       <section className="hud mission">
-        <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a><a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a></span>
+        <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a>{feedbackLink}</span>
         <h1>{level.title}</h1>
-        <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
-        <p>{level.brief}</p>
-        {mode === 'guided' && <p role="note" className="guided-hint">{level.guidedHint}</p>}
-        <Objectives level={level} cost={cost} result={running ? null : result} />
-        <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
-        {newTypes.length > 0 && (
-          <ul className="new-components" aria-label={t.newComponents}>
-            {newTypes.map(type => <li key={type}><strong>New: {t.componentTypes[type] ?? type}</strong> {t.componentIntros[type]}</li>)}
-          </ul>
-        )}
-        {(level.failureEvents?.length ?? 0) > 0 && (
-          <ul className="incidents" aria-label={t.incidents}>
-            {level.failureEvents!.map(f => <li key={`${f.atS}-${f.componentType}-${f.instance}`}>⚡ {t.incident(t.componentTypes[f.componentType] ?? f.componentType, f.instance + 1, f.atS)}</li>)}
-          </ul>
-        )}
-        <p className="hint">{t.canvasHint}</p>
+        {mission}
       </section>
 
-      <section className="hud cost-hud">
-        <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />
-      </section>
+      <section className="hud cost-hud">{costMeter}</section>
 
       <div className="hud panel-toggles">
         <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
         <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
       </div>
 
-      {panels.inspector && (
-        <Inspector component={selectedComponent} options={selectedComponent ? level.componentOptions[selectedComponent.type] : undefined}
-          onChange={params => selectedComponent && updateParams(selectedComponent.id, params)}
-          onRemove={() => selectedComponent && removeComponent(selectedComponent.id)}
-          lastRun={result && !running && selectedComponent ? (result.components.find(c => c.id === selectedComponent.id) ?? null) : null}
-          instanceNames={selectedComponent ? instanceNames(design).get(selectedComponent.id) : undefined} />
-      )}
+      {panels.inspector && inspector}
+      {panels.results && results}
 
-      {panels.results && <ResultsDrawer level={level} design={design} result={result} running={running} bucket={bucket} hint={hint} />}
-
-      <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>
-        <Hotbar types={level.allowedComponents} onAdd={addComponent} />
-        <button className={`play ${tutorialOnPlay ? 'tutorial-target' : ''}`} onClick={play} disabled={running}>{t.play}</button>
-        {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
-      </div>
-      {running && result && (() => {
-        const b = result.buckets[bucket]!;
-        return (
-          <div className="hud clock" role="timer" aria-label={t.clock}>
-            <strong>t = {Math.floor(playT)} s</strong>
-            <span>{Math.round(b.rps)} req/s</span>
-            <span className={b.p95 > level.requirements.p95Ms ? 'bad' : 'ok'}>p95 {Math.round(b.p95)} ms</span>
-            <span className={b.errorRate > level.requirements.maxErrorRate ? 'bad' : ''}>{percent(b.errorRate)} {t.errorsWord}</span>
-          </div>
-        );
-      })()}
-      {problem && <div className="hud problem" role="alert">{problem.message}</div>}
-      {tutorial && (step || (tutorialFinished && !tutorialSkipped)) && (
-        <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
-          {step ? <>
-            <span className="eyebrow">{t.tutorial.step(tutorialStep + 1, tutorial.length)}</span>
-            <p>{step.text}</p>
-            <button className="link-button" onClick={() => { setTutorialSkipped(true); setTutorialFinished(true); onTutorialDone(); }}>{t.tutorial.skip}</button>
-          </> : <p>{t.tutorial.done}</p>}
-        </section>
-      )}
-
-      {result && showReport && (
-        <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
-          onDetails={() => { setShowReport(false); setPanels({ inspector: true, results: true }); setSelected(result.bottleneck?.componentId ?? null); }} />
-      )}
+      <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>{controls}</div>
+      {overlays}
+      {report}
     </div>
   );
 }

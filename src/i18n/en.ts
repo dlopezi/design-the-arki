@@ -109,7 +109,7 @@ export const en = {
   hintLabel: 'Hint:',
   viewDetails: 'View details',
   bottleneck: 'Bottleneck',
-  panels: { inspector: 'Inspector', results: 'Results' },
+  panels: { title: 'Panels', mission: 'Mission', inspector: 'Inspector', results: 'Results', hide: 'Hide panel', show: 'Show panel' },
   results: {
     title: 'Results',
     empty: 'Press Play to send traffic through your design.',
