@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const demo = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Try it: a tiny simulation' });
+const demo = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Training: a tiny simulation' });
 
 test('a new visitor learns what the game is, tries the demo and starts the tutorial', async ({ page }) => {
   await page.goto('/');
@@ -18,7 +18,7 @@ test('a new visitor learns what the game is, tries the demo and starts the tutor
   await expect(demo(page).getByText('700 req/s')).toBeVisible();
   await expect(demo(page).getByRole('status')).toHaveText('✗ The app server is overloaded');
 
-  await page.getByRole('link', { name: 'Play level 1' }).first().click();
+  await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Play level 1' }).click();
   await expect(page).toHaveURL(/#01-hello-world\/guided$/);
   await expect(page.getByRole('region', { name: 'Tutorial' })).toContainText('Step 1 of 4');
 });
@@ -28,14 +28,45 @@ test('a returning player continues at the next open level', async ({ page }) => 
     localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 3 }, '02-first-spike': { bestStars: 2 } } }));
   });
   await page.goto('/');
-  await page.getByRole('link', { name: 'Continue: level 3' }).first().click();
+  await expect(page.getByRole('img', { name: '5 of 24 stars collected' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Chapter 1 · Core: 2 of 8 levels passed' })).toBeVisible();
+  await page.getByRole('link', { name: 'Continue: level 3' }).click();
   await expect(page).toHaveURL(/#03-bigger-or-more$/);
   await expect(page.getByRole('heading', { name: 'Bigger or more?' })).toBeVisible();
 });
 
-test('the landing links to the level map', async ({ page }) => {
+test('the title screen menu links to the level map', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'All levels' }).click();
+  await page.getByRole('link', { name: 'Level map' }).click();
   await expect(page).toHaveURL(/#levels$/);
   await expect(page.getByRole('heading', { name: 'Chapter 1 · Core' })).toBeVisible();
+});
+
+test('the menu works from the keyboard like a game menu', async ({ page }) => {
+  await page.goto('/');
+  const menu = page.getByRole('navigation', { name: 'Main menu' });
+  await expect(menu.getByRole('link', { name: 'Play level 1' })).toHaveAttribute('data-selected', 'true');
+
+  // ↓ ↓ selects "How to play"; Enter opens the steps, Escape closes them and keeps the selection.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('button', { name: 'How to play' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'How to play' });
+  await expect(dialog).toContainText('1 · Build');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(menu.getByRole('button', { name: 'How to play' })).toBeFocused();
+
+  // ↑ goes back to "Level map"; Enter opens it.
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#levels$/);
+});
+
+test('Enter on a fresh title screen starts the selected first item', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Play level 1' })).toHaveAttribute('data-selected', 'true');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#01-hello-world\/guided$/);
 });
