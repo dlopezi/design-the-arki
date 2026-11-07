@@ -29,7 +29,7 @@ const PLAYBACK_MS = 6000;
 const usePrefersReducedMotion = () => useMediaQuery('(prefers-reduced-motion: reduce)');
 type Layout = 'compact' | 'medium' | 'wide';
 /** Medium layout sizes (px), kept in step with `.game.medium` in styles.css. */
-const MEDIUM = { side: 282, resultsTall: 270, resultsShort: 204, controls: 84, top: 170, topWithTutorial: 300 };
+const MEDIUM = { side: 282, resultsTall: 270, resultsShort: 204, controls: 108, top: 170, topWithTutorial: 300 };
 const px = (n: number) => `${n}px` as const;
 /**
  * Keep the diagram clear of the floating panels.
@@ -52,7 +52,7 @@ const fitOptions = (layout: Layout, state: FitState) => {
     const m = mediumMargins(state);
     return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: { top: px(m.top), right: px(m.right), bottom: px(m.bottom), left: px(m.left) } };
   }
-  return { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 330 : 140) } };
+  return { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 352 : 160) } };
 };
 /** A phone is narrower than the diagram at React Flow's default minimum zoom (0.5); the player can pinch to zoom in. */
 const COMPACT_MIN_ZOOM = 0.25;

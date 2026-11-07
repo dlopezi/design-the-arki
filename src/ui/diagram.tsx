@@ -3,6 +3,7 @@ import { catalog } from '../catalog/catalog';
 import { hitRateOf } from '../engine/simulate';
 import type { Design, Presentation, Result } from '../engine/types';
 import { en as t } from '../i18n/en';
+import { ComponentBadge } from './componentArt';
 
 // Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
 const PERSON = { w: 150, h: 112 };
@@ -17,12 +18,12 @@ const ZONES: Presentation['zone'][] = ['edge', 'application', 'data'];
 export type PersonData = { title: string; selected: boolean };
 export type BoundaryData = { title: string; kind: string; system: boolean };
 export type ComponentData = {
-  componentId: string; title: string; technology: string; detail: string;
+  componentId: string; type: string; title: string; technology: string; detail: string;
   container: boolean; selected: boolean; problem: boolean; bottleneck: boolean; tutorialTarget: boolean;
   /** Share of capacity in use during playback (0–1); null when not playing or hidden. */
   load: number | null;
 };
-export type InstanceData = { name: string; detail: string; load: number | null; down: boolean };
+export type InstanceData = { type: string; name: string; detail: string; load: number | null; down: boolean };
 
 export const loadLevel = (load: number) => (load >= 0.9 ? 'high' : load >= 0.7 ? 'medium' : 'low');
 
@@ -59,10 +60,15 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
   return (
     <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''} ${data.tutorialTarget ? 'tutorial-target' : ''}`}>
       <Handle type="target" position={Position.Left} />
-      <strong>{data.title}{data.bottleneck && <span className="badge">{t.bottleneck}</span>}</strong>
-      <span className="c4-kind">[{data.technology}]</span>
-      <span className="c4-detail">{data.detail}</span>
-      {!data.container && <Load value={data.load} />}
+      <div className="c4-main">
+        <ComponentBadge type={data.type} />
+        <div className="c4-text">
+          <strong>{data.title}{data.bottleneck && <span className="badge">{t.bottleneck}</span>}</strong>
+          <span className="c4-kind">[{data.technology}]</span>
+          <span className="c4-detail">{data.detail}</span>
+          {!data.container && <Load value={data.load} />}
+        </div>
+      </div>
       <Handle type="source" position={Position.Right} />
     </div>
   );
@@ -71,9 +77,12 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
 function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
   return (
     <div className={`c4-instance ${data.down ? 'down' : data.load === null ? '' : loadLevel(data.load)}`}>
-      <strong>{data.name}{data.down && <span className="badge down">{t.down}</span>}</strong>
-      <span className="c4-detail">{data.detail}</span>
-      {!data.down && <Load value={data.load} />}
+      <ComponentBadge type={data.type} small down={data.down} />
+      <div className="c4-text">
+        <strong>{data.name}{data.down && <span className="badge down">{t.down}</span>}</strong>
+        <span className="c4-detail">{data.detail}</span>
+        {!data.down && <Load value={data.load} />}
+      </div>
     </div>
   );
 }
@@ -186,7 +195,7 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
           : spec.presentation?.hideCapacity ? '' : `${size ? `${t.inspector.sizes[size]} · ` : ''}${t.inspector.connections(workers)}`;
       nodes.push(sized<ComponentData>({ id: member.id, type: 'component', parentId: zoneId, extent: 'parent',
         position: { x: ZONE.pad, y }, selected: state.selected === member.id,
-        data: { componentId: member.id, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
+        data: { componentId: member.id, type: member.type, title: t.componentTypes[member.type] ?? member.type, technology: spec.presentation?.technology ?? '',
           detail, container: member.container, selected: state.selected === member.id, problem: state.problemIds.includes(member.id),
           bottleneck: state.bottleneckId === member.id, tutorialTarget: state.tutorialTargetType === member.type,
           load: live && !spec.presentation?.hideCapacity ? (liveOf(member.id)?.bucketUtilization[live.bucket] ?? null) : null } }, BOX.w, member.height));
@@ -194,7 +203,7 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
         for (let k = 0; k < member.instances; k++) {
           nodes.push(sized<InstanceData>({ id: `${member.id}#${k}`, type: 'instance', parentId: member.id, extent: 'parent',
             position: { x: (BOX.w - INSTANCE.w) / 2, y: CONTAINER_HEAD + k * (INSTANCE.h + INSTANCE.gap) },
-            data: { name: names.get(member.id)![k]!, detail: `${workers} workers`,
+            data: { type: member.type, name: names.get(member.id)![k]!, detail: `${workers} workers`,
               load: live ? (liveOf(member.id)?.instances[k]?.bucketUtilization[live.bucket] ?? null) : null,
               down: !!live && (liveOf(member.id)?.instances[k]?.killedAtS ?? Infinity) <= live.t }, deletable: false, selectable: false, connectable: false }, INSTANCE.w, INSTANCE.h));
         }
