@@ -37,5 +37,8 @@ export function loadAnalytics(): void {
   document.head.appendChild(script);
 }
 
-/** Where "Send feedback" points; set VITE_FEEDBACK_URL to use a form instead of GitHub issues. */
-export const feedbackUrl = (import.meta.env.VITE_FEEDBACK_URL as string | undefined) ?? 'https://github.com/dlopezi/archi-game/issues/new';
+/**
+ * Where "Send feedback" points; set VITE_FEEDBACK_URL to use a form instead of GitHub issues.
+ * `||`, not `??`: CI passes an unset repository variable as an empty string.
+ */
+export const feedbackUrl = (import.meta.env.VITE_FEEDBACK_URL as string | undefined) || 'https://github.com/dlopezi/archi-game/issues/new';

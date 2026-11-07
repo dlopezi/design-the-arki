@@ -51,6 +51,8 @@ test('without an analytics script the game still works', async ({ page }) => {
 test('a feedback link is visible on the level select and in the game', async ({ page }) => {
   await openLevel(page, '01-hello-world');
   await expect(page.getByRole('link', { name: 'Send feedback' })).toBeVisible();
+  // A real address even when the build setting is empty (CI passes an unset variable as '').
+  await expect(page.getByRole('link', { name: 'Send feedback' })).toHaveAttribute('href', /^(https:\/\/|mailto:)/);
   await page.getByRole('link', { name: 'Levels' }).click();
   await expect(page.getByRole('heading', { name: 'Chapter 1 · Core' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Send feedback' })).toBeVisible();
