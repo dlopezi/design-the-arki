@@ -843,3 +843,28 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .base-note { border-left-color: var(--ok); }
 .base-note a { color: var(--accent); }
 .archive-pick { color: var(--accent) !important; font-size: 13.5px; }
+
+/* Title screen without the training panel: the menu sits alone in the middle. */
+.title-panels { grid-template-columns: minmax(0, 360px); }
+
+/* Campaign on one screen (computer and tablet): the map shrinks to the free height, the briefing scrolls inside itself if it must. */
+.campaign { height: 100dvh; min-height: 0; padding-bottom: 12px; grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
+.campaign .home-topbar { position: static; padding: 10px 0; }
+.campaign-tools { display: flex; gap: 12px; align-items: center; font-size: 12.5px; }
+.campaign-grid { min-height: 0; height: 100%; align-items: stretch; }
+.campaign-sectors { min-height: 0; align-content: start; }
+.campaign-sector { gap: 8px; padding: 10px 12px; }
+.campaign-head { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 14px; }
+.campaign-head .home-eyebrow { margin: 0; }
+.campaign-head .home-progress { grid-column: 1 / -1; height: 8px; }
+.campaign-head .home-legend { grid-column: 3; grid-row: 1; justify-content: flex-end; }
+/* Map size: as wide as the column, but never taller than the space left on screen. */
+.campaign-map { width: min(100%, calc((100dvh - 210px) * 760 / 520)); margin: 0 auto; }
+.campaign-briefing { position: static; max-height: 100%; overflow-y: auto; gap: 6px; padding: 14px 16px; }
+/* Without the training panel the menu uses two columns, so the title screen fits on short laptop screens. */
+.title-panels { grid-template-columns: minmax(0, 680px); }
+.title-menu ul { grid-template-columns: 1fr 1fr; }
+.title-menu li:first-child { grid-column: 1 / -1; }
+@media (max-width: 600px) { .title-menu ul { grid-template-columns: minmax(0, 1fr); } }
+@media (max-height: 760px) { .title-logo { font-size: clamp(40px, 7vw, 76px); } .title-main { gap: 16px; } }
+.title-menu li:last-child { grid-column: 1 / -1; }

@@ -1,22 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-const demo = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'Training: a tiny simulation' });
-
-test('a new visitor learns what the game is, tries the demo and starts the tutorial', async ({ page }) => {
+test('a new visitor learns what the game is and starts the tutorial', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Watch your system break.');
   await expect(page.getByText('A puzzle game for system-design interviews')).toBeVisible();
-
-  // 300 req/s is too much for one app server; a second one behind a load balancer holds.
-  await expect(demo(page).getByRole('status')).toHaveText('✗ The app server is overloaded');
-  await demo(page).getByRole('button', { name: 'Add an app server' }).click();
-  await expect(demo(page).getByRole('status')).toHaveText('✓ Your system holds');
-  await expect(demo(page).getByRole('img')).toHaveAttribute('aria-label', /a load balancer, 2 app servers/);
-
-  // More traffic breaks it again.
-  await demo(page).getByRole('slider').fill('700');
-  await expect(demo(page).getByText('700 req/s')).toBeVisible();
-  await expect(demo(page).getByRole('status')).toHaveText('✗ The app server is overloaded');
 
   // A new player first reads the briefing: what each building is for.
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Play level 1' }).click();

@@ -291,7 +291,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         play();
         e.preventDefault();
       } else if (e.key === 'i' || e.key === 'I') {
-        if (compact) openSheet('inspector'); else if (medium) setSideTab(tab => (tab === 'inspector' ? 'mission' : 'inspector')); else togglePanel('inspector');
+        // Wide: the inspector is always in the console, so I has nothing to toggle.
+        if (compact) openSheet('inspector'); else if (medium) setSideTab(tab => (tab === 'inspector' ? 'mission' : 'inspector'));
       } else if (e.key === 'r' || e.key === 'R') {
         if (compact) openSheet('results'); else togglePanel('results');
       }
@@ -470,7 +471,6 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         {clock}
         <div className="rts-resources">{costMeter}</div>
         <div className="panel-toggles">
-          <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
           <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
         </div>
         {feedbackLink}
@@ -486,7 +486,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       <div className="console">
         <div className="console-frame console-map"><span className="console-label">{t.console.map}</span></div>
         <div className="console-frame console-unit">
-          {panels.inspector ? inspector : <p className="muted console-empty">{t.console.inspectorHidden}</p>}
+          {inspector}
         </div>
         <div className="console-frame console-command">
           <span className="console-label">{t.console.build}</span>

@@ -121,6 +121,10 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
           <a href={archiveHref}>{t.archive.title}</a>
         </nav>
         <span className="home-pill" role="img" aria-label={t.levelSelect.totalStars(totalStars, maxStars)}><span className="home-star">★</span> {totalStars} / {maxStars}</span>
+        <span className="campaign-tools">
+          <FeedbackButton className="link-button" info={() => ({ level: 'none' })} />
+          <button className="link-button" onClick={() => setConfirming(true)}>{t.levelSelect.resetProgress}</button>
+        </span>
       </header>
       {notice && <p role="status" className="notice">{notice}</p>}
       {!storageWorks && <p className="notice">{t.levelSelect.noStorage}</p>}
@@ -143,6 +147,9 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
                   <div className="home-progress" role="img" aria-label={t.levelSelect.chapterStars(chapterStars, chapterMax)}>
                     <span style={{ width: `${(chapterStars / chapterMax) * 100}%` }} />
                   </div>
+                  <ul className="home-legend" aria-label={t.levelSelect.legend}>
+                    {MODES.map(mode => <li key={mode}><span className={`home-dot mode-${mode}`} aria-hidden="true" />{t.modes[mode].name}</li>)}
+                  </ul>
                 </div>
                 <div className="campaign-map" style={{ aspectRatio: `${MAP.w} / ${height}` }}>
                   <svg viewBox={`0 0 ${MAP.w} ${height}`} aria-hidden="true" className="campaign-terrain">
@@ -180,21 +187,13 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
                     })}
                   </ol>
                 </div>
-                <ul className="home-legend" aria-label={t.levelSelect.legend}>
-                  {MODES.map(mode => <li key={mode}><span className={`home-dot mode-${mode}`} aria-hidden="true" />{t.modes[mode].name}</li>)}
-                </ul>
               </section>
             );
           })}
-          <p className="campaign-soon">{t.levelSelect.moreSectors}</p>
         </div>
         <Briefing level={selected} number={selectedIndex + 1} state={stateOf(selected)} newTypes={newTypesIn(levels, selected.id)} progress={progress} />
       </div>
 
-      <footer className="home-footer">
-        <FeedbackButton className="secondary" info={() => ({ level: 'none' })} />
-        <button className="link-button" onClick={() => setConfirming(true)}>{t.levelSelect.resetProgress}</button>
-      </footer>
       {confirming && <ConfirmReset onCancel={() => setConfirming(false)} onConfirm={() => { setConfirming(false); onReset(); }} />}
     </main>
   );

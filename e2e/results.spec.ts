@@ -30,22 +30,19 @@ test('a failed run explains itself: hint, highlighted bottleneck, results drawer
   await expect(row.getByRole('cell').nth(3)).not.toHaveText('0');
 });
 
-test('inspector and results can be hidden and shown with buttons or the I and R keys', async ({ page }) => {
+test('the inspector is always shown; results can be hidden and shown with a button or the R key', async ({ page }) => {
   const inspector = page.getByRole('complementary', { name: 'Inspector' });
   const results = page.getByRole('region', { name: 'Results' });
   await expect(inspector).toBeVisible();
   await expect(results).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Inspector' })).toHaveCount(0);
 
   await page.keyboard.press('i');
-  await expect(inspector).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Inspector' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(inspector).toBeVisible();
   await page.keyboard.press('r');
   await expect(results).toHaveCount(0);
-
   await page.getByRole('button', { name: 'Results' }).click();
   await expect(results).toBeVisible();
-  await page.getByRole('button', { name: 'Inspector' }).click();
-  await expect(inspector).toBeVisible();
 });
 
 test('a healthy run has no bottleneck', async ({ page }) => {
