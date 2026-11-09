@@ -1,0 +1,399 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway: does a real-time strategy loop (build phase, waves of users, money that grows, reputation) feel right?
+     Not part of the build and not using the real engine: a simple capacity model stands in for the simulation.
+     Open with the dev server at /prototypes/rts-loop.prototype.html. Tune the numbers with the ⚙ panel. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo: tiempo real</title>
+<style>
+:root {
+  --bg: #04080a; --line: #1f3438; --line-strong: #2f4b51; --fg: #dce8e5; --muted: #8ca5a1; --accent: #3ee0c8;
+  --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --star: #fde047;
+  --steel: linear-gradient(180deg, #172629 0%, #0c1517 55%, #091012 100%);
+  --bevel: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.55);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: radial-gradient(900px 520px at 50% 35%, #0c1b1d 0%, #05090b 70%), var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.label { font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 8px rgba(62,224,200,.35); }
+.muted { color: var(--muted); }
+.btn { padding: 6px 12px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #1a2b2f, #0e181a); box-shadow: var(--bevel); border-radius: 2px; font: 800 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.go { background: linear-gradient(180deg, #6ef0a6, #22a35a 60%, #16723f); color: #03140a; border-color: #86efac; }
+.btn.on { border-color: var(--accent); color: var(--accent); }
+.app { height: 100%; display: grid; grid-template-rows: 52px minmax(0, 1fr) 230px; }
+
+/* Top bar: resources */
+.bar { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--steel); border-bottom: 2px solid var(--line-strong); }
+.bar h1 { margin: 0 auto 0 0; font: 800 16px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.res { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: #060b0c; border: 1px solid var(--line); font: 800 14px var(--mono); white-space: nowrap; }
+.res .money { color: var(--star); font-size: 18px; text-shadow: 0 0 10px rgba(253,224,71,.35); }
+.res .rate { font-size: 12px; } .rate.up { color: var(--ok); } .rate.down { color: var(--bad); }
+.res .phase { color: var(--accent); }
+.rep { width: 120px; height: 10px; background: #0a1112; border: 1px solid var(--line-strong); }
+.rep span { display: block; height: 100%; background: var(--ok); -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); }
+
+/* Field: the base */
+.field { position: relative; overflow: hidden; background-image: linear-gradient(rgba(62,224,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(62,224,200,.06) 1px, transparent 1px); background-size: 48px 48px; }
+.mission { position: absolute; top: 12px; left: 12px; width: 270px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); display: grid; gap: 6px; z-index: 2; }
+.mission ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 3px; }
+.mission li { display: flex; gap: 8px; align-items: center; }
+.mission li i { width: 12px; height: 12px; border: 2px solid var(--line-strong); flex: none; }
+.mission li.ok i { background: var(--ok); border-color: var(--ok); } .mission li.bad i { background: var(--bad); border-color: var(--bad); }
+.timeline { display: grid; gap: 2px; font-size: 12.5px; }
+.timeline div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+.timeline div.now { color: var(--fg); font-weight: 700; } .timeline div.past { opacity: .45; text-decoration: line-through; }
+.lanes { position: absolute; inset: 0 0 0 300px; display: flex; align-items: center; justify-content: center; gap: 26px; padding: 20px; }
+.lane { display: grid; gap: 8px; justify-items: center; min-width: 96px; }
+.lane > .label { font-size: 10px; }
+.unit { position: relative; display: grid; justify-items: center; padding: 4px 6px 6px; border: 1px solid transparent; background: none; }
+.unit:hover { border-color: var(--line-strong); }
+.unit.selected { border-color: var(--ok); box-shadow: 0 0 14px rgba(74,222,128,.35); }
+.unit .name { font: 800 10.5px var(--mono); text-transform: uppercase; }
+.unit .load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
+.unit .load span { display: block; height: 100%; background: var(--ok); }
+.unit .load.medium span { background: var(--warn); } .unit .load.high span { background: var(--bad); }
+.unit .progress { position: absolute; left: 8px; right: 8px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
+.unit .progress span { display: block; height: 100%; background: var(--warn); }
+.unit.building svg { opacity: .45; filter: grayscale(.6); }
+.unit.down svg { filter: grayscale(1) brightness(.6); }
+.empty-slot { width: 70px; height: 70px; border: 1px dashed var(--line-strong); display: grid; place-items: center; color: var(--muted); font-size: 11px; text-align: center; }
+.arrow { width: 26px; height: 2px; background: rgba(62,224,200,.5); position: relative; align-self: center; }
+.arrow.flow { background: repeating-linear-gradient(90deg, #b7fff4 0 4px, transparent 4px 10px); background-size: 20px 2px; animation: flow .5s linear infinite; }
+@keyframes flow { to { background-position: 20px 0; } }
+.banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; }
+.banner.warn { border-color: var(--warn); color: var(--warn); } .banner.bad { border-color: var(--bad); color: var(--bad); }
+.log { position: absolute; right: 12px; top: 12px; width: 250px; max-height: 210px; overflow: hidden; display: grid; gap: 2px; font: 12px var(--mono); }
+.log div { padding: 3px 8px; background: rgba(6,11,12,.85); border-left: 2px solid var(--accent); }
+.log div.warn { border-left-color: var(--warn); } .log div.bad { border-left-color: var(--bad); } .log div.ok { border-left-color: var(--ok); }
+
+/* Console */
+.console { display: grid; grid-template-columns: 360px minmax(0, 1fr) 380px; border-top: 2px solid var(--line-strong); }
+.frame { padding: 10px 14px; background: var(--steel); box-shadow: var(--bevel); min-width: 0; overflow: hidden; }
+.frame + .frame { border-left: 2px solid var(--line-strong); }
+.charts { display: grid; gap: 6px; }
+.chart { display: grid; grid-template-columns: 70px 1fr 64px; align-items: center; gap: 8px; font: 700 12px var(--mono); }
+.chart svg { width: 100%; height: 34px; display: block; background: #060b0c; border: 1px solid var(--line); }
+.chart b { text-align: right; } .chart b.bad { color: var(--bad); }
+.econ { margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 12.5px; }
+.econ span:nth-child(even) { text-align: right; font-family: var(--mono); }
+.inspector { display: grid; gap: 8px; align-content: start; }
+.inspector .head { display: flex; gap: 10px; align-items: center; }
+.inspector h3 { margin: 0; font: 800 15px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 18px; font-size: 13px; }
+.rows span:nth-child(even) { text-align: right; font-family: var(--mono); }
+.build { display: grid; gap: 8px; align-content: start; }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.card { padding: 4px 2px 0; display: grid; justify-items: center; background: linear-gradient(180deg, #16262a, #0a1214); border: 1px solid var(--line-strong); box-shadow: var(--bevel); border-radius: 2px; position: relative; }
+.card:hover:not(:disabled) { border-color: var(--accent); }
+.card:disabled { opacity: .4; cursor: default; }
+.card .n { font: 700 9.5px var(--mono); text-transform: uppercase; }
+.card .c { width: 100%; text-align: center; font: 800 11px var(--mono); color: var(--star); background: #060b0c; margin-top: 2px; }
+.card .t { position: absolute; top: 2px; right: 4px; font: 700 9.5px var(--mono); color: var(--muted); }
+.card kbd { position: absolute; top: 2px; left: 4px; font: 700 9.5px var(--mono); color: var(--accent); }
+.controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* Tuning and end */
+.tune { position: absolute; right: 16px; top: 60px; z-index: 5; width: 300px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--warn); display: grid; gap: 6px; }
+.tune label { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: 12.5px; }
+.tune input { width: 70px; background: #060b0c; color: var(--fg); border: 1px solid var(--line-strong); padding: 2px 4px; font: 12px var(--mono); }
+.backdrop { position: fixed; inset: 0; background: rgba(2,7,6,.75); display: grid; place-items: center; z-index: 10; }
+.end { width: 420px; padding: 24px; background: var(--steel); border: 1px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
+.end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.end .stars { font-size: 38px; color: var(--star); letter-spacing: 4px; } .end .stars .off { color: var(--line-strong); }
+.proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<span class="proto">PROTOTIPO · MODELO SIMPLIFICADO, NO ES EL MOTOR REAL</span>
+<script>
+// ───────── Tunable numbers (⚙ panel) ─────────
+const TUNE = {
+  startMoney: 150,      // $ at the start
+  passive: 2,           // $ per second, always
+  per100Visits: 1,      // $ per 100 requests served
+  upkeepFactor: 100,    // monthly cost / this = $ per second of upkeep
+  buildPhase: 30,       // seconds before the first users
+  refund: 0.5,          // share of the price back when removing a building
+};
+const TUNE_LABELS = { startMoney: 'Dinero inicial ($)', passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 visitas', upkeepFactor: 'Mantenimiento: coste/mes ÷', buildPhase: 'Fase de construcción (s)', refund: 'Devolución al quitar (0–1)' };
+
+// ───────── Level: "Venta flash" style, with waves and an incident ─────────
+const LEVEL = { title: 'Venta flash', p95: 200, maxErrors: 0.01, starMoney: [150, 220] };
+const waves = () => {
+  const b = TUNE.buildPhase;
+  return [
+    { from: b, to: b + 30, rps: 180, name: 'Oleada 1 · tráfico normal' },
+    { from: b + 30, to: b + 60, rps: 420, name: 'Oleada 2 · venta flash' },
+    { from: b + 60, to: b + 90, rps: 420, name: 'Oleada 3 · se cae un servidor', incident: true },
+  ];
+};
+const endTime = () => waves().at(-1).to;
+
+// ───────── Buildings ─────────
+const TYPES = {
+  loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
+  appServer: { name: 'Fábrica', comp: 'App server', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
+  cache: { name: 'Generador', comp: 'Caché', color: '#f59e0b', price: 30, monthly: 30, build: 6, hit: 0.6, key: '3' },
+  database: { name: 'Silos', comp: 'Base de datos', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
+};
+const DB_UPGRADE = { price: 100, monthly: 100, cap: 800 };
+
+function shade(hex, f) { const t = f > 0 ? 255 : 0, k = Math.abs(f); return '#' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).map(v => Math.round(v + (t - v) * k).toString(16).padStart(2, '0')).join(''); }
+const P = (pts) => pts.map(p => p.join(',')).join(' ');
+function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${P([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${P([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${P([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
+function cyl(cx, cy, r, h, p) { const ry = r / 2, top = cy - h; return `<g stroke="${p.dark}" stroke-width=".6"><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx + r},${cy} L${cx + r},${top} Z" fill="${p.base}"/><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx},${cy + ry} L${cx},${top + ry} A${r} ${ry} 0 0 1 ${cx - r},${top} Z" fill="${p.dark}" stroke="none"/><ellipse cx="${cx}" cy="${top}" rx="${r}" ry="${ry}" fill="${p.top}"/></g>`; }
+const DRAW = {
+  loadBalancer: p => box(32, 48, 14, 6, p) + box(32, 41, 2.5, 26, p) + `<path d="M32 20 L18 27 M32 20 L46 27" stroke="${p.light}" stroke-width="1.4"/><circle cx="32" cy="12" r="6" fill="${p.glow}" opacity=".3"/><circle cx="32" cy="12" r="2.6" fill="${p.glow}"/>`,
+  appServer: p => box(29, 47, 17, 15, p) + box(23, 31, 3.5, 10, p) + box(33, 29, 3, 7, p) + box(47, 50, 7, 8, p) + `<polygon points="33,45 37,43 37,39 33,41" fill="#fde68a"/><polygon points="39,42 43,40 43,36 39,38" fill="#fde68a"/>`,
+  cache: p => box(32, 50, 16, 7, p) + `<ellipse cx="32" cy="43" rx="9" ry="4.5" fill="${p.glow}" opacity=".55"/><polygon points="32,6 41,22 32,38 23,22" fill="${p.light}"/><polygon points="32,6 41,22 32,38" fill="${p.base}"/><polygon points="32,11 36,22 32,30 28,22" fill="${p.glow}" opacity=".85"/>`,
+  database: p => cyl(41, 45, 8, 20, p) + cyl(26, 52, 11, 27, p),
+};
+function building(type, size) {
+  const c = TYPES[type].color;
+  const p = { base: c, light: shade(c, .25), dark: shade(c, -.45), top: shade(c, .45), glow: shade(c, .6) };
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
+}
+const person = `<svg width="56" height="56" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="#2aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="#13262a" stroke="#3ee0c8"/></svg>`;
+
+// ───────── State ─────────
+let S;
+function reset() {
+  S = { t: 0, money: TUNE.startMoney, rep: 100, units: [], nextId: 1, selected: null, speed: 1, paused: false, over: null,
+    hist: [], last: null, log: [], earlyBonus: 0, incidentDone: false, waveIdx: -1, startedEarly: false, minMoney: TUNE.startMoney };
+  log('Fase de construcción: prepara tu base antes de que lleguen los usuarios.', 'ok');
+}
+function log(text, kind = '') { S.log.unshift({ text: `[${fmt(S.t)}] ${text}`, kind }); S.log = S.log.slice(0, 8); }
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const ready = (type) => S.units.filter(u => u.type === type && u.ready && !u.down);
+const upkeepPerS = () => S.units.reduce((sum, u) => sum + (u.upgraded ? DB_UPGRADE.monthly : TYPES[u.type].monthly), 0) / TUNE.upkeepFactor;
+const currentWave = () => waves().find(w => S.t >= w.from && S.t < w.to) ?? null;
+
+function buildUnit(type) {
+  const spec = TYPES[type];
+  if (S.over || S.money < spec.price) return;
+  S.money -= spec.price;
+  const count = S.units.filter(u => u.type === type).length + 1;
+  const id = S.nextId++;
+  S.units.push({ id, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, ready: false, down: false, upgraded: false });
+  S.selected = id;
+  log(`Construyendo ${spec.name} (${spec.build} s)`);
+  render();
+}
+function removeUnit(id) {
+  const u = S.units.find(x => x.id === id); if (!u) return;
+  S.money += Math.round(TYPES[u.type].price * TUNE.refund);
+  S.units = S.units.filter(x => x.id !== id); S.selected = null;
+  log(`${TYPES[u.type].name} quitado: +$${Math.round(TYPES[u.type].price * TUNE.refund)}`);
+  render();
+}
+function upgradeDb(id) {
+  const u = S.units.find(x => x.id === id);
+  if (!u || u.upgraded || S.money < DB_UPGRADE.price) return;
+  S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = 6;
+  log('Mejorando la base de datos a tier Medium (6 s)', 'warn'); render();
+}
+function callNow() {
+  if (S.t >= TUNE.buildPhase) return;
+  const bonus = Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2);
+  S.money += bonus; S.t = TUNE.buildPhase; S.startedEarly = true;
+  log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); render();
+}
+
+// ───────── Simplified capacity model: one step of dt seconds ─────────
+function step(dt) {
+  if (S.over || S.paused) return;
+  S.t += dt;
+  for (const u of S.units) if (!u.ready) { u.left -= dt; if (u.left <= 0) { u.ready = true; log(`${TYPES[u.type].name}${u.type === 'appServer' ? ' ' + u.label : ''} lista`, 'ok'); } }
+
+  const w = currentWave();
+  const idx = w ? waves().indexOf(w) : -1;
+  if (idx !== S.waveIdx && w) { S.waveIdx = idx; log(w.name, 'warn'); }
+  if (w?.incident && !S.incidentDone) {
+    const victim = ready('appServer')[0];
+    if (victim) { victim.down = true; log(`¡${victim.label} se ha caído!`, 'bad'); }
+    S.incidentDone = true;
+  }
+  const rps = w ? w.rps : 0;
+  const apps = ready('appServer'), lbs = ready('loadBalancer'), caches = ready('cache'), dbs = ready('database');
+  const db = dbs[0];
+  // Without a load balancer only the first app server receives traffic.
+  const usableApps = lbs.length ? apps.length : Math.min(1, apps.length);
+  const appCap = usableApps * TYPES.appServer.cap;
+  const dbCap = db ? (db.upgraded ? DB_UPGRADE.cap : TYPES.database.cap) : 0;
+  const hit = caches.length ? TYPES.cache.hit : 0;
+  const byApps = Math.min(rps, appCap);
+  const toDb = byApps * (1 - hit);
+  const byDb = Math.min(toDb, dbCap);
+  const served = db ? byApps * hit + byDb : 0;
+  const errors = rps ? (rps - served) / rps : 0;
+  const rhoApp = appCap ? Math.min(byApps / appCap, .97) : 1, rhoDb = dbCap ? Math.min(toDb / dbCap, .97) : 1;
+  const lat = (20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0);
+  const p95 = rps ? Math.min(2000, Math.round(lat)) : 0;
+  const revenue = (served / 100) * TUNE.per100Visits;
+  const upkeep = upkeepPerS();
+  const net = TUNE.passive + revenue - upkeep;
+  S.money += net * dt;
+  S.minMoney = Math.min(S.minMoney, S.money);
+  S.last = { rps, served, errors, p95, revenue, upkeep, net, rhoApp, rhoDb, usableApps, appsReady: apps.length, hit };
+  if (rps) {
+    const badLat = p95 > LEVEL.p95, badErr = errors > LEVEL.maxErrors;
+    S.rep += (badErr ? -6 : badLat ? -3 : 1) * dt;
+    S.rep = Math.max(0, Math.min(100, S.rep));
+    if (S.rep <= 0) { S.over = 'lost'; log('Reputación a 0: los usuarios se han ido.', 'bad'); }
+  }
+  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ t: S.t, rps, p95, errors, money: S.money });
+  if (S.money < 0) { S.over = 'lost'; log('Sin dinero: no puedes pagar el mantenimiento.', 'bad'); }
+  if (!S.over && S.t >= endTime()) S.over = 'won';
+}
+
+// ───────── Render ─────────
+const spark = (vals, max, color, limit) => {
+  const n = 60, v = vals.slice(-n), w = 200, h = 34;
+  const pts = v.map((y, i) => `${(i / (n - 1)) * w},${h - Math.min(1, y / max) * (h - 2) - 1}`).join(' ');
+  const lim = limit ? `<line x1="0" x2="${w}" y1="${h - (limit / max) * (h - 2) - 1}" y2="${h - (limit / max) * (h - 2) - 1}" stroke="#f87171" stroke-dasharray="3 3" opacity=".7"/>` : '';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${lim}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
+};
+let tuneOpen = false;
+function unitHtml(u) {
+  const rho = u.type === 'appServer' ? S.last?.rhoApp : u.type === 'database' ? S.last?.rhoDb : u.type === 'cache' && S.last?.rps ? .1 : u.type === 'loadBalancer' && S.last?.rps ? .05 : 0;
+  const lvl = rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '';
+  const idle = u.type === 'appServer' && u.ready && !u.down && S.last && !ready('loadBalancer').length && ready('appServer')[0] !== u;
+  return `<button class="unit ${u.ready ? '' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" title="${TYPES[u.type].name}">
+    ${building(u.type, 60)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / (u.upgraded ? 6 : TYPES[u.type].build)) * 100}%"></span></span>` : ''}
+    <span class="name">${u.label}${u.down ? ' · caído' : idle ? ' · sin tráfico' : ''}</span>
+    ${u.ready && !u.down ? `<span class="load ${lvl}"><span style="width:${Math.round((idle ? 0 : rho || 0) * 100)}%"></span></span>` : ''}</button>`;
+}
+function lane(type, title) {
+  const units = S.units.filter(u => u.type === type);
+  return `<div class="lane"><span class="label">${title}</span>${units.length ? units.map(unitHtml).join('') : `<div class="empty-slot">vacío</div>`}</div>`;
+}
+function render() {
+  const w = currentWave(), inBuild = S.t < TUNE.buildPhase, L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS(), served: 0 };
+  const phase = inBuild ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : w ? `${w.name.split(' · ')[0].toUpperCase()} · ${fmt(w.to - S.t)}` : 'FIN';
+  const sel = S.units.find(u => u.id === S.selected);
+  const flowing = L.rps > 0;
+  const banner = inBuild ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>` : w ? `<div class="banner ${w.incident ? 'bad' : 'warn'}">${w.name} · ${w.rps} req/s</div>` : '';
+  document.getElementById('app').innerHTML = `
+  <header class="bar">
+    <h1>${LEVEL.title}</h1>
+    <span class="res">💰 <span class="money">$${Math.floor(S.money)}</span><span class="rate ${L.net >= 0 ? 'up' : 'down'}">${L.net >= 0 ? '+' : ''}${L.net.toFixed(1)}/s</span></span>
+    <span class="res">⏱ <span class="phase">${phase}</span></span>
+    <span class="res">❤ REPUTACIÓN <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>
+    <button class="btn" data-act="tune">⚙ Números</button>
+  </header>
+  <main class="field">
+    <section class="mission">
+      <span class="label">Misión</span>
+      <span class="muted">Aguanta las 3 oleadas sin que la reputación llegue a 0. Las estrellas dependen del dinero que te quede.</span>
+      <ul>
+        <li class="${!L.rps ? '' : L.p95 <= LEVEL.p95 ? 'ok' : 'bad'}"><i></i>p95 ≤ ${LEVEL.p95} ms</li>
+        <li class="${!L.rps ? '' : L.errors <= LEVEL.maxErrors ? 'ok' : 'bad'}"><i></i>Errores ≤ ${LEVEL.maxErrors * 100}%</li>
+      </ul>
+      <span class="label">Cronología</span>
+      <div class="timeline">
+        <div class="${inBuild ? 'now' : 'past'}"><span>Construcción</span><span>0:00</span></div>
+        ${waves().map(x => `<div class="${S.t >= x.to ? 'past' : x === w ? 'now' : ''}"><span>${x.name.split(' · ')[1]} · ${x.rps} req/s</span><span>${fmt(x.from)}</span></div>`).join('')}
+      </div>
+    </section>
+    ${banner}
+    <div class="lanes">
+      <div class="lane"><span class="label">Usuarios</span>${person}<span class="name" style="font:800 11px var(--mono)">${L.rps} req/s</span></div>
+      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('loadBalancer', 'Borde')}
+      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('appServer', 'Aplicación')}
+      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('cache', 'Caché')}
+      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('database', 'Datos')}
+    </div>
+    <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>
+  </main>
+  <footer class="console">
+    <section class="frame"><span class="label">Resultados en vivo</span>
+      <div class="charts">
+        <div class="chart">RPS${spark(S.hist.map(h => h.rps), 500, '#3ee0c8')}<b>${L.rps}</b></div>
+        <div class="chart">P95${spark(S.hist.map(h => h.p95), 600, '#fbbf24', LEVEL.p95)}<b class="${L.p95 > LEVEL.p95 ? 'bad' : ''}">${L.p95} ms</b></div>
+        <div class="chart">ERRORES${spark(S.hist.map(h => h.errors), .5, '#f87171', LEVEL.maxErrors)}<b class="${L.errors > LEVEL.maxErrors ? 'bad' : ''}">${(L.errors * 100).toFixed(1)}%</b></div>
+      </div>
+      <div class="econ"><span class="muted">Ingreso fijo</span><span>+$${TUNE.passive.toFixed(1)}/s</span><span class="muted">Visitas atendidas</span><span>+$${L.revenue.toFixed(1)}/s</span><span class="muted">Mantenimiento</span><span>−$${L.upkeep.toFixed(1)}/s</span></div>
+    </section>
+    <section class="frame inspector"><span class="label">Inspector</span>
+      ${sel ? `<div class="head">${building(sel.type, 56)}<div><h3>${sel.label}</h3><span class="muted">${TYPES[sel.type].name} · ${TYPES[sel.type].comp}</span></div></div>
+        <div class="rows">
+          <span class="muted">Estado</span><span>${sel.down ? 'caído' : sel.ready ? 'en servicio' : `en obra · ${Math.ceil(sel.left)} s`}</span>
+          <span class="muted">Mantenimiento</span><span>$${((sel.upgraded ? DB_UPGRADE.monthly : TYPES[sel.type].monthly) / TUNE.upkeepFactor).toFixed(1)}/s</span>
+          ${sel.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
+          ${sel.type === 'database' ? `<span class="muted">Capacidad</span><span>${sel.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${sel.upgraded ? 'Medium' : 'Small'})</span>` : ''}
+          ${sel.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
+          ${sel.type === 'loadBalancer' ? `<span class="muted">Efecto</span><span>reparte entre ${ready('appServer').length} app servers</span>` : ''}
+        </div>
+        <div class="controls">
+          ${sel.type === 'database' && !sel.upgraded ? `<button class="btn" data-upgrade="${sel.id}" ${S.money < DB_UPGRADE.price ? 'disabled' : ''}>Mejorar a Medium · $${DB_UPGRADE.price}</button>` : ''}
+          <button class="btn" data-remove="${sel.id}">Quitar · +$${Math.round(TYPES[sel.type].price * TUNE.refund)}</button>
+        </div>`
+      : `<p class="muted">Selecciona un edificio de tu base para ver su estado. Construye con la tarjeta de la derecha o con las teclas 1–4.</p>
+         <p class="muted">Pista: sin torre de enlace, solo la primera fábrica recibe tráfico.</p>`}
+    </section>
+    <section class="frame build"><span class="label">Construir</span>
+      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over ? 'disabled' : ''}><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${building(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
+      <div class="controls">
+        ${inBuild ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
+        <button class="btn ${S.paused ? 'on' : ''}" data-act="pause">${S.paused ? '▶ Seguir' : '⏸ Pausa'}</button>
+        ${[1, 2, 4].map(x => `<button class="btn ${S.speed === x ? 'on' : ''}" data-speed="${x}">${x}×</button>`).join('')}
+        <button class="btn" data-act="restart">↺</button>
+      </div>
+    </section>
+  </footer>
+  ${tuneOpen ? `<div class="tune"><span class="label">Números (para ajustar)</span>${Object.entries(TUNE).map(([k, v]) => `<label>${TUNE_LABELS[k]}<input type="number" step="any" data-tune="${k}" value="${v}"></label>`).join('')}<span class="muted" style="font-size:12px">Los cambios se aplican al reiniciar (↺).</span></div>` : ''}
+  ${S.over ? endHtml() : ''}`;
+}
+function endHtml() {
+  const won = S.over === 'won';
+  const stars = won ? 1 + LEVEL.starMoney.filter(m => S.money >= m).length : 0;
+  return `<div class="backdrop"><div class="end">
+    <div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
+    <h2 style="color:${won ? 'var(--ok)' : 'var(--bad)'}">${won ? 'Base defendida' : 'Base perdida'}</h2>
+    <div class="muted">Dinero final <b style="color:var(--star)">$${Math.floor(S.money)}</b> · Reputación ${Math.round(S.rep)}% · Edificios ${S.units.length}</div>
+    <div class="muted">★★ con $${LEVEL.starMoney[0]} · ★★★ con $${LEVEL.starMoney[1]}</div>
+    <button class="btn go" data-act="restart">↺ Jugar otra vez</button></div></div>`;
+}
+
+// ───────── Input and loop ─────────
+// pointerdown, not click: the screen redraws 10 times a second, which can swallow a click.
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  const el = e.target.closest('button'); if (!el) return;
+  if (el.dataset.build) buildUnit(el.dataset.build);
+  else if (el.dataset.unit) { S.selected = Number(el.dataset.unit); render(); }
+  else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
+  else if (el.dataset.upgrade) upgradeDb(Number(el.dataset.upgrade));
+  else if (el.dataset.speed) { S.speed = Number(el.dataset.speed); render(); }
+  else if (el.dataset.act === 'call') callNow();
+  else if (el.dataset.act === 'pause') { S.paused = !S.paused; render(); }
+  else if (el.dataset.act === 'restart') { reset(); render(); }
+  else if (el.dataset.act === 'tune') { tuneOpen = !tuneOpen; render(); }
+});
+document.addEventListener('change', e => { const k = e.target.dataset?.tune; if (k) TUNE[k] = Number(e.target.value); });
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input')) return;
+  const t = Object.entries(TYPES).find(([, v]) => v.key === e.key); if (t) buildUnit(t[0]);
+  if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; render(); }
+  if (e.key === 'Escape') { S.selected = null; render(); }
+});
+reset(); render();
+let lastFrame = performance.now();
+setInterval(() => {
+  const now = performance.now(), real = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
+  if (S.over || S.paused) return;
+  const sim = real * S.speed, n = Math.ceil(sim / 0.1);
+  for (let i = 0; i < n; i++) step(sim / n);
+  if (!document.querySelector('.tune input:focus')) render();
+}, 100);
+</script>
+</body>
+</html>
