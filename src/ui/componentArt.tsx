@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { t } from '../i18n';
 
 /**
  * How each component type looks: a small isometric building in the type's colour, standing on a pad,
@@ -11,6 +12,9 @@ export const componentArt: Record<string, { color: string }> = {
   cache: { color: '#f59e0b' },
   database: { color: '#9b6bff' },
 };
+
+/** The player-facing building name of a component type (the app server is a factory). */
+export const buildingName = (type: string) => t.archive.buildings[type]?.name ?? t.componentTypes[type] ?? type;
 
 /** Grey for a failed instance, and for a type without art. */
 const GREY = '#5b6577';

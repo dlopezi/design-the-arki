@@ -5,7 +5,7 @@ import { t, percent } from '../i18n';
 import type { ComponentOptions } from '../levels/levels';
 import type { ConnectionTarget } from './connections';
 import { instanceCountOf, loadLevel, sizeOf } from './diagram';
-import { artStyle, Building } from './componentArt';
+import { artStyle, Building, buildingName } from './componentArt';
 
 const MAX_INSTANCES = 8;
 const QUEUE_STEP = 10;
@@ -118,7 +118,7 @@ export function Inspector({ component, options, onChange, onRemove, lastRun, ins
         <span className="unit-portrait" style={artStyle(component.type)}><Building type={component.type} size={58} /></span>
         <div>
           <h3>{t.componentTypes[component.type] ?? component.type}</h3>
-          <span className="muted">{t.archive.buildings[component.type]?.name} · [{t.container}: {spec.presentation?.technology}]</span>
+          <span className="muted">{buildingName(component.type)} · [{t.container}: {spec.presentation?.technology}]</span>
         </div>
       </div>
 

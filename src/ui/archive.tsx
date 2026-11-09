@@ -3,7 +3,7 @@ import { archiveEntries } from '../archive/archive';
 import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
-import { artStyle, Building } from './componentArt';
+import { artStyle, Building, buildingName } from './componentArt';
 import { levelsHref } from './routes';
 
 type Props = {
@@ -47,7 +47,7 @@ export function Archive({ levels, progress, briefing }: Props) {
               <button aria-current={e.type === entry.type} className={isOpen(e.unlocked) ? '' : 'locked'} onClick={() => setSelected(e.type)}>
                 <Building type={e.type} size={44} down={!isOpen(e.unlocked)} />
                 <span className="name">
-                  {a.buildings[e.type]?.name ?? e.type}
+                  {buildingName(e.type)}
                   <small>{t.componentTypes[e.type] ?? e.type}{isOpen(e.unlocked) ? '' : ` · ${a.locked}`}</small>
                 </span>
               </button>
@@ -58,7 +58,7 @@ export function Archive({ levels, progress, briefing }: Props) {
         <section className={`archive-detail panel ${open ? '' : 'is-locked'}`} style={artStyle(entry.type)} aria-labelledby="archive-name" aria-live="polite">
           <div className="archive-art"><Building type={entry.type} size={180} down={!open} /></div>
           <div>
-            <h2 id="archive-name">{text?.name ?? entry.type}</h2>
+            <h2 id="archive-name">{buildingName(entry.type)}</h2>
             <span className="kind">{a.component}: <strong>{t.componentTypes[entry.type] ?? entry.type}</strong></span>
           </div>
           {open ? (

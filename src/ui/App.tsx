@@ -50,13 +50,13 @@ const mediumMargins = ({ results, tutorial, tall }: FitState): Margins => ({
 });
 const MAX_ZOOM = 1.1;
 const fitOptions = (layout: Layout, state: FitState) => {
-  const { inspector, results, tutorial, ran } = state;
+  const { results, tutorial, ran } = state;
   if (layout === 'compact') return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: px(16) };
   if (layout === 'medium') {
     const m = mediumMargins(state);
     return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: { top: px(m.top), right: px(m.right), bottom: px(m.bottom), left: px(m.left) } };
   }
-  void inspector; // Wide: the inspector lives in the console, so it never covers the diagram.
+  // Wide: the inspector lives in the console, so it never covers the diagram.
   // Before the first run the results panel is one line high; the tutorial card sits under the top bar.
   const resultsHeight = results ? (ran ? WIDE.results : WIDE.resultsEmpty) + 12 : 0;
   return { maxZoom: 1.1, padding: { top: px(WIDE.bar + 24 + (tutorial ? WIDE.tutorial : 0)), left: px(WIDE.mission + 40), right: px(32), bottom: px(WIDE.console + 24 + resultsHeight) } };
@@ -338,20 +338,19 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     <button className={`play ${tutorialOnPlay ? 'tutorial-target' : ''}`} onClick={play} disabled={running}>{t.play}</button>
     {running && <button className="secondary" onClick={skip}>{t.skip}</button>}
   </>;
-  const overlays = <>
-    {running && result && (() => {
-      const b = result.buckets[bucket]!;
-      return (
-        <div className="hud clock" role="timer" aria-label={t.clock}>
-          <strong>t = {Math.floor(playT)} s</strong>
-          <span>{Math.round(b.rps)} req/s</span>
-          <span className={b.p95 > level.requirements.p95Ms ? 'bad' : 'ok'}>p95 {Math.round(b.p95)} ms</span>
-          <span className={b.errorRate > level.requirements.maxErrorRate ? 'bad' : ''}>{percent(b.errorRate)} {t.errorsWord}</span>
-        </div>
-      );
-    })()}
-    {problem && <div className="hud problem" role="alert">{problem.message}</div>}
-  </>;
+  const clock = running && result && (() => {
+    const b = result.buckets[bucket]!;
+    return (
+      <div className="hud clock" role="timer" aria-label={t.clock}>
+        <strong>t = {Math.floor(playT)} s</strong>
+        <span>{Math.round(b.rps)} req/s</span>
+        <span className={b.p95 > level.requirements.p95Ms ? 'bad' : 'ok'}>p95 {Math.round(b.p95)} ms</span>
+        <span className={b.errorRate > level.requirements.maxErrorRate ? 'bad' : ''}>{percent(b.errorRate)} {t.errorsWord}</span>
+      </div>
+    );
+  })();
+  const problemNote = problem && <div className="hud problem" role="alert">{problem.message}</div>;
+  const overlays = <>{clock}{problemNote}</>;
   const tutorialCard = tutorial && showTutorial && (
     <section className="hud tutorial" aria-label={t.tutorial.title} aria-live="polite">
       {step ? <>
@@ -451,6 +450,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       <header className="hud rts-bar">
         <a className="back" href={levelsHref}>← {t.levels}</a>
         <h1>{level.title}</h1>
+        {/* While a run plays, the live clock (rps, p95, errors) joins the resources. */}
+        {clock}
         <div className="rts-resources">{costMeter}</div>
         <div className="panel-toggles">
           <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
@@ -476,7 +477,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
           <div className="controls">{controls}</div>
         </div>
       </div>
-      {overlays}
+      {problemNote}
       {tutorialCard}
       {report}
     </div>

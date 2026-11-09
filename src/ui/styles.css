@@ -720,3 +720,13 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .game.wide .results.empty { height: auto; }
 /* While a run plays, Skip sits in the build card's corner, so the console keeps its width. */
 .console .controls > .secondary { position: absolute; top: 6px; right: 12px; padding: 2px 12px; font-size: 12.5px; }
+/* Wide: the live clock sits in the resource bar, between the level name and the cost. */
+.game.wide .rts-bar .clock { position: static; transform: none; clip-path: none; box-shadow: none; padding: 2px 12px; margin-left: auto; background: #060b0c; border: 1px solid var(--line); font-family: var(--mono); }
+.game.wide .rts-bar .clock strong { font-size: 15px; color: var(--accent); }
+.game.wide .rts-bar .clock + .rts-resources { margin-left: 0; }
+.game.wide .rts-bar .clock, .rts-resources .cost-label, .rts-resources .cost-value { flex: none; white-space: nowrap; }
+.game.wide .rts-bar .clock { align-items: center; gap: 12px; font-size: 13px; }
+.game.wide .rts-bar h1 { flex: 0 1 auto; }
+.game.wide .rts-bar h1 { flex: none; }
+.rts-resources { flex: 0 1 auto; min-width: 0; }
+.rts-resources .meter { width: auto; flex: 1 1 150px; min-width: 50px; max-width: 150px; }

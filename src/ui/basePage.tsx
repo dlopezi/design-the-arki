@@ -3,7 +3,7 @@ import { baseOf, type District } from '../base/base';
 import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
-import { Building } from './componentArt';
+import { Building, buildingName } from './componentArt';
 import { archiveHref, levelsHref } from './routes';
 
 // Isometric layout: each district is a diamond plot; plots sit on a grid three wide, in level order.
@@ -77,7 +77,7 @@ export function BasePage({ levels, progress }: { levels: LevelDefinition[]; prog
                 <g key={d.levelId}>
                   <polygon className="base-district-floor" points={diamond(c.x, c.y, PLOT.w, PLOT.h)} />
                   <DistrictBuildings district={d} cx={c.x} cy={c.y} />
-                  <text className="base-district-label" x={c.x} y={c.y + PLOT.h + 16} textAnchor="middle">{d.number}. {d.title}</text>
+                  <text className="base-district-label" x={c.x} y={c.y + PLOT.h + 16} textAnchor="middle">{b.district(d.number, d.title)}</text>
                 </g>
               );
             })}
@@ -89,7 +89,7 @@ export function BasePage({ levels, progress }: { levels: LevelDefinition[]; prog
               <h3>{b.district(d.number, d.title)}</h3>
               <ul>
                 {d.buildings.map((bd, k) => (
-                  <li key={k}><Building type={bd.type} size={26} />{bd.count} × {t.archive.buildings[bd.type]?.name ?? bd.type}</li>
+                  <li key={k}><Building type={bd.type} size={26} />{bd.count} × {buildingName(bd.type)}</li>
                 ))}
               </ul>
             </li>
