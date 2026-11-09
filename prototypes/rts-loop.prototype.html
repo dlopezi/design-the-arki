@@ -1,8 +1,9 @@
 <!doctype html>
 <!-- PROTOTYPE, throwaway: does a real-time strategy loop feel right? A build phase, then ONE wave of users per level
-     (each level teaches one idea), money that grows by itself and per visit, reputation, the base drawn in C4 layers,
-     and every request visible as a dot. Not part of the build and not the real engine: a simple capacity model stands in.
-     Open with the dev server at /prototypes/rts-loop.prototype.html. Tune the numbers with the ⚙ panel. -->
+     (each level teaches one idea), money that grows by itself and per visit, reputation, and the base as an isometric map
+     (like "Your base") that you move over, with C4 zones as plots and connections you draw between buildings.
+     Requests travel there and back. Not part of the build and not the real engine: a simple capacity model stands in.
+     Open with the dev server at /prototypes/rts-loop.prototype.html. -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -19,7 +20,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body { background: radial-gradient(900px 520px at 50% 35%, #0c1b1d 0%, #05090b 70%), var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
 button { font: inherit; color: inherit; cursor: pointer; }
 .label { font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 8px rgba(62,224,200,.35); }
 .muted { color: var(--muted); }
@@ -30,7 +31,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn.on { border-color: var(--accent); color: var(--accent); }
 .app { height: 100%; display: grid; grid-template-rows: 52px minmax(0, 1fr) 230px; }
 
-/* Top bar: level, resources */
 .bar { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--steel); border-bottom: 2px solid var(--line-strong); }
 .bar h1 { margin: 0; font: 800 16px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 .levels { display: flex; gap: 4px; margin-right: auto; }
@@ -42,56 +42,56 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rep { width: 110px; height: 10px; background: #0a1112; border: 1px solid var(--line-strong); }
 .rep span { display: block; height: 100%; -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); }
 
-/* Field: the base, drawn in C4 layers */
-.field { position: relative; overflow: hidden; background-image: linear-gradient(rgba(62,224,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(62,224,200,.06) 1px, transparent 1px); background-size: 48px 48px; }
-.mission { position: absolute; top: 12px; left: 12px; width: 270px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); display: grid; gap: 6px; z-index: 2; }
+/* The map */
+.field { position: relative; overflow: hidden; background: radial-gradient(900px 520px at 55% 45%, #0c1b1d 0%, #05090b 75%); }
+#world { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
+#world.panning { cursor: grabbing; } #world.linking { cursor: crosshair; }
+.hud { position: absolute; z-index: 2; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); }
+.mission { top: 12px; left: 12px; width: 270px; padding: 12px 14px; display: grid; gap: 6px; }
 .mission ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 .mission li { display: flex; gap: 8px; align-items: center; }
 .mission li i { width: 12px; height: 12px; border: 2px solid var(--line-strong); flex: none; }
 .mission li.ok i { background: var(--ok); border-color: var(--ok); } .mission li.bad i { background: var(--bad); border-color: var(--bad); }
 .lesson { padding: 6px 8px; border-left: 3px solid var(--accent); background: rgba(62,224,200,.07); font-size: 13px; }
-.c4 { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; background: var(--steel); border: 1px solid var(--line-strong); }
+.howto { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+.howto b { color: var(--fg); }
+.c4 { top: 12px; right: 12px; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; }
 .c4 .label { margin-right: 8px; }
 .c4 button { padding: 3px 9px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 11.5px var(--mono); }
 .c4 button.on { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
-.scene { position: absolute; inset: 56px 16px 64px 300px; display: flex; align-items: center; justify-content: center; gap: 56px; }
-.crowd { display: grid; justify-items: center; gap: 4px; min-width: 110px; }
-.crowd .people { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; min-height: 48px; align-content: center; }
-.crowd .people i { width: 22px; height: 22px; background: no-repeat center/contain url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="%232aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="%2313262a" stroke="%233ee0c8" stroke-width="3"/></svg>'); }
-@keyframes pop { from { transform: scale(0); opacity: 0; } }
-.crowd .count { font: 800 13px var(--mono); }
-.crowd .wait { font-size: 12px; color: var(--muted); text-align: center; }
-.system { border: 1px solid rgba(62,224,200,.45); background: rgba(62,224,200,.03); padding: 10px 14px 14px; display: grid; gap: 8px; box-shadow: inset 0 0 40px rgba(62,224,200,.06); }
-.system > .label { font-size: 12px; } .system .kind { font: 400 11px system-ui; color: var(--muted); letter-spacing: 0; text-transform: none; text-shadow: none; }
-.zones { display: flex; align-items: center; gap: 34px; }
-.zone { border: 1px dashed rgba(140,165,161,.4); background: rgba(0,0,0,.28); padding: 8px 10px 10px; display: grid; gap: 6px; justify-items: center; min-width: 120px; }
-.zone .zname { font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; justify-self: start; }
-.zone .zname small { font: 400 11px system-ui; letter-spacing: 0; text-transform: none; color: var(--muted); }
-.unit { position: relative; display: grid; justify-items: center; padding: 2px 6px 6px; border: 1px solid var(--line); background: linear-gradient(180deg, #132326, #0a1315); min-width: 96px; }
-.unit:hover { border-color: var(--line-strong); }
-.unit.selected { border-color: var(--ok); box-shadow: 0 0 14px rgba(74,222,128,.35); }
-.unit .name { font: 800 10.5px var(--mono); text-transform: uppercase; }
-.unit .sub { font-size: 10.5px; color: var(--muted); }
-.unit .load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
-.unit .load span { display: block; height: 100%; background: var(--ok); }
-.unit .load.medium span { background: var(--warn); } .unit .load.high span { background: var(--bad); }
-.unit .progress { position: absolute; left: 10px; right: 10px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
-.unit .progress span { display: block; height: 100%; background: var(--warn); }
-.unit.building svg { opacity: .45; filter: grayscale(.6); }
-.unit.down { border-color: var(--bad); } .unit.down svg { filter: grayscale(1) brightness(.6); }
-.container { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); background: rgba(19,35,38,.5); }
-.container > .name { font: 800 10.5px var(--mono); text-transform: uppercase; justify-self: start; }
-.empty { width: 96px; height: 70px; border: 1px dashed var(--line-strong); display: grid; place-items: center; color: var(--muted); font-size: 11px; }
-.ctx-buildings { display: flex; gap: 8px; align-items: center; }
-.ctx-buildings b { font: 800 12px var(--mono); }
-.banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; }
+.zoombox { top: 52px; right: 12px; display: flex; gap: 2px; padding: 3px; }
+.zoombox button { width: 28px; height: 26px; border: 1px solid var(--line-strong); background: #0b1416; font: 800 14px var(--mono); }
+.banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; pointer-events: none; }
 .banner.warn { border-color: var(--warn); color: var(--warn); } .banner.bad { border-color: var(--bad); color: var(--bad); }
-.log { position: absolute; left: 12px; right: 330px; bottom: 8px; display: flex; gap: 6px; overflow: hidden; z-index: 2; font: 12px var(--mono); }
+.log { position: absolute; left: 12px; right: 12px; bottom: 8px; display: flex; gap: 6px; overflow: hidden; z-index: 2; font: 12px var(--mono); pointer-events: none; }
 .log div { flex: none; padding: 3px 8px; background: rgba(6,11,12,.9); border-left: 2px solid var(--accent); white-space: nowrap; }
 .log div.warn { border-left-color: var(--warn); } .log div.bad { border-left-color: var(--bad); } .log div.ok { border-left-color: var(--ok); }
-#fx { position: fixed; pointer-events: none; z-index: 4; }
 
-/* Console */
+/* SVG world */
+.ground { fill: #08110f; }
+.ground-grid { stroke: rgba(62,224,200,.05); }
+.wall { fill: rgba(10,22,24,.45); stroke: rgba(62,224,200,.35); stroke-width: 3; }
+.plot { fill: rgba(62,224,200,.05); stroke: rgba(62,224,200,.35); stroke-dasharray: 8 6; stroke-width: 1.5; }
+.site { fill: url(#hatch); stroke: rgba(251,191,36,.45); stroke-dasharray: 10 6; stroke-width: 2; }
+.zlabel { fill: var(--accent); font: 800 13px var(--mono); letter-spacing: .12em; }
+.zkind { fill: var(--muted); font: 400 11px system-ui; }
+.ulabel { fill: var(--fg); font: 800 11px var(--mono); text-anchor: middle; paint-order: stroke; stroke: #05090b; stroke-width: 4px; stroke-linejoin: round; }
+.usub { fill: var(--muted); font: 400 10.5px system-ui; text-anchor: middle; paint-order: stroke; stroke: #05090b; stroke-width: 4px; }
+.usub.bad { fill: var(--bad); }
+.unit { cursor: pointer; }
+.unit:hover > svg { filter: brightness(1.18); }
+.unit.building > svg { opacity: .5; }
+.unit.down > svg { filter: grayscale(1) brightness(.55); }
+/* Selected: the building's own base glows in its type's colour. */
+.unit.selected > svg > polygon:first-child { stroke: var(--c); stroke-opacity: 1; stroke-width: 2.5; fill: color-mix(in srgb, var(--c) 28%, #111a1e); filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
+.link { stroke: rgba(62,224,200,.55); stroke-width: 3; fill: none; filter: drop-shadow(0 0 3px rgba(62,224,200,.6)); pointer-events: none; }
+.link-hit { stroke: transparent; stroke-width: 16; fill: none; cursor: pointer; }
+.link.selected { stroke: #fff; }
+.link.temp { stroke: var(--warn); stroke-dasharray: 6 6; }
+.gate { cursor: crosshair; }
+#fx, #temp { pointer-events: none; }
+.gate-pad { fill: rgba(62,224,200,.08); stroke: rgba(62,224,200,.6); stroke-width: 2; }
+
 .console { display: grid; grid-template-columns: 360px minmax(0, 1fr) 380px; border-top: 2px solid var(--line-strong); }
 .frame { padding: 10px 14px; background: var(--steel); box-shadow: var(--bevel); min-width: 0; overflow: hidden; }
 .frame + .frame { border-left: 2px solid var(--line-strong); }
@@ -116,60 +116,43 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .card .t { position: absolute; top: 2px; right: 4px; font: 700 9.5px var(--mono); color: var(--muted); }
 .card kbd { position: absolute; top: 2px; left: 4px; font: 700 9.5px var(--mono); color: var(--accent); }
 .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-
-.tune { position: absolute; right: 16px; top: 60px; z-index: 6; width: 300px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--warn); display: grid; gap: 6px; }
-.tune label { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: 12.5px; }
-.tune input { width: 70px; background: #060b0c; color: var(--fg); border: 1px solid var(--line-strong); padding: 2px 4px; font: 12px var(--mono); }
 .backdrop { position: fixed; inset: 0; background: rgba(2,7,6,.75); display: grid; place-items: center; z-index: 10; }
 .end { width: 440px; padding: 24px; background: var(--steel); border: 1px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
 .end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .end .stars { font-size: 38px; color: var(--star); letter-spacing: 4px; } .end .stars .off { color: var(--line-strong); }
 .proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
-
-/* Map look: no cards. Buildings stand on the ground, a green ring marks the selection, zones are plots inside the base wall. */
-.system { border: 2px solid rgba(62,224,200,.3); border-radius: 36px; background: rgba(10,22,24,.35); padding: 12px 24px 18px; }
-.zones { gap: 40px; }
-.zone { border: 1px dashed rgba(62,224,200,.28); border-radius: 28px; padding: 10px 18px 14px;
-  background: radial-gradient(ellipse at 50% 55%, rgba(62,224,200,.07), rgba(0,0,0,.25) 75%); }
-.unit { background: none; border: 1px solid transparent; min-width: 84px; padding: 0 4px 4px; }
-.unit:hover { border-color: transparent; filter: brightness(1.15); }
-.unit .name { text-shadow: 0 1px 3px #000, 0 0 6px #000; }
-.unit.selected { border-color: transparent; box-shadow: none; }
-/* Selected: the building's own base lights up in neon, in its type's colour. */
-.unit.selected svg > polygon:first-child { stroke: var(--c); stroke-opacity: 1; stroke-width: 2.5; fill: color-mix(in srgb, var(--c) 28%, #111a1e);
-  filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
-.unit.down { border-color: transparent; } .unit.down .name { color: var(--bad); }
-.container { border: none; background: none; padding: 0; justify-items: center; }
-.container > .name { color: var(--muted); font-weight: 700; }
-.build-site { width: 460px; height: 230px; display: grid; place-content: center; gap: 6px; text-align: center; color: var(--muted);
-  border: 2px dashed rgba(251,191,36,.35); border-radius: 36px; background: repeating-linear-gradient(45deg, rgba(251,191,36,.04) 0 14px, transparent 14px 28px); }
-.build-site b { font: 800 14px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
-.reqmode { top: 52px; }
 </style>
 </head>
 <body>
-<div class="app" id="app"></div>
-<canvas id="fx"></canvas>
+<div class="app">
+  <header class="bar" id="bar"></header>
+  <main class="field" id="field">
+    <svg id="world">
+      <defs><pattern id="hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="16" height="16" fill="rgba(251,191,36,.03)"/><rect width="7" height="16" fill="rgba(251,191,36,.07)"/></pattern></defs>
+      <g id="cam"><g id="ground"></g><g id="links"></g><g id="units"></g><g id="fx"></g><g id="temp"></g></g>
+    </svg>
+    <div id="hud"></div>
+  </main>
+  <footer class="console" id="console"></footer>
+</div>
+<div id="overlay"></div>
 <span class="proto">PROTOTIPO · MODELO SIMPLIFICADO, NO ES EL MOTOR REAL</span>
 <script>
-// ───────── Tunable numbers (⚙ panel) ─────────
+// ───────── Numbers ─────────
 const TUNE = { passive: 2, per100Visits: 1, upkeepFactor: 100, buildPhase: 30, refund: 0.5 };
-const TUNE_LABELS = { passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 visitas', upkeepFactor: 'Mantenimiento: coste/mes ÷', buildPhase: 'Fase de construcción (s)', refund: 'Devolución al quitar (0–1)' };
-
-// ───────── Three mini-levels: ONE wave each, ONE idea each ─────────
 const LEVELS = [
-  { id: 'spike', title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
+  { title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 150, wave: { rps: 300, length: 45 }, stars: [110, 150] },
-  { id: 'cache', title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
+  { title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
     allowed: ['loadBalancer', 'appServer', 'cache', 'database'], start: 200, wave: { rps: 420, length: 45 }, stars: [130, 180], noUpgrade: true },
-  { id: 'n1', title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
+  { title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 220, wave: { rps: 300, length: 50, incidentAt: 20 }, stars: [110, 160] },
 ];
 let level = LEVELS[0];
 const P95 = 200, MAX_ERR = 0.01;
 const waveFrom = () => TUNE.buildPhase, waveTo = () => TUNE.buildPhase + level.wave.length;
 
-// ───────── Buildings ─────────
+// ───────── Buildings and the rules for connecting them ─────────
 const TYPES = {
   loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', zone: 'edge', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
   appServer: { name: 'Fábrica', comp: 'App server', zone: 'app', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
@@ -177,11 +160,19 @@ const TYPES = {
   database: { name: 'Silos', comp: 'Base de datos', zone: 'data', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
 };
 const DB_UPGRADE = { price: 100, monthly: 100, cap: 800 };
-const ZONES = [['edge', 'Borde'], ['app', 'Aplicación'], ['data', 'Datos']];
+// Who may send requests to whom (as in the game). Connections join component types, like the game's diagram.
+const CAN = { users: ['loadBalancer', 'appServer'], loadBalancer: ['appServer'], appServer: ['cache', 'database'], cache: ['database'] };
+const NAME = { users: 'Usuarios', ...Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [k, v.name])) };
+
+// The map, in units of the isometric world: zones are diamond plots in a row inside the base wall.
+const ZONES = { edge: { name: 'Borde', x: -240, y: 0, w: 120 }, app: { name: 'Aplicación', x: 40, y: 0, w: 175 }, data: { name: 'Datos', x: 340, y: 0, w: 135 } };
+const GATE = { x: -520, y: 0 };
+const WALL = { x: 50, y: 0, w: 500, h: 250 };
+const diamond = (x, y, w, h = w / 2) => `${x - w},${y} ${x},${y - h} ${x + w},${y} ${x},${y + h}`;
 
 function shade(hex, f) { const t = f > 0 ? 255 : 0, k = Math.abs(f); return '#' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).map(v => Math.round(v + (t - v) * k).toString(16).padStart(2, '0')).join(''); }
-const P = (pts) => pts.map(p => p.join(',')).join(' ');
-function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${P([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${P([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${P([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
+const PT = (pts) => pts.map(p => p.join(',')).join(' ');
+function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${PT([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${PT([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${PT([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
 function cyl(cx, cy, r, h, p) { const ry = r / 2, top = cy - h; return `<g stroke="${p.dark}" stroke-width=".6"><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx + r},${cy} L${cx + r},${top} Z" fill="${p.base}"/><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx},${cy + ry} L${cx},${top + ry} A${r} ${ry} 0 0 1 ${cx - r},${top} Z" fill="${p.dark}" stroke="none"/><ellipse cx="${cx}" cy="${top}" rx="${r}" ry="${ry}" fill="${p.top}"/></g>`; }
 const DRAW = {
   loadBalancer: p => box(32, 48, 14, 6, p) + box(32, 41, 2.5, 26, p) + `<path d="M32 20 L18 27 M32 20 L46 27" stroke="${p.light}" stroke-width="1.4"/><circle cx="32" cy="12" r="6" fill="${p.glow}" opacity=".3"/><circle cx="32" cy="12" r="2.6" fill="${p.glow}"/>`,
@@ -189,19 +180,19 @@ const DRAW = {
   cache: p => box(32, 50, 16, 7, p) + `<ellipse cx="32" cy="43" rx="9" ry="4.5" fill="${p.glow}" opacity=".55"/><polygon points="32,6 41,22 32,38 23,22" fill="${p.light}"/><polygon points="32,6 41,22 32,38" fill="${p.base}"/><polygon points="32,11 36,22 32,30 28,22" fill="${p.glow}" opacity=".85"/>`,
   database: p => cyl(41, 45, 8, 20, p) + cyl(26, 52, 11, 27, p),
 };
-function building(type, size) {
+function building(type, size, x = 0, y = 0) {
   const c = TYPES[type].color;
   const p = { base: c, light: shade(c, .25), dark: shade(c, -.45), top: shade(c, .45), glow: shade(c, .6) };
-  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
+  return `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 64 64" overflow="visible"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
 }
 
 // ───────── State ─────────
-let S, layer = 3, tuneOpen = false;
+let S, layer = 3, cam = { x: 0, y: 0, k: 1 }, camSet = false;
 function reset(next = level) {
   level = next;
-  S = { t: 0, money: level.start, rep: 100, units: [], nextId: 1, selected: null, speed: 1, paused: false, over: null,
+  S = { t: 0, money: level.start, rep: 100, units: [], links: {}, nextId: 1, selected: null, speed: 1, paused: false, over: null,
     hist: [], last: null, log: [], incidentDone: false, waveStarted: false, visits: 0 };
-  log(`${level.title}: prepara tu base. Los usuarios llegan en ${TUNE.buildPhase} s.`, 'ok');
+  log(`${level.title}: construye y conecta tu base. Los usuarios llegan en ${TUNE.buildPhase} s.`, 'ok');
   particles.length = 0;
 }
 function log(text, kind = '') { S.log.unshift({ text: `[${fmt(S.t)}] ${text}`, kind }); S.log = S.log.slice(0, 6); }
@@ -217,31 +208,59 @@ function buildUnit(type) {
   const count = S.units.filter(u => u.type === type).length + 1;
   const id = S.nextId++;
   S.units.push({ id, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, total: spec.build, ready: false, down: false, upgraded: false });
-  S.selected = id;
-  if (layer === 1) layer = 3; // layer 1 shows no buildings: show the new one
+  S.selected = { unit: id };
+  if (layer === 1) layer = 3;
   log(`Construyendo ${spec.name} (${spec.build} s)`);
-  render();
+  renderAll();
 }
 function removeUnit(id) {
   const u = S.units.find(x => x.id === id); if (!u) return;
   const back = Math.round(TYPES[u.type].price * TUNE.refund);
   S.money += back; S.units = S.units.filter(x => x.id !== id); S.selected = null;
-  log(`${TYPES[u.type].name} quitado: +$${back}`); render();
+  if (!S.units.some(x => x.type === u.type)) for (const [from, to] of Object.entries(S.links)) if (from === u.type || to === u.type) delete S.links[from];
+  log(`${TYPES[u.type].name} quitado: +$${back}`); renderAll();
+}
+function connect(from, to) {
+  if (from === to) return;
+  if (!(CAN[from] ?? []).includes(to)) { log(`No se puede conectar ${NAME[from]} → ${NAME[to]}`, 'bad'); renderAll(); return; }
+  S.links[from] = to; S.selected = { link: from };
+  log(`Conectado: ${NAME[from]} → ${NAME[to]}`, 'ok'); renderAll();
 }
 function upgradeDb(id) {
   const u = S.units.find(x => x.id === id);
   if (!u || u.upgraded || level.noUpgrade || S.money < DB_UPGRADE.price) return;
   S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = u.total = 6;
-  log('Mejorando los silos a tier Medium (6 s)', 'warn'); render();
+  log('Mejorando los silos a tier Medium (6 s)', 'warn'); renderAll();
 }
 function callNow() {
   if (S.t >= TUNE.buildPhase) return;
   const bonus = Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2);
   S.money += bonus; S.t = TUNE.buildPhase;
-  log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); render();
+  log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); renderAll();
 }
 
-// ───────── Simplified capacity model: one step of dt seconds ─────────
+// ───────── Simplified capacity model, following the player's connections ─────────
+function chain() { const out = []; let cur = S.links.users; while (cur && !out.includes(cur)) { out.push(cur); cur = S.links[cur]; } return out; }
+function flowModel(rps) {
+  const c = chain(), lb = ready('loadBalancer')[0], apps = ready('appServer'), db = ready('database')[0], cache = ready('cache')[0];
+  const ai = c.indexOf('appServer');
+  const viaLb = c[0] === 'loadBalancer' && ai === 1 && !!lb;
+  const reached = ai === 0 || viaLb;
+  const usableApps = !reached ? 0 : viaLb ? apps.length : Math.min(1, apps.length); // without a load balancer only one factory gets traffic
+  const after = ai < 0 ? [] : c.slice(ai + 1);
+  const cacheOn = after[0] === 'cache' && !!cache;
+  const dbOn = !!db && (after[0] === 'database' || (after[0] === 'cache' && after[1] === 'database'));
+  const appCap = usableApps * TYPES.appServer.cap, dbCap = dbOn ? (db.upgraded ? DB_UPGRADE.cap : TYPES.database.cap) : 0;
+  const hit = cacheOn ? TYPES.cache.hit : 0;
+  const byApps = Math.min(rps, appCap), toDb = byApps * (1 - hit), byDb = Math.min(toDb, dbCap);
+  const served = after.length ? byApps * hit + byDb : 0;
+  const rhoApp = appCap ? Math.min(byApps / appCap, .97) : 1, rhoDb = dbCap ? Math.min(toDb / dbCap, .97) : 1;
+  const p95 = rps ? Math.min(2000, Math.round((20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0))) : 0;
+  const problem = !S.links.users ? 'Conecta a los usuarios con tu base' : !reached ? 'Las peticiones no llegan a ninguna fábrica'
+    : !after.length ? 'Las fábricas no envían a ningún sitio' : !dbOn ? 'Falta conectar los silos (base de datos)' : null;
+  return { rps, served, errors: rps ? (rps - served) / rps : 0, p95, rhoApp, rhoDb, hit, cacheOn, dbOn, viaLb, usableApps,
+    dropAtApps: rps ? 1 - byApps / rps : 0, dropAtDb: toDb ? 1 - byDb / toDb : 1, problem };
+}
 function step(dt) {
   if (S.over || S.paused) return;
   S.t += dt;
@@ -252,264 +271,146 @@ function step(dt) {
     if (victim) { victim.down = true; log(`¡${victim.label} se ha caído!`, 'bad'); }
     S.incidentDone = true;
   }
-  const rps = inWave() ? level.wave.rps : 0;
-  const apps = ready('appServer'), lbs = ready('loadBalancer'), caches = ready('cache'), db = ready('database')[0];
-  const usableApps = lbs.length ? apps.length : Math.min(1, apps.length); // without a load balancer only one app gets traffic
-  const appCap = usableApps * TYPES.appServer.cap;
-  const dbCap = db ? (db.upgraded ? DB_UPGRADE.cap : TYPES.database.cap) : 0;
-  const hit = caches.length ? TYPES.cache.hit : 0;
-  const byApps = Math.min(rps, appCap);
-  const toDb = byApps * (1 - hit);
-  const byDb = Math.min(toDb, dbCap);
-  const served = db ? byApps * hit + byDb : 0;
-  const errors = rps ? (rps - served) / rps : 0;
-  const rhoApp = appCap ? Math.min(byApps / appCap, .97) : 1, rhoDb = dbCap ? Math.min(toDb / dbCap, .97) : 1;
-  const p95 = rps ? Math.min(2000, Math.round((20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0))) : 0;
-  const revenue = (served / 100) * TUNE.per100Visits, upkeep = upkeepPerS(), net = TUNE.passive + revenue - upkeep;
-  S.money += net * dt; S.visits += served * dt;
-  S.last = { rps, served, errors, p95, revenue, upkeep, net, rhoApp, rhoDb, usableApps, hit,
-    dropAtApps: rps ? 1 - byApps / rps : 0, dropAtDb: toDb ? 1 - byDb / toDb : (db ? 0 : 1) };
-  if (rps) {
-    S.rep += (errors > MAX_ERR ? -6 : p95 > P95 ? -4 : 1) * dt;
-    S.rep = Math.max(0, Math.min(100, S.rep));
+  const L = flowModel(inWave() ? level.wave.rps : 0);
+  const revenue = (L.served / 100) * TUNE.per100Visits, upkeep = upkeepPerS(), net = TUNE.passive + revenue - upkeep;
+  S.money += net * dt; S.visits += L.served * dt;
+  S.last = { ...L, revenue, upkeep, net };
+  if (L.rps) {
+    S.rep = Math.max(0, Math.min(100, S.rep + (L.errors > MAX_ERR ? -6 : L.p95 > P95 ? -4 : 1) * dt));
     if (S.rep <= 0) { S.over = 'lost'; log('Reputación a 0: los usuarios se han ido.', 'bad'); }
   }
-  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ rps, p95, errors });
+  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ rps: L.rps, p95: L.p95, errors: L.errors });
   if (S.money < 0) { S.over = 'lost'; log('Sin dinero para el mantenimiento.', 'bad'); }
   if (!S.over && S.t >= waveTo()) S.over = 'won';
 }
 
-// ───────── Requests on the map (canvas over the field): four ways to draw them ─────────
-const REQ_MODES = [['people', 'Usuarios'], ['dots', 'Puntos'], ['roundtrip', 'Ida y vuelta'], ['flow', 'Flujo']];
-let reqMode = 'people';
-const particles = [];
-let spawnDebt = 0;
-const q = (sel) => document.querySelector(sel);
-// The point where a request reaches a building: the middle of its drawing.
-function nodePoint(el) { const d = el.querySelector('svg') ?? el; const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * .6 }; }
-/** The live buildings on screen, following the C4 layer. */
-function graph() {
-  const users = q('[data-node="users"] .people') ?? q('[data-node="users"]');
-  if (!users) return null;
-  const r = users.getBoundingClientRect();
-  const g = { users: { x: r.right - 6, y: r.top + r.height / 2 } };
-  if (layer === 1) { const sys = q('[data-node="system"]'); g.system = sys && nodePoint(sys); return g; }
-  const lb = q('[data-node="loadBalancer"].live'); g.lb = lb && nodePoint(lb);
-  const apps = [...document.querySelectorAll('[data-node="appServer"].live')].map(nodePoint);
-  g.apps = layer === 3 && !lb ? apps.slice(0, 1) : apps; // without a load balancer only one factory gets traffic
-  const c = q('[data-node="cache"].live'); g.cache = c && nodePoint(c);
-  const d = q('[data-node="database"].live'); g.db = d && nodePoint(d);
-  return g;
+// ───────── Where things are on the map ─────────
+/** Ground points of every building in the current C4 layer: key (unit id, or type in layer 2) → { x, y, size, type }. */
+function layout() {
+  const spots = {};
+  if (!S.units.length || layer === 1) return spots;
+  for (const [zone, z] of Object.entries(ZONES)) {
+    let items = S.units.filter(u => TYPES[u.type].zone === zone);
+    if (layer === 2) items = [...new Set(items.map(u => u.type))].map(type => ({ id: type, type }));
+    const n = items.length; if (!n) continue;
+    const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), cell = (z.w * .78) / cols;
+    const size = Math.min(100, Math.max(64, cell * 1.9));
+    items.forEach((u, k) => {
+      const da = (k % cols) - (cols - 1) / 2, db = Math.floor(k / cols) - (rows - 1) / 2;
+      spots[u.id] = { x: z.x + (da - db) * cell, y: z.y + ((da + db) * cell) / 2, size, type: u.type, unit: layer === 3 ? u : null };
+    });
+  }
+  return spots;
 }
-/** One request's route; dropAt is the stop where it fails, or null when it is answered. */
-function routeFor(g) {
-  const L = S.last ?? {};
-  const pts = [g.users];
-  if (layer === 1) { if (!g.system) return { pts, dropAt: 0 }; pts.push(g.system); return { pts, dropAt: Math.random() < (L.errors ?? 0) ? 1 : null }; }
-  if (g.lb) pts.push(g.lb);
-  if (!g.apps.length) return { pts, dropAt: pts.length - 1 };
-  pts.push(g.apps[Math.floor(Math.random() * g.apps.length)]);
-  if (Math.random() < (L.dropAtApps ?? 0)) return { pts, dropAt: pts.length - 1 };
-  if (g.cache) { pts.push(g.cache); if (Math.random() < (L.hit ?? 0)) return { pts, dropAt: null }; }
-  if (!g.db) return { pts, dropAt: pts.length - 1 };
-  pts.push(g.db);
-  return { pts, dropAt: Math.random() < (L.dropAtDb ?? 0) ? pts.length - 1 : null };
-}
-const SPEED = { dots: 260, people: 150, roundtrip: 300 };
-const PER = { dots: 25, people: 40, roundtrip: 30 }; // requests one figure stands for
-const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: route.dropAt === 0 });
-function advance(p, dt) {
-  if (p.dead || p.arrived) { p.life -= dt * (p.dead ? 1.4 : 3); return; }
-  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
-  if (!b) { p.arrived = true; onArrive(p); return; }
-  p.f += ((SPEED[reqMode] ?? 260) * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-  if (p.f < 1) return;
-  p.seg++; p.f = 0;
-  if (p.dropAt !== null && p.seg >= p.dropAt) onFail(p);
-  else if (!p.pts[p.seg + 1]) { p.arrived = true; onArrive(p); }
-}
-function onFail(p) {
-  if (reqMode === 'people' && p.kind === 'req') {
-    // An unhappy user walks back home.
-    const back = p.pts.slice(0, p.seg + 1).reverse();
-    Object.assign(p, { pts: back, seg: 0, f: 0, dropAt: null, kind: 'angry' });
-  } else if (reqMode === 'roundtrip' && p.kind === 'req') {
-    p.dead = true; spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, 'error');
-  } else p.dead = true;
-}
-function onArrive(p) {
-  if (reqMode === 'roundtrip' && p.kind === 'req') spawn({ pts: [...p.pts].reverse(), dropAt: null }, 'reply');
-  if (reqMode === 'people' && p.kind === 'req') p.kind = 'happy';
-}
-const posOf = (p) => { const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a; return { x: a.x + (b.x - a.x) * p.f, y: a.y + (b.y - a.y) * p.f }; };
-function drawPerson(x, y, color) {
-  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y - 6, 2.6, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(x - 3.4, y + 2); ctx.quadraticCurveTo(x, y - 6, x + 3.4, y + 2); ctx.closePath(); ctx.fill();
-}
-function drawParticle(p) {
-  const { x, y } = posOf(p);
-  ctx.globalAlpha = Math.max(0, p.life);
-  if (reqMode === 'people') {
-    const color = p.kind === 'angry' ? '#f87171' : p.kind === 'happy' ? '#4ade80' : '#7ff5e5';
-    ctx.shadowColor = color; ctx.shadowBlur = 6; drawPerson(x, y, color); ctx.shadowBlur = 0;
-    if (p.kind === 'angry') { ctx.font = '800 11px ui-monospace'; ctx.fillText('!', x - 2, y - 11); }
-    if (p.kind === 'happy') { ctx.font = '800 10px ui-monospace'; ctx.fillStyle = '#fde047'; ctx.fillText('+$', x + 5, y - 8 - (1 - p.life) * 14); }
-  } else if (reqMode === 'roundtrip') {
-    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
-    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 6;
-    ctx.fillRect(x - 3, y - 3 + (p.kind === 'req' ? -5 : 5), 6, 6); ctx.shadowBlur = 0;
-    if (p.kind === 'error' && p.seg === 0 && p.f < .3) { ctx.font = '800 10px ui-monospace'; ctx.fillText('503', x + 5, y - 2); }
+const bodyOf = (s) => ({ x: s.x, y: s.y - s.size * .25 });
+const liveSpot = (s) => (s.unit ? s.unit.ready && !s.unit.down : ready(s.type).length > 0);
+
+// ───────── Render: the world (SVG), then the HUD around it ─────────
+const $ = (id) => document.getElementById(id);
+function renderWorld() {
+  const spots = layout(), L = S.last;
+  let g = `<polygon class="ground" points="${diamond(0, 0, 1400, 700)}"/>`;
+  for (let i = -14; i <= 14; i++) g += `<line class="ground-grid" x1="${i * 50 - 700}" y1="${i * 25 + 350}" x2="${i * 50 + 700}" y2="${i * 25 - 350}"/><line class="ground-grid" x1="${i * 50 - 700}" y1="${-i * 25 - 350}" x2="${i * 50 + 700}" y2="${-i * 25 + 350}"/>`;
+  if (!S.units.length) {
+    g += `<polygon class="site" points="${diamond(WALL.x, WALL.y, 380, 190)}"/><text class="zlabel" x="${WALL.x}" y="${WALL.y - 6}" text-anchor="middle" style="fill:#fbbf24">ZONA DE CONSTRUCCIÓN</text>
+      <text class="zkind" x="${WALL.x}" y="${WALL.y + 16}" text-anchor="middle">Construye tu primer edificio con la tarjeta de abajo o las teclas 1–4</text>`;
+  } else if (layer === 1) {
+    g += `<polygon class="wall" points="${diamond(WALL.x, WALL.y, 260, 130)}"/><text class="zlabel" x="${WALL.x - 120}" y="${WALL.y - 80}">TU SISTEMA <tspan class="zkind">[Sistema de software]</tspan></text>`;
   } else {
-    const color = p.dead ? '#f87171' : p.arrived ? '#4ade80' : '#b7fff4';
-    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(x, y + (p.dead ? (1 - p.life) * 18 : 0), p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-    if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
+    g += `<polygon class="wall" points="${diamond(WALL.x, WALL.y, WALL.w, WALL.h)}"/><text class="zlabel" x="${WALL.x - 120}" y="${WALL.y - WALL.h + 70}">TU SISTEMA <tspan class="zkind">[Sistema de software]</tspan></text>`;
+    for (const [zone, z] of Object.entries(ZONES)) if (S.units.some(u => TYPES[u.type].zone === zone))
+      g += `<polygon class="plot" points="${diamond(z.x, z.y, z.w)}"/><text class="zlabel" x="${z.x - z.w * .55}" y="${z.y - z.w * .5 - 10}">${z.name.toUpperCase()} <tspan class="zkind">[Contenedor]</tspan></text>`;
   }
-  ctx.globalAlpha = 1;
-}
-/** "Flujo": pipes whose width is the traffic on them, with the numbers written on top and the losses in red. */
-function drawFlow(g, now) {
-  const L = S.last; if (!L?.rps) return;
-  const servedApps = L.rps * (1 - L.dropAtApps), toDb = servedApps * (1 - L.hit);
-  const segs = [], drops = [];
-  const add = (a, b, v, bad) => a && b && v > 0 && segs.push({ a, b, v, bad });
-  if (layer === 1) { add(g.users, g.system, L.rps * (1 - L.errors), false); if (L.errors > 0) drops.push({ at: g.system ?? g.users, v: L.rps * L.errors }); }
-  else {
-    const n = Math.max(1, g.apps.length);
-    if (g.lb) { add(g.users, g.lb, L.rps); g.apps.forEach(a => add(g.lb, a, L.rps / n, L.dropAtApps > 0)); }
-    else g.apps.forEach(a => add(g.users, a, L.rps, L.dropAtApps > 0));
-    const next = g.cache ?? g.db;
-    g.apps.forEach(a => add(a, next, servedApps / n, false));
-    if (g.cache) add(g.cache, g.db, toDb, L.dropAtDb > 0);
-    if (!g.apps.length) drops.push({ at: g.lb ?? g.users, v: L.rps });
-    else if (L.dropAtApps > 0) drops.push({ at: g.apps[0], v: L.rps * L.dropAtApps });
-    if (L.dropAtDb > 0 && toDb > 0) drops.push({ at: g.db ?? g.cache ?? g.apps[0], v: toDb * L.dropAtDb });
+  const people = inWave() ? Math.min(12, Math.ceil(level.wave.rps / 35)) : 1;
+  g += `<g class="gate" data-type="users"><polygon class="gate-pad" points="${diamond(GATE.x, GATE.y, 70)}"/>
+    ${Array.from({ length: people }, (_, i) => { const x = people === 1 ? GATE.x : GATE.x - 30 + (i % 4) * 20, y = people === 1 ? GATE.y : GATE.y - 14 + Math.floor(i / 4) * 14; return `<circle cx="${x}" cy="${y - 7}" r="4.5" fill="#2aa596"/><path d="M${x - 6} ${y + 5} Q${x} ${y - 6} ${x + 6} ${y + 5} Z" fill="#13262a" stroke="#3ee0c8"/>`; }).join('')}
+    <text class="ulabel" x="${GATE.x}" y="${GATE.y + 56}">USUARIOS</text>
+    <text class="usub" x="${GATE.x}" y="${GATE.y + 70}">${inWave() ? `${level.wave.rps} req/s · ${Math.round(S.visits).toLocaleString('es')} visitas` : S.t < TUNE.buildPhase ? 'arrastra desde aquí para conectar' : 'se han ido'}</text></g>`;
+  $('ground').innerHTML = g;
+
+  // Connections: type to type, drawn from every building of one type to every building of the next.
+  let l = '';
+  const pointsOf = (key) => key === 'users' ? [GATE] : Object.values(spots).filter(s => s.type === key);
+  if (layer === 1) { if (S.links.users && S.units.length) l += `<line class="link" x1="${GATE.x}" y1="${GATE.y}" x2="${WALL.x - 260}" y2="${WALL.y}"/>`; }
+  else for (const [from, to] of Object.entries(S.links)) for (const a of pointsOf(from)) for (const b of pointsOf(to)) {
+    l += `<line class="link ${S.selected?.link === from ? 'selected' : ''}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><line class="link-hit" data-link="${from}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
   }
-  ctx.lineCap = 'round';
-  for (const sgm of segs) {
-    const w = 2 + sgm.v / 45, color = sgm.bad ? '#fbbf24' : '#3ee0c8';
-    ctx.strokeStyle = color; ctx.globalAlpha = .25; ctx.lineWidth = w + 6; ctx.beginPath(); ctx.moveTo(sgm.a.x, sgm.a.y); ctx.lineTo(sgm.b.x, sgm.b.y); ctx.stroke();
-    ctx.globalAlpha = .9; ctx.lineWidth = w; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -(now / 1000) * 60 * S.speed;
-    ctx.beginPath(); ctx.moveTo(sgm.a.x, sgm.a.y); ctx.lineTo(sgm.b.x, sgm.b.y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.globalAlpha = 1; ctx.font = '800 11px ui-monospace'; ctx.fillStyle = '#dce8e5';
-    ctx.fillText(`${Math.round(sgm.v)}/s`, (sgm.a.x + sgm.b.x) / 2 - 16, (sgm.a.y + sgm.b.y) / 2 - w / 2 - 6);
-  }
-  for (const d of drops) {
-    ctx.font = '800 12px ui-monospace'; ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 8;
-    ctx.fillText(`✕ −${Math.round(d.v)}/s`, d.at.x - 24, d.at.y + 46); ctx.shadowBlur = 0;
-  }
-}
-const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
-let lastAnim = performance.now();
-function animate(now) {
-  const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
-  const field = document.querySelector('.field');
-  if (field) {
-    const r = field.getBoundingClientRect(), dpr = devicePixelRatio || 1;
-    if (fx.width !== Math.round(r.width * dpr) || fx.height !== Math.round(r.height * dpr)) { fx.width = Math.round(r.width * dpr); fx.height = Math.round(r.height * dpr); }
-    Object.assign(fx.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-    ctx.setTransform(dpr, 0, 0, dpr, -r.left * dpr, -r.top * dpr);
-    ctx.clearRect(r.left, r.top, r.width, r.height);
-    const running = !S.over && !S.paused, g = graph();
-    if (g && reqMode === 'flow') drawFlow(g, now);
-    else if (g) {
-      if (running && S.last?.rps) {
-        spawnDebt += (S.last.rps / PER[reqMode]) * dt * S.speed;
-        while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; spawn(routeFor(g)); }
-      }
-      for (const p of particles) { if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt); drawParticle(p); }
-      for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+  $('links').innerHTML = l;
+
+  let u = '';
+  if (layer === 1 && S.units.length) {
+    const types = Object.keys(TYPES).filter(t => S.units.some(x => x.type === t));
+    types.forEach((t, i) => { const x = WALL.x + (i - (types.length - 1) / 2) * 90, n = S.units.filter(x => x.type === t).length;
+      u += `<g class="unit" data-type="${t}" data-unit="${S.units.find(x => x.type === t).id}" style="--c:${TYPES[t].color}">${building(t, 80, x - 40, WALL.y - 62)}<text class="ulabel" x="${x}" y="${WALL.y + 32}">${TYPES[t].name.toUpperCase()}${n > 1 ? ` × ${n}` : ''}</text></g>`; });
+    u += `<text class="usub" x="${WALL.x}" y="${WALL.y + 70}">${S.units.length} edificios · cambia a la capa 3 para ver cada uno</text>`;
+  } else {
+    for (const s of Object.values(spots).sort((a, b) => a.y - b.y)) {
+      const unit = s.unit, all = S.units.filter(x => x.type === s.type), live = all.filter(x => x.ready && !x.down);
+      const isSel = unit ? S.selected?.unit === unit.id : all.some(x => x.id === S.selected?.unit);
+      const status = unit ? (unit.down ? 'down' : unit.ready ? '' : 'building') : (live.length ? '' : 'building');
+      const label = unit ? unit.label : `${TYPES[s.type].comp}${all.length > 1 ? ` × ${all.length}` : ''}`;
+      const idleApp = unit && s.type === 'appServer' && L?.usableApps === 1 && ready('appServer')[0] !== unit;
+      const rho = !L?.rps ? 0 : s.type === 'appServer' ? (idleApp ? 0 : L.rhoApp) : s.type === 'database' ? (L.dbOn ? L.rhoDb : 0) : s.type === 'cache' ? (L.cacheOn ? .1 : 0) : (L.viaLb ? .05 : 0);
+      const sub = unit ? (unit.down ? 'caído' : !unit.ready ? `en obra · ${Math.ceil(unit.left)} s` : idleApp ? 'sin tráfico' : '') : `${live.length}/${all.length} en servicio`;
+      const sz = s.size, ty = s.y + sz * .2 + 12;
+      u += `<g class="unit ${status} ${isSel ? 'selected' : ''}" data-type="${s.type}" data-unit="${unit ? unit.id : all[0].id}" style="--c:${TYPES[s.type].color}">
+        ${building(s.type, sz, s.x - sz / 2, s.y - sz * 50 / 64)}
+        ${unit && !unit.ready ? `<rect x="${s.x - 28}" y="${s.y - sz * .62}" width="56" height="6" fill="#060b0c" stroke="#fbbf24"/><rect x="${s.x - 28}" y="${s.y - sz * .62}" width="${56 * (1 - unit.left / unit.total)}" height="6" fill="#fbbf24"/>` : ''}
+        <text class="ulabel" x="${s.x}" y="${ty}">${label.toUpperCase()}</text>
+        ${sub ? `<text class="usub ${unit?.down ? 'bad' : ''}" x="${s.x}" y="${ty + 13}">${sub}</text>` : ''}
+        ${status === '' && L?.rps ? `<rect x="${s.x - 26}" y="${ty + (sub ? 18 : 5)}" width="52" height="4" fill="#060b0c"/><rect x="${s.x - 26}" y="${ty + (sub ? 18 : 5)}" width="${52 * rho}" height="4" fill="${rho >= .9 ? '#f87171' : rho >= .7 ? '#fbbf24' : '#4ade80'}"/>` : ''}
+      </g>`;
     }
   }
-  requestAnimationFrame(animate);
+  $('units').innerHTML = u;
+}
+function applyCam() { $('cam').setAttribute('transform', `translate(${cam.x} ${cam.y}) scale(${cam.k})`); }
+function fitCam() {
+  const r = $('world').getBoundingClientRect();
+  cam.k = Math.min(1, (r.width - 320) / 1250, (r.height - 70) / 560);
+  cam.x = 290 + (r.width - 290) / 2 + 20 * cam.k; cam.y = r.height / 2 - 6; applyCam();
 }
 
-// ───────── Render ─────────
 const spark = (vals, max, color, limit) => {
   const n = 60, v = vals.slice(-n), w = 200, h = 34;
   const pts = v.map((y, i) => `${(i / (n - 1)) * w},${h - Math.min(1, y / max) * (h - 2) - 1}`).join(' ');
   const lim = limit ? `<line x1="0" x2="${w}" y1="${h - (limit / max) * (h - 2) - 1}" y2="${h - (limit / max) * (h - 2) - 1}" stroke="#f87171" stroke-dasharray="3 3" opacity=".7"/>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${lim}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
 };
-const loadOf = (type) => (S.last?.rps ? (type === 'appServer' ? S.last.rhoApp : type === 'database' ? S.last.rhoDb : type === 'cache' ? .1 : .05) : 0);
-const lvl = (rho) => (rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '');
-function unitHtml(u, size = 64) {
-  const idle = u.type === 'appServer' && u.ready && !u.down && !ready('loadBalancer').length && ready('appServer')[0] !== u;
-  const rho = idle ? 0 : loadOf(u.type);
-  return `<button class="unit ${size < 60 ? 'small' : ''} ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}" style="--c:${TYPES[u.type].color}">
-    ${building(u.type, size)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / u.total) * 100}%"></span></span>` : ''}
-    <span class="name">${u.label}</span>
-    <span class="sub">${u.down ? 'caído' : !u.ready ? `en obra · ${Math.ceil(u.left)} s` : idle ? 'sin tráfico' : u.type === 'database' ? (u.upgraded ? 'Medium' : 'Small') : ''}</span>
-    ${u.ready && !u.down ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
-}
-function zoneInner(zone) {
-  const units = S.units.filter(u => TYPES[u.type].zone === zone);
-  if (!units.length) return `<div class="empty">vacío</div>`;
-  if (layer === 2) {
-    // Layer 2: one card per component, instances folded into × N.
-    return [...new Set(units.map(u => u.type))].map(type => {
-      const all = units.filter(u => u.type === type), live = all.filter(u => u.ready && !u.down);
-      const rho = loadOf(type);
-      return `<button class="unit ${live.length ? 'live' : 'building'} ${all.some(u => u.id === S.selected) ? 'selected' : ''}" data-node="${type}" data-unit="${all[0].id}" style="--c:${TYPES[type].color}">${building(type, 64)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
-        <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
-    }).join('');
-  }
-  // Layer 3: every instance; app servers sit inside their container.
-  const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer');
-  return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 52)).join('')}</div>` : '');
-}
-function systemHtml() {
-  if (!S.units.length) return `<div class="build-site" data-node="site"><b>Zona de construcción</b><span>Aquí se levantará tu base.</span><span>Construye tu primer edificio con la tarjeta de abajo o las teclas 1–4.</span></div>`;
-  if (layer === 1) {
-    const counts = Object.keys(TYPES).map(t => [t, S.units.filter(u => u.type === t).length]).filter(([, n]) => n);
-    return `<div class="system" data-node="system" style="min-width:300px"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
-      <div class="ctx-buildings">${counts.length ? counts.map(([t, n]) => `${building(t, 48)}${n > 1 ? `<b>× ${n}</b>` : ''}`).join('') : '<span class="muted">aún sin edificios</span>'}</div>
-      <span class="muted" style="font-size:12px">${S.units.length} edificios · mantenimiento $${upkeepPerS().toFixed(1)}/s · cambia a la capa 3 para ver cada uno</span></div>`;
-  }
-  return `<div class="system"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
-    <div class="zones">${ZONES.filter(([z]) => S.units.some(u => TYPES[u.type].zone === z)).map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
-}
-function render() {
+const icon = (type, size) => building(type, size).replace('overflow="visible"', '');
+function renderHud() {
   const wave = inWave(), building_ = S.t < TUNE.buildPhase;
   const L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS(), served: 0 };
   const phase = building_ ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : wave ? `OLEADA · ${fmt(waveTo() - S.t)}` : 'FIN';
-  const sel = S.units.find(u => u.id === S.selected);
-  const people = wave ? Math.min(16, Math.ceil(level.wave.rps / 30)) : 0;
-  const banner = building_ ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
-    : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
-  document.getElementById('app').innerHTML = `
-  <header class="bar">
+  $('bar').innerHTML = `
     <h1>${level.title}</h1>
     <span class="levels">${LEVELS.map((l, i) => `<button class="btn ${l === level ? 'on' : ''}" data-level="${i}">Nivel ${i + 1}</button>`).join('')}</span>
     <span class="res">💰 <span class="money">$${Math.floor(S.money)}</span><span class="rate ${L.net >= 0 ? 'up' : 'down'}">${L.net >= 0 ? '+' : ''}${L.net.toFixed(1)}/s</span></span>
     <span class="res">⏱ <span class="phase">${phase}</span></span>
-    <span class="res">❤ <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>
-    <button class="btn" data-act="tune">⚙</button>
-  </header>
-  <main class="field">
-    <section class="mission">
+    <span class="res">❤ <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>`;
+  const problem = S.units.length ? flowModel(1).problem : null;
+  const banner = building_ ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
+    : wave && L.problem ? `<div class="banner bad">⚠ ${L.problem}</div>`
+    : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
+  $('hud').innerHTML = `
+    <section class="hud mission">
       <span class="label">Misión</span>
       <div class="lesson">${level.lesson}</div>
-      <span class="muted">Una oleada de ${level.wave.rps} req/s durante ${level.wave.length} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero final.</span>
+      <span class="muted">Una oleada de ${level.wave.rps} req/s durante ${level.wave.length} s.</span>
       <ul>
         <li class="${!L.rps ? '' : L.p95 <= P95 ? 'ok' : 'bad'}"><i></i>p95 ≤ ${P95} ms</li>
         <li class="${!L.rps ? '' : L.errors <= MAX_ERR ? 'ok' : 'bad'}"><i></i>Errores ≤ ${MAX_ERR * 100}%</li>
       </ul>
+      ${problem ? `<span style="color:var(--warn);font-size:13px">⚠ ${problem}</span>` : ''}
+      <div class="howto"><span><b>Conectar:</b> arrastra de un edificio (o de los usuarios) a otro.</span><span><b>Moverte:</b> arrastra el suelo · rueda para zoom.</span><span><b>Quitar conexión:</b> clic en la línea y Supr.</span></div>
     </section>
-    <div class="c4 reqmode"><span class="label">Peticiones</span>${REQ_MODES.map(([k, n]) => `<button class="${reqMode === k ? 'on' : ''}" data-req="${k}">${n}</button>`).join('')}</div>
-    <div class="c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
+    <div class="hud c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
+    <div class="hud zoombox"><button data-zoom="1.2" title="Acercar">+</button><button data-zoom="0.83" title="Alejar">−</button><button data-act="fit" title="Encuadrar">⌂</button></div>
     ${banner}
-    <div class="scene">
-      <div class="crowd" data-node="users">
-        <span class="label">Usuarios</span>
-        <div class="people">${Array.from({ length: people }, (_, i) => `<i></i>`).join('')}</div>
-        ${wave ? `<span class="count">${L.rps} req/s</span><span class="wait">${Math.round(S.visits).toLocaleString('es')} visitas atendidas</span>` : `<span class="wait">${building_ ? 'esperando…' : 'se han ido'}</span>`}
-      </div>
-      ${systemHtml()}
-    </div>
-    <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>
-  </main>
-  <footer class="console">
+    <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>`;
+
+  const selUnit = S.units.find(u => u.id === S.selected?.unit), selLink = S.selected?.link;
+  $('console').innerHTML = `
     <section class="frame"><span class="label">Resultados en vivo</span>
       <div class="charts">
         <div class="chart">RPS${spark(S.hist.map(h => h.rps), 500, '#3ee0c8')}<b>${L.rps}</b></div>
@@ -519,38 +420,36 @@ function render() {
       <div class="econ"><span class="muted">Ingreso fijo</span><span>+$${TUNE.passive.toFixed(1)}/s</span><span class="muted">Visitas atendidas</span><span>+$${L.revenue.toFixed(1)}/s</span><span class="muted">Mantenimiento</span><span>−$${L.upkeep.toFixed(1)}/s</span></div>
     </section>
     <section class="frame inspector"><span class="label">Inspector</span>
-      ${sel ? `<div class="head">${building(sel.type, 56)}<div><h3>${sel.label}</h3><span class="muted">${TYPES[sel.type].name} · ${TYPES[sel.type].comp}</span></div></div>
+      ${selLink && S.links[selLink] ? `<div class="head"><div><h3>Conexión</h3><span class="muted">${NAME[selLink]} → ${NAME[S.links[selLink]]}</span></div></div>
+          <div class="controls"><button class="btn" data-unlink="${selLink}">Quitar conexión (Supr)</button></div>`
+      : selUnit ? `<div class="head">${icon(selUnit.type, 56)}<div><h3>${selUnit.label}</h3><span class="muted">${TYPES[selUnit.type].name} · ${TYPES[selUnit.type].comp}</span></div></div>
         <div class="rows">
-          <span class="muted">Estado</span><span>${sel.down ? 'caído' : sel.ready ? 'en servicio' : `en obra · ${Math.ceil(sel.left)} s`}</span>
-          <span class="muted">Mantenimiento</span><span>$${((sel.upgraded ? DB_UPGRADE.monthly : TYPES[sel.type].monthly) / TUNE.upkeepFactor).toFixed(1)}/s</span>
-          ${sel.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
-          ${sel.type === 'database' ? `<span class="muted">Capacidad</span><span>${sel.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${sel.upgraded ? 'Medium' : 'Small'})</span>` : ''}
-          ${sel.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
-          ${sel.type === 'loadBalancer' ? `<span class="muted">Efecto</span><span>reparte entre ${ready('appServer').length} fábricas</span>` : ''}
+          <span class="muted">Estado</span><span>${selUnit.down ? 'caído' : selUnit.ready ? 'en servicio' : `en obra · ${Math.ceil(selUnit.left)} s`}</span>
+          <span class="muted">Envía peticiones a</span><span>${S.links[selUnit.type] ? NAME[S.links[selUnit.type]] : CAN[selUnit.type] ? '— arrástralo a otro edificio' : 'responde (fin del camino)'}</span>
+          <span class="muted">Mantenimiento</span><span>$${((selUnit.upgraded ? DB_UPGRADE.monthly : TYPES[selUnit.type].monthly) / TUNE.upkeepFactor).toFixed(1)}/s</span>
+          ${selUnit.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
+          ${selUnit.type === 'database' ? `<span class="muted">Capacidad</span><span>${selUnit.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${selUnit.upgraded ? 'Medium' : 'Small'})</span>` : ''}
+          ${selUnit.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
         </div>
         <div class="controls">
-          ${sel.type === 'database' && !sel.upgraded ? `<button class="btn" data-upgrade="${sel.id}" ${S.money < DB_UPGRADE.price || level.noUpgrade ? 'disabled' : ''}>${level.noUpgrade ? 'Tier fijo en este nivel' : `Mejorar a Medium · $${DB_UPGRADE.price}`}</button>` : ''}
-          <button class="btn" data-remove="${sel.id}">Quitar · +$${Math.round(TYPES[sel.type].price * TUNE.refund)}</button>
+          ${selUnit.type === 'database' && !selUnit.upgraded ? `<button class="btn" data-upgrade="${selUnit.id}" ${S.money < DB_UPGRADE.price || level.noUpgrade ? 'disabled' : ''}>${level.noUpgrade ? 'Tier fijo en este nivel' : `Mejorar a Medium · $${DB_UPGRADE.price}`}</button>` : ''}
+          <button class="btn" data-remove="${selUnit.id}">Quitar · +$${Math.round(TYPES[selUnit.type].price * TUNE.refund)}</button>
         </div>`
-      : `<p class="muted">Selecciona un edificio para ver su estado. Construye con la tarjeta de la derecha o con las teclas 1–4.</p>`}
+      : `<p class="muted">Selecciona un edificio o una conexión. Para conectar, arrastra de un edificio a otro (también desde los usuarios).</p>`}
     </section>
     <section class="frame build"><span class="label">Construir</span>
-      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over || !level.allowed.includes(k) ? 'disabled' : ''} title="${level.allowed.includes(k) ? '' : 'No disponible en este nivel'}"><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${building(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
+      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over || !level.allowed.includes(k) ? 'disabled' : ''}><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${icon(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
       <div class="controls">
         ${building_ ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
         <button class="btn ${S.paused ? 'on' : ''}" data-act="pause">${S.paused ? '▶ Seguir' : '⏸ Pausa'}</button>
         ${[1, 2, 4].map(x => `<button class="btn ${S.speed === x ? 'on' : ''}" data-speed="${x}">${x}×</button>`).join('')}
         <button class="btn" data-act="restart">↺</button>
       </div>
-    </section>
-  </footer>
-  ${tuneOpen ? `<div class="tune"><span class="label">Números (para ajustar)</span>${Object.entries(TUNE).map(([k, v]) => `<label>${TUNE_LABELS[k]}<input type="number" step="any" data-tune="${k}" value="${v}"></label>`).join('')}<span class="muted" style="font-size:12px">Los cambios se aplican al reiniciar (↺).</span></div>` : ''}
-  ${S.over ? endHtml() : ''}`;
+    </section>`;
+  $('overlay').innerHTML = S.over ? endHtml() : '';
 }
 function endHtml() {
-  const won = S.over === 'won';
-  const stars = won ? 1 + level.stars.filter(m => S.money >= m).length : 0;
-  const next = LEVELS[LEVELS.indexOf(level) + 1];
+  const won = S.over === 'won', stars = won ? 1 + level.stars.filter(m => S.money >= m).length : 0, next = LEVELS[LEVELS.indexOf(level) + 1];
   return `<div class="backdrop"><div class="end">
     <div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
     <h2 style="color:${won ? 'var(--ok)' : 'var(--bad)'}">${won ? 'Base defendida' : 'Base perdida'}</h2>
@@ -558,40 +457,141 @@ function endHtml() {
     <div class="muted">★★ con $${level.stars[0]} · ★★★ con $${level.stars[1]}</div>
     <div class="controls" style="justify-content:center"><button class="btn" data-act="restart">↺ Otra vez</button>${won && next ? `<button class="btn go" data-level="${LEVELS.indexOf(next)}">Nivel ${LEVELS.indexOf(next) + 1} ▶</button>` : ''}</div></div></div>`;
 }
+function renderAll() { renderWorld(); renderHud(); }
 
-// ───────── Input and loop ─────────
-// pointerdown, not click: the screen redraws 10 times a second, which can swallow a click.
-document.addEventListener('pointerdown', e => {
+// ───────── Requests: there and back (in world units, drawn inside the SVG) ─────────
+const particles = [];
+let spawnDebt = 0;
+function routeFor(spots, L) {
+  const pts = [{ x: GATE.x + 40, y: GATE.y - 10 }];
+  if (layer === 1) { if (!S.links.users || !S.units.length) return { pts, dropAt: 0 }; pts.push({ x: WALL.x, y: WALL.y - 20 }); return { pts, dropAt: Math.random() < L.errors ? 1 : null }; }
+  const live = (type) => Object.values(spots).filter(s => s.type === type && liveSpot(s)).map(bodyOf);
+  if (L.viaLb) { const lb = live('loadBalancer')[0]; if (lb) pts.push(lb); }
+  let apps = live('appServer'); if (!L.viaLb) apps = apps.slice(0, 1);
+  if (!L.usableApps || !apps.length) return { pts, dropAt: pts.length > 1 ? pts.length - 1 : 0 };
+  pts.push(apps[Math.floor(Math.random() * apps.length)]);
+  if (Math.random() < L.dropAtApps) return { pts, dropAt: pts.length - 1 };
+  if (L.cacheOn) { const c = live('cache')[0]; if (c) pts.push(c); if (Math.random() < L.hit) return { pts, dropAt: null }; }
+  if (!L.dbOn) return { pts, dropAt: pts.length - 1 };
+  const db = live('database')[0]; if (db) pts.push(db);
+  return { pts, dropAt: Math.random() < L.dropAtDb ? pts.length - 1 : null };
+}
+const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: kind === 'req' && route.dropAt === 0 });
+function bounce(p) { // a request reached its last stop: the answer (or the error) travels back
+  if (p.kind !== 'req') return;
+  const failed = p.dropAt !== null;
+  spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, failed ? 'error' : 'reply');
+}
+function advance(p, dt) {
+  if (p.dead || p.arrived) { p.life -= dt * 2.5; return; }
+  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
+  if (!b) { p.arrived = true; bounce(p); return; }
+  p.f += (320 * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  if (p.f < 1) return;
+  p.seg++; p.f = 0;
+  if ((p.dropAt !== null && p.seg >= p.dropAt) || !p.pts[p.seg + 1]) { p.arrived = true; bounce(p); }
+}
+let lastAnim = performance.now();
+function animate(now) {
+  const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
+  const running = !S.over && !S.paused, L = S.last;
+  if (running && L?.rps) {
+    spawnDebt += (L.rps / 30) * dt * S.speed;
+    const spots = layout();
+    while (spawnDebt >= 1 && particles.length < 300) { spawnDebt--; spawn(routeFor(spots, L)); }
+  }
+  let out = '';
+  for (const p of particles) {
+    if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt);
+    if (p.dead && p.kind === 'req') { bounce(p); p.kind = 'gone'; }
+    const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a;
+    const x = a.x + (b.x - a.x) * p.f, y = a.y + (b.y - a.y) * p.f + (p.kind === 'req' ? -5 : 5);
+    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
+    if (p.kind !== 'gone') out += `<rect x="${(x - 3.5).toFixed(1)}" y="${(y - 3.5).toFixed(1)}" width="7" height="7" fill="${color}" opacity="${Math.max(0, p.life).toFixed(2)}" style="filter:drop-shadow(0 0 4px ${color})"/>`;
+    if (p.kind === 'error' && p.seg === 0 && p.f < .25) out += `<text x="${x + 6}" y="${y - 4}" fill="#f87171" font-family="ui-monospace" font-size="11" font-weight="800">503</text>`;
+  }
+  for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0 || particles[i].kind === 'gone') particles.splice(i, 1);
+  $('fx').innerHTML = out;
+  requestAnimationFrame(animate);
+}
+
+// ───────── Map input: pan, zoom, select, connect ─────────
+const world = $('world');
+let drag = null;
+const toWorld = (e) => { const r = world.getBoundingClientRect(); return { x: (e.clientX - r.left - cam.x) / cam.k, y: (e.clientY - r.top - cam.y) / cam.k }; };
+world.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
+  camSet = true;
+  world.setPointerCapture(e.pointerId);
+  const node = e.target.closest('[data-type]'), link = e.target.closest('[data-link]');
+  if (link) { S.selected = { link: link.dataset.link }; renderAll(); return; }
+  if (node && (node.dataset.type === 'users' || CAN[node.dataset.type])) drag = { kind: 'link', from: node.dataset.type, unit: node.dataset.unit, sx: e.clientX, sy: e.clientY, start: toWorld(e) };
+  else if (node) drag = { kind: 'select', unit: node.dataset.unit, sx: e.clientX, sy: e.clientY };
+  else drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y, moved: false };
+});
+world.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 5;
+  if (drag.kind === 'pan') { if (moved) drag.moved = true; cam.x = drag.cx + e.clientX - drag.sx; cam.y = drag.cy + e.clientY - drag.sy; applyCam(); world.classList.add('panning'); }
+  if (drag.kind === 'link' && moved) {
+    drag.linking = true; world.classList.add('linking');
+    const p = toWorld(e);
+    $('temp').innerHTML = `<line class="link temp" x1="${drag.start.x}" y1="${drag.start.y}" x2="${p.x}" y2="${p.y}"/>`;
+  }
+});
+world.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag; drag = null; world.classList.remove('panning', 'linking'); $('temp').innerHTML = '';
+  if (d.kind === 'link' && d.linking) {
+    world.releasePointerCapture(e.pointerId);
+    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-type]');
+    if (target && target.dataset.type !== 'users') connect(d.from, target.dataset.type);
+    return;
+  }
+  if (d.kind === 'pan' && !d.moved) { S.selected = null; renderAll(); return; }
+  if ((d.kind === 'link' || d.kind === 'select') && d.unit) { S.selected = { unit: Number(d.unit) }; renderAll(); }
+});
+world.addEventListener('wheel', e => {
+  e.preventDefault(); camSet = true;
+  const r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const k = Math.min(2.2, Math.max(.35, cam.k * (e.deltaY < 0 ? 1.1 : .9)));
+  cam.x = mx - (mx - cam.x) * (k / cam.k); cam.y = my - (my - cam.y) * (k / cam.k); cam.k = k; applyCam();
+}, { passive: false });
+
+// Buttons around the map
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('#world')) return;
   const el = e.target.closest('button'); if (!el) return;
   if (el.dataset.build) buildUnit(el.dataset.build);
-  else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); render(); }
-  else if (el.dataset.req) { reqMode = el.dataset.req; particles.length = 0; render(); }
-  else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; render(); }
-  else if (el.dataset.unit) { S.selected = Number(el.dataset.unit); render(); }
+  else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); renderAll(); }
+  else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; renderAll(); }
+  else if (el.dataset.zoom) { const r = world.getBoundingClientRect(), k = Math.min(2.2, Math.max(.35, cam.k * Number(el.dataset.zoom))); cam.x = r.width / 2 - (r.width / 2 - cam.x) * (k / cam.k); cam.y = r.height / 2 - (r.height / 2 - cam.y) * (k / cam.k); cam.k = k; camSet = true; applyCam(); }
+  else if (el.dataset.act === 'fit') { camSet = false; fitCam(); }
+  else if (el.dataset.unlink) { delete S.links[el.dataset.unlink]; S.selected = null; log('Conexión quitada'); renderAll(); }
   else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
   else if (el.dataset.upgrade) upgradeDb(Number(el.dataset.upgrade));
-  else if (el.dataset.speed) { S.speed = Number(el.dataset.speed); render(); }
+  else if (el.dataset.speed) { S.speed = Number(el.dataset.speed); renderHud(); }
   else if (el.dataset.act === 'call') callNow();
-  else if (el.dataset.act === 'pause') { S.paused = !S.paused; render(); }
-  else if (el.dataset.act === 'restart') { reset(); render(); }
-  else if (el.dataset.act === 'tune') { tuneOpen = !tuneOpen; render(); }
+  else if (el.dataset.act === 'pause') { S.paused = !S.paused; renderHud(); }
+  else if (el.dataset.act === 'restart') { reset(); renderAll(); }
 });
-document.addEventListener('change', e => { const k = e.target.dataset?.tune; if (k) TUNE[k] = Number(e.target.value); });
 document.addEventListener('keydown', e => {
-  if (e.target.closest('input')) return;
   const t = Object.entries(TYPES).find(([, v]) => v.key === e.key); if (t) buildUnit(t[0]);
-  if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; render(); }
-  if (e.key === 'Escape') { S.selected = null; render(); }
+  if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; renderHud(); }
+  if (e.key === 'Escape') { S.selected = null; renderAll(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selected?.link) { delete S.links[S.selected.link]; S.selected = null; log('Conexión quitada'); renderAll(); }
 });
-reset(); render(); requestAnimationFrame(animate);
+addEventListener('resize', () => { if (!camSet) fitCam(); });
+
+reset(); fitCam(); renderAll(); requestAnimationFrame(animate);
 let lastFrame = performance.now();
 setInterval(() => {
   const now = performance.now(), real = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
-  if (S.over || S.paused) return;
+  if (S.over || S.paused) { if (S.over && !$('overlay').innerHTML) renderHud(); return; }
   const sim = real * S.speed, n = Math.ceil(sim / 0.1);
   for (let i = 0; i < n; i++) step(sim / n);
-  if (!document.querySelector('.tune input:focus')) render();
+  if (!drag) renderWorld();
+  renderHud();
 }, 100);
 </script>
 </body>
