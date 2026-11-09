@@ -10,7 +10,7 @@
 
 export const FEEDBACK_ENDPOINT = 'https://api.web3forms.com/submit';
 /** Web3Forms access key (sends to the owner's email). Empty: sending is off. */
-export const WEB3FORMS_KEY = '';
+export const WEB3FORMS_KEY = 'a4168522-5fbb-46df-8ba7-488da1ca3344';
 
 export const MIN_LENGTH = 5;
 export const MAX_LENGTH = 2000;
