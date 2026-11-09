@@ -1,6 +1,7 @@
 <!doctype html>
-<!-- PROTOTYPE, throwaway: does a real-time strategy loop (build phase, waves of users, money that grows, reputation) feel right?
-     Not part of the build and not using the real engine: a simple capacity model stands in for the simulation.
+<!-- PROTOTYPE, throwaway: does a real-time strategy loop feel right? A build phase, then ONE wave of users per level
+     (each level teaches one idea), money that grows by itself and per visit, reputation, the base drawn in C4 layers,
+     and every request visible as a dot. Not part of the build and not the real engine: a simple capacity model stands in.
      Open with the dev server at /prototypes/rts-loop.prototype.html. Tune the numbers with the ⚙ panel. -->
 <html lang="es">
 <head>
@@ -29,49 +30,66 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn.on { border-color: var(--accent); color: var(--accent); }
 .app { height: 100%; display: grid; grid-template-rows: 52px minmax(0, 1fr) 230px; }
 
-/* Top bar: resources */
-.bar { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--steel); border-bottom: 2px solid var(--line-strong); }
-.bar h1 { margin: 0 auto 0 0; font: 800 16px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+/* Top bar: level, resources */
+.bar { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--steel); border-bottom: 2px solid var(--line-strong); }
+.bar h1 { margin: 0; font: 800 16px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.levels { display: flex; gap: 4px; margin-right: auto; }
+.levels .btn { padding: 3px 8px; font-size: 11px; }
 .res { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: #060b0c; border: 1px solid var(--line); font: 800 14px var(--mono); white-space: nowrap; }
 .res .money { color: var(--star); font-size: 18px; text-shadow: 0 0 10px rgba(253,224,71,.35); }
 .res .rate { font-size: 12px; } .rate.up { color: var(--ok); } .rate.down { color: var(--bad); }
 .res .phase { color: var(--accent); }
-.rep { width: 120px; height: 10px; background: #0a1112; border: 1px solid var(--line-strong); }
-.rep span { display: block; height: 100%; background: var(--ok); -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); }
+.rep { width: 110px; height: 10px; background: #0a1112; border: 1px solid var(--line-strong); }
+.rep span { display: block; height: 100%; -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); }
 
-/* Field: the base */
+/* Field: the base, drawn in C4 layers */
 .field { position: relative; overflow: hidden; background-image: linear-gradient(rgba(62,224,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(62,224,200,.06) 1px, transparent 1px); background-size: 48px 48px; }
 .mission { position: absolute; top: 12px; left: 12px; width: 270px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); display: grid; gap: 6px; z-index: 2; }
-.mission ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 3px; }
+.mission ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 .mission li { display: flex; gap: 8px; align-items: center; }
 .mission li i { width: 12px; height: 12px; border: 2px solid var(--line-strong); flex: none; }
 .mission li.ok i { background: var(--ok); border-color: var(--ok); } .mission li.bad i { background: var(--bad); border-color: var(--bad); }
-.timeline { display: grid; gap: 2px; font-size: 12.5px; }
-.timeline div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
-.timeline div.now { color: var(--fg); font-weight: 700; } .timeline div.past { opacity: .45; text-decoration: line-through; }
-.lanes { position: absolute; inset: 0 0 0 300px; display: flex; align-items: center; justify-content: center; gap: 26px; padding: 20px; }
-.lane { display: grid; gap: 8px; justify-items: center; min-width: 96px; }
-.lane > .label { font-size: 10px; }
-.unit { position: relative; display: grid; justify-items: center; padding: 4px 6px 6px; border: 1px solid transparent; background: none; }
+.lesson { padding: 6px 8px; border-left: 3px solid var(--accent); background: rgba(62,224,200,.07); font-size: 13px; }
+.c4 { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; background: var(--steel); border: 1px solid var(--line-strong); }
+.c4 .label { margin-right: 8px; }
+.c4 button { padding: 3px 9px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 11.5px var(--mono); }
+.c4 button.on { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
+.scene { position: absolute; inset: 56px 16px 64px 300px; display: flex; align-items: center; justify-content: center; gap: 56px; }
+.crowd { display: grid; justify-items: center; gap: 4px; min-width: 110px; }
+.crowd .people { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; min-height: 48px; align-content: center; }
+.crowd .people i { width: 22px; height: 22px; background: no-repeat center/contain url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="%232aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="%2313262a" stroke="%233ee0c8" stroke-width="3"/></svg>'); }
+@keyframes pop { from { transform: scale(0); opacity: 0; } }
+.crowd .count { font: 800 13px var(--mono); }
+.crowd .wait { font-size: 12px; color: var(--muted); text-align: center; }
+.system { border: 1px solid rgba(62,224,200,.45); background: rgba(62,224,200,.03); padding: 10px 14px 14px; display: grid; gap: 8px; box-shadow: inset 0 0 40px rgba(62,224,200,.06); }
+.system > .label { font-size: 12px; } .system .kind { font: 400 11px system-ui; color: var(--muted); letter-spacing: 0; text-transform: none; text-shadow: none; }
+.zones { display: flex; align-items: center; gap: 34px; }
+.zone { border: 1px dashed rgba(140,165,161,.4); background: rgba(0,0,0,.28); padding: 8px 10px 10px; display: grid; gap: 6px; justify-items: center; min-width: 120px; }
+.zone .zname { font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; justify-self: start; }
+.zone .zname small { font: 400 11px system-ui; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.unit { position: relative; display: grid; justify-items: center; padding: 2px 6px 6px; border: 1px solid var(--line); background: linear-gradient(180deg, #132326, #0a1315); min-width: 96px; }
 .unit:hover { border-color: var(--line-strong); }
 .unit.selected { border-color: var(--ok); box-shadow: 0 0 14px rgba(74,222,128,.35); }
 .unit .name { font: 800 10.5px var(--mono); text-transform: uppercase; }
+.unit .sub { font-size: 10.5px; color: var(--muted); }
 .unit .load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
 .unit .load span { display: block; height: 100%; background: var(--ok); }
 .unit .load.medium span { background: var(--warn); } .unit .load.high span { background: var(--bad); }
-.unit .progress { position: absolute; left: 8px; right: 8px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
+.unit .progress { position: absolute; left: 10px; right: 10px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
 .unit .progress span { display: block; height: 100%; background: var(--warn); }
 .unit.building svg { opacity: .45; filter: grayscale(.6); }
-.unit.down svg { filter: grayscale(1) brightness(.6); }
-.empty-slot { width: 70px; height: 70px; border: 1px dashed var(--line-strong); display: grid; place-items: center; color: var(--muted); font-size: 11px; text-align: center; }
-.arrow { width: 26px; height: 2px; background: rgba(62,224,200,.5); position: relative; align-self: center; }
-.arrow.flow { background: repeating-linear-gradient(90deg, #b7fff4 0 4px, transparent 4px 10px); background-size: 20px 2px; animation: flow .5s linear infinite; }
-@keyframes flow { to { background-position: 20px 0; } }
-.banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; }
+.unit.down { border-color: var(--bad); } .unit.down svg { filter: grayscale(1) brightness(.6); }
+.container { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); background: rgba(19,35,38,.5); }
+.container > .name { font: 800 10.5px var(--mono); text-transform: uppercase; justify-self: start; }
+.empty { width: 96px; height: 70px; border: 1px dashed var(--line-strong); display: grid; place-items: center; color: var(--muted); font-size: 11px; }
+.ctx-buildings { display: flex; gap: 8px; align-items: center; }
+.ctx-buildings b { font: 800 12px var(--mono); }
+.banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; }
 .banner.warn { border-color: var(--warn); color: var(--warn); } .banner.bad { border-color: var(--bad); color: var(--bad); }
-.log { position: absolute; right: 12px; top: 12px; width: 250px; max-height: 210px; overflow: hidden; display: grid; gap: 2px; font: 12px var(--mono); }
-.log div { padding: 3px 8px; background: rgba(6,11,12,.85); border-left: 2px solid var(--accent); }
+.log { position: absolute; left: 12px; right: 330px; bottom: 8px; display: flex; gap: 6px; overflow: hidden; z-index: 2; font: 12px var(--mono); }
+.log div { flex: none; padding: 3px 8px; background: rgba(6,11,12,.9); border-left: 2px solid var(--accent); white-space: nowrap; }
 .log div.warn { border-left-color: var(--warn); } .log div.bad { border-left-color: var(--bad); } .log div.ok { border-left-color: var(--ok); }
+#fx { position: fixed; pointer-events: none; z-index: 4; }
 
 /* Console */
 .console { display: grid; grid-template-columns: 360px minmax(0, 1fr) 380px; border-top: 2px solid var(--line-strong); }
@@ -92,19 +110,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .card { padding: 4px 2px 0; display: grid; justify-items: center; background: linear-gradient(180deg, #16262a, #0a1214); border: 1px solid var(--line-strong); box-shadow: var(--bevel); border-radius: 2px; position: relative; }
 .card:hover:not(:disabled) { border-color: var(--accent); }
-.card:disabled { opacity: .4; cursor: default; }
+.card:disabled { opacity: .35; cursor: default; }
 .card .n { font: 700 9.5px var(--mono); text-transform: uppercase; }
 .card .c { width: 100%; text-align: center; font: 800 11px var(--mono); color: var(--star); background: #060b0c; margin-top: 2px; }
 .card .t { position: absolute; top: 2px; right: 4px; font: 700 9.5px var(--mono); color: var(--muted); }
 .card kbd { position: absolute; top: 2px; left: 4px; font: 700 9.5px var(--mono); color: var(--accent); }
 .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
-/* Tuning and end */
-.tune { position: absolute; right: 16px; top: 60px; z-index: 5; width: 300px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--warn); display: grid; gap: 6px; }
+.tune { position: absolute; right: 16px; top: 60px; z-index: 6; width: 300px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--warn); display: grid; gap: 6px; }
 .tune label { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: 12.5px; }
 .tune input { width: 70px; background: #060b0c; color: var(--fg); border: 1px solid var(--line-strong); padding: 2px 4px; font: 12px var(--mono); }
 .backdrop { position: fixed; inset: 0; background: rgba(2,7,6,.75); display: grid; place-items: center; z-index: 10; }
-.end { width: 420px; padding: 24px; background: var(--steel); border: 1px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
+.end { width: 440px; padding: 24px; background: var(--steel); border: 1px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
 .end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .end .stars { font-size: 38px; color: var(--star); letter-spacing: 4px; } .end .stars .off { color: var(--line-strong); }
 .proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
@@ -112,39 +129,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
 </head>
 <body>
 <div class="app" id="app"></div>
+<canvas id="fx"></canvas>
 <span class="proto">PROTOTIPO · MODELO SIMPLIFICADO, NO ES EL MOTOR REAL</span>
 <script>
 // ───────── Tunable numbers (⚙ panel) ─────────
-const TUNE = {
-  startMoney: 150,      // $ at the start
-  passive: 2,           // $ per second, always
-  per100Visits: 1,      // $ per 100 requests served
-  upkeepFactor: 100,    // monthly cost / this = $ per second of upkeep
-  buildPhase: 30,       // seconds before the first users
-  refund: 0.5,          // share of the price back when removing a building
-};
-const TUNE_LABELS = { startMoney: 'Dinero inicial ($)', passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 visitas', upkeepFactor: 'Mantenimiento: coste/mes ÷', buildPhase: 'Fase de construcción (s)', refund: 'Devolución al quitar (0–1)' };
+const TUNE = { passive: 2, per100Visits: 1, upkeepFactor: 100, buildPhase: 30, refund: 0.5 };
+const TUNE_LABELS = { passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 visitas', upkeepFactor: 'Mantenimiento: coste/mes ÷', buildPhase: 'Fase de construcción (s)', refund: 'Devolución al quitar (0–1)' };
 
-// ───────── Level: "Venta flash" style, with waves and an incident ─────────
-const LEVEL = { title: 'Venta flash', p95: 200, maxErrors: 0.01, starMoney: [150, 220] };
-const waves = () => {
-  const b = TUNE.buildPhase;
-  return [
-    { from: b, to: b + 30, rps: 180, name: 'Oleada 1 · tráfico normal' },
-    { from: b + 30, to: b + 60, rps: 420, name: 'Oleada 2 · venta flash' },
-    { from: b + 60, to: b + 90, rps: 420, name: 'Oleada 3 · se cae un servidor', incident: true },
-  ];
-};
-const endTime = () => waves().at(-1).to;
+// ───────── Three mini-levels: ONE wave each, ONE idea each ─────────
+const LEVELS = [
+  { id: 'spike', title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
+    allowed: ['loadBalancer', 'appServer', 'database'], start: 150, wave: { rps: 300, length: 45 }, stars: [110, 150] },
+  { id: 'cache', title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
+    allowed: ['loadBalancer', 'appServer', 'cache', 'database'], start: 200, wave: { rps: 420, length: 45 }, stars: [130, 180], noUpgrade: true },
+  { id: 'n1', title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
+    allowed: ['loadBalancer', 'appServer', 'database'], start: 220, wave: { rps: 300, length: 50, incidentAt: 20 }, stars: [110, 160] },
+];
+let level = LEVELS[0];
+const P95 = 200, MAX_ERR = 0.01;
+const waveFrom = () => TUNE.buildPhase, waveTo = () => TUNE.buildPhase + level.wave.length;
 
 // ───────── Buildings ─────────
 const TYPES = {
-  loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
-  appServer: { name: 'Fábrica', comp: 'App server', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
-  cache: { name: 'Generador', comp: 'Caché', color: '#f59e0b', price: 30, monthly: 30, build: 6, hit: 0.6, key: '3' },
-  database: { name: 'Silos', comp: 'Base de datos', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
+  loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', zone: 'edge', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
+  appServer: { name: 'Fábrica', comp: 'App server', zone: 'app', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
+  cache: { name: 'Generador', comp: 'Caché', zone: 'data', color: '#f59e0b', price: 30, monthly: 30, build: 6, hit: 0.6, key: '3' },
+  database: { name: 'Silos', comp: 'Base de datos', zone: 'data', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
 };
 const DB_UPGRADE = { price: 100, monthly: 100, cap: 800 };
+const ZONES = [['edge', 'Borde'], ['app', 'Aplicación'], ['data', 'Datos']];
 
 function shade(hex, f) { const t = f > 0 ? 255 : 0, k = Math.abs(f); return '#' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).map(v => Math.round(v + (t - v) * k).toString(16).padStart(2, '0')).join(''); }
 const P = (pts) => pts.map(p => p.join(',')).join(' ');
@@ -161,49 +174,50 @@ function building(type, size) {
   const p = { base: c, light: shade(c, .25), dark: shade(c, -.45), top: shade(c, .45), glow: shade(c, .6) };
   return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
 }
-const person = `<svg width="56" height="56" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="#2aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="#13262a" stroke="#3ee0c8"/></svg>`;
 
 // ───────── State ─────────
-let S;
-function reset() {
-  S = { t: 0, money: TUNE.startMoney, rep: 100, units: [], nextId: 1, selected: null, speed: 1, paused: false, over: null,
-    hist: [], last: null, log: [], earlyBonus: 0, incidentDone: false, waveIdx: -1, startedEarly: false, minMoney: TUNE.startMoney };
-  log('Fase de construcción: prepara tu base antes de que lleguen los usuarios.', 'ok');
+let S, layer = 3, tuneOpen = false;
+function reset(next = level) {
+  level = next;
+  S = { t: 0, money: level.start, rep: 100, units: [], nextId: 1, selected: null, speed: 1, paused: false, over: null,
+    hist: [], last: null, log: [], incidentDone: false, waveStarted: false, visits: 0 };
+  log(`${level.title}: prepara tu base. Los usuarios llegan en ${TUNE.buildPhase} s.`, 'ok');
+  particles.length = 0;
 }
-function log(text, kind = '') { S.log.unshift({ text: `[${fmt(S.t)}] ${text}`, kind }); S.log = S.log.slice(0, 8); }
+function log(text, kind = '') { S.log.unshift({ text: `[${fmt(S.t)}] ${text}`, kind }); S.log = S.log.slice(0, 6); }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ready = (type) => S.units.filter(u => u.type === type && u.ready && !u.down);
 const upkeepPerS = () => S.units.reduce((sum, u) => sum + (u.upgraded ? DB_UPGRADE.monthly : TYPES[u.type].monthly), 0) / TUNE.upkeepFactor;
-const currentWave = () => waves().find(w => S.t >= w.from && S.t < w.to) ?? null;
+const inWave = () => S.t >= waveFrom() && S.t < waveTo();
 
 function buildUnit(type) {
   const spec = TYPES[type];
-  if (S.over || S.money < spec.price) return;
+  if (S.over || S.money < spec.price || !level.allowed.includes(type)) return;
   S.money -= spec.price;
   const count = S.units.filter(u => u.type === type).length + 1;
   const id = S.nextId++;
-  S.units.push({ id, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, ready: false, down: false, upgraded: false });
+  S.units.push({ id, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, total: spec.build, ready: false, down: false, upgraded: false });
   S.selected = id;
+  if (layer === 1) layer = 3; // layer 1 shows no buildings: show the new one
   log(`Construyendo ${spec.name} (${spec.build} s)`);
   render();
 }
 function removeUnit(id) {
   const u = S.units.find(x => x.id === id); if (!u) return;
-  S.money += Math.round(TYPES[u.type].price * TUNE.refund);
-  S.units = S.units.filter(x => x.id !== id); S.selected = null;
-  log(`${TYPES[u.type].name} quitado: +$${Math.round(TYPES[u.type].price * TUNE.refund)}`);
-  render();
+  const back = Math.round(TYPES[u.type].price * TUNE.refund);
+  S.money += back; S.units = S.units.filter(x => x.id !== id); S.selected = null;
+  log(`${TYPES[u.type].name} quitado: +$${back}`); render();
 }
 function upgradeDb(id) {
   const u = S.units.find(x => x.id === id);
-  if (!u || u.upgraded || S.money < DB_UPGRADE.price) return;
-  S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = 6;
-  log('Mejorando la base de datos a tier Medium (6 s)', 'warn'); render();
+  if (!u || u.upgraded || level.noUpgrade || S.money < DB_UPGRADE.price) return;
+  S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = u.total = 6;
+  log('Mejorando los silos a tier Medium (6 s)', 'warn'); render();
 }
 function callNow() {
   if (S.t >= TUNE.buildPhase) return;
   const bonus = Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2);
-  S.money += bonus; S.t = TUNE.buildPhase; S.startedEarly = true;
+  S.money += bonus; S.t = TUNE.buildPhase;
   log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); render();
 }
 
@@ -212,20 +226,15 @@ function step(dt) {
   if (S.over || S.paused) return;
   S.t += dt;
   for (const u of S.units) if (!u.ready) { u.left -= dt; if (u.left <= 0) { u.ready = true; log(`${TYPES[u.type].name}${u.type === 'appServer' ? ' ' + u.label : ''} lista`, 'ok'); } }
-
-  const w = currentWave();
-  const idx = w ? waves().indexOf(w) : -1;
-  if (idx !== S.waveIdx && w) { S.waveIdx = idx; log(w.name, 'warn'); }
-  if (w?.incident && !S.incidentDone) {
+  if (inWave() && !S.waveStarted) { S.waveStarted = true; log(`¡Llegan los usuarios! ${level.wave.rps} req/s`, 'warn'); }
+  if (level.wave.incidentAt && !S.incidentDone && S.t >= waveFrom() + level.wave.incidentAt) {
     const victim = ready('appServer')[0];
     if (victim) { victim.down = true; log(`¡${victim.label} se ha caído!`, 'bad'); }
     S.incidentDone = true;
   }
-  const rps = w ? w.rps : 0;
-  const apps = ready('appServer'), lbs = ready('loadBalancer'), caches = ready('cache'), dbs = ready('database');
-  const db = dbs[0];
-  // Without a load balancer only the first app server receives traffic.
-  const usableApps = lbs.length ? apps.length : Math.min(1, apps.length);
+  const rps = inWave() ? level.wave.rps : 0;
+  const apps = ready('appServer'), lbs = ready('loadBalancer'), caches = ready('cache'), db = ready('database')[0];
+  const usableApps = lbs.length ? apps.length : Math.min(1, apps.length); // without a load balancer only one app gets traffic
   const appCap = usableApps * TYPES.appServer.cap;
   const dbCap = db ? (db.upgraded ? DB_UPGRADE.cap : TYPES.database.cap) : 0;
   const hit = caches.length ? TYPES.cache.hit : 0;
@@ -235,23 +244,87 @@ function step(dt) {
   const served = db ? byApps * hit + byDb : 0;
   const errors = rps ? (rps - served) / rps : 0;
   const rhoApp = appCap ? Math.min(byApps / appCap, .97) : 1, rhoDb = dbCap ? Math.min(toDb / dbCap, .97) : 1;
-  const lat = (20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0);
-  const p95 = rps ? Math.min(2000, Math.round(lat)) : 0;
-  const revenue = (served / 100) * TUNE.per100Visits;
-  const upkeep = upkeepPerS();
-  const net = TUNE.passive + revenue - upkeep;
-  S.money += net * dt;
-  S.minMoney = Math.min(S.minMoney, S.money);
-  S.last = { rps, served, errors, p95, revenue, upkeep, net, rhoApp, rhoDb, usableApps, appsReady: apps.length, hit };
+  const p95 = rps ? Math.min(2000, Math.round((20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0))) : 0;
+  const revenue = (served / 100) * TUNE.per100Visits, upkeep = upkeepPerS(), net = TUNE.passive + revenue - upkeep;
+  S.money += net * dt; S.visits += served * dt;
+  S.last = { rps, served, errors, p95, revenue, upkeep, net, rhoApp, rhoDb, usableApps, hit,
+    dropAtApps: rps ? 1 - byApps / rps : 0, dropAtDb: toDb ? 1 - byDb / toDb : (db ? 0 : 1) };
   if (rps) {
-    const badLat = p95 > LEVEL.p95, badErr = errors > LEVEL.maxErrors;
-    S.rep += (badErr ? -6 : badLat ? -3 : 1) * dt;
+    S.rep += (errors > MAX_ERR ? -6 : p95 > P95 ? -4 : 1) * dt;
     S.rep = Math.max(0, Math.min(100, S.rep));
     if (S.rep <= 0) { S.over = 'lost'; log('Reputación a 0: los usuarios se han ido.', 'bad'); }
   }
-  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ t: S.t, rps, p95, errors, money: S.money });
-  if (S.money < 0) { S.over = 'lost'; log('Sin dinero: no puedes pagar el mantenimiento.', 'bad'); }
-  if (!S.over && S.t >= endTime()) S.over = 'won';
+  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ rps, p95, errors });
+  if (S.money < 0) { S.over = 'lost'; log('Sin dinero para el mantenimiento.', 'bad'); }
+  if (!S.over && S.t >= waveTo()) S.over = 'won';
+}
+
+// ───────── Requests as dots (canvas over the field) ─────────
+const particles = [];
+let spawnDebt = 0;
+const centerOf = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+function pathFor() {
+  // Where a request goes, as screen points, following the C4 layer on screen.
+  const pts = [centerOf('[data-node="users"]')];
+  if (layer === 1) { pts.push(centerOf('[data-node="system"]')); return { pts, dropAt: null }; }
+  const L = S.last ?? {};
+  const lb = document.querySelector('[data-node="loadBalancer"]:not(.building)');
+  if (lb) pts.push(centerOf('[data-node="loadBalancer"]:not(.building)'));
+  const appEls = [...document.querySelectorAll('[data-node="appServer"].live')];
+  const usable = layer === 3 ? (lb ? appEls : appEls.slice(0, 1)) : appEls;
+  if (!usable.length) return { pts, dropAt: pts.length - 1, fail: true };
+  const a = usable[Math.floor(Math.random() * usable.length)].getBoundingClientRect();
+  pts.push({ x: a.left + a.width / 2, y: a.top + a.height / 2 });
+  if (Math.random() < (L.dropAtApps ?? 0)) return { pts, dropAt: pts.length - 1, fail: true };
+  const cache = document.querySelector('[data-node="cache"].live');
+  if (cache) { pts.push(centerOf('[data-node="cache"].live')); if (Math.random() < (L.hit ?? 0)) return { pts, dropAt: null }; }
+  const db = document.querySelector('[data-node="database"].live');
+  if (!db) return { pts, dropAt: pts.length - 1, fail: true };
+  pts.push(centerOf('[data-node="database"].live'));
+  if (Math.random() < (L.dropAtDb ?? 0)) return { pts, dropAt: pts.length - 1, fail: true };
+  return { pts, dropAt: null };
+}
+const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
+let lastAnim = performance.now();
+function animate(now) {
+  const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
+  const field = document.querySelector('.field');
+  if (field) {
+    const r = field.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    if (fx.width !== Math.round(r.width * dpr) || fx.height !== Math.round(r.height * dpr)) { fx.width = Math.round(r.width * dpr); fx.height = Math.round(r.height * dpr); }
+    Object.assign(fx.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    ctx.setTransform(dpr, 0, 0, dpr, -r.left * dpr, -r.top * dpr);
+    ctx.clearRect(r.left, r.top, r.width, r.height);
+    const running = !S.over && !S.paused;
+    // One dot stands for about 25 requests.
+    if (running && S.last?.rps) {
+      spawnDebt += (S.last.rps / 25) * dt * S.speed;
+      while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; const p = pathFor(); if (p.pts.every(Boolean)) particles.push({ ...p, seg: 0, f: 0, life: 1 }); }
+    }
+    for (const p of particles) {
+      if (running) {
+        if (p.dead) p.life -= dt * 2;
+        else {
+          const a = p.pts[p.seg], b = p.pts[p.seg + 1];
+          if (!b) { p.done = true; p.life -= dt * 4; }
+          else {
+            p.f += (260 * dt * Math.min(S.speed, 2)) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+            if (p.f >= 1) { p.seg++; p.f = 0; if (p.dropAt !== null && p.seg >= p.dropAt) p.dead = true; }
+          }
+        }
+      }
+      const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a;
+      const x = a.x + (b.x - a.x) * p.f, y = a.y + (b.y - a.y) * p.f + (p.dead ? (1 - p.life) * 18 : 0);
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.dead ? '#f87171' : p.done ? '#4ade80' : '#b7fff4';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(x, y, p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill();
+      if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+  requestAnimationFrame(animate);
 }
 
 // ───────── Render ─────────
@@ -261,55 +334,79 @@ const spark = (vals, max, color, limit) => {
   const lim = limit ? `<line x1="0" x2="${w}" y1="${h - (limit / max) * (h - 2) - 1}" y2="${h - (limit / max) * (h - 2) - 1}" stroke="#f87171" stroke-dasharray="3 3" opacity=".7"/>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${lim}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
 };
-let tuneOpen = false;
-function unitHtml(u) {
-  const rho = u.type === 'appServer' ? S.last?.rhoApp : u.type === 'database' ? S.last?.rhoDb : u.type === 'cache' && S.last?.rps ? .1 : u.type === 'loadBalancer' && S.last?.rps ? .05 : 0;
-  const lvl = rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '';
-  const idle = u.type === 'appServer' && u.ready && !u.down && S.last && !ready('loadBalancer').length && ready('appServer')[0] !== u;
-  return `<button class="unit ${u.ready ? '' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" title="${TYPES[u.type].name}">
-    ${building(u.type, 60)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / (u.upgraded ? 6 : TYPES[u.type].build)) * 100}%"></span></span>` : ''}
-    <span class="name">${u.label}${u.down ? ' · caído' : idle ? ' · sin tráfico' : ''}</span>
-    ${u.ready && !u.down ? `<span class="load ${lvl}"><span style="width:${Math.round((idle ? 0 : rho || 0) * 100)}%"></span></span>` : ''}</button>`;
+const loadOf = (type) => (S.last?.rps ? (type === 'appServer' ? S.last.rhoApp : type === 'database' ? S.last.rhoDb : type === 'cache' ? .1 : .05) : 0);
+const lvl = (rho) => (rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '');
+function unitHtml(u, size = 54) {
+  const idle = u.type === 'appServer' && u.ready && !u.down && !ready('loadBalancer').length && ready('appServer')[0] !== u;
+  const rho = idle ? 0 : loadOf(u.type);
+  return `<button class="unit ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}" ${u.down ? 'data-down' : ''}>
+    ${building(u.type, size)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / u.total) * 100}%"></span></span>` : ''}
+    <span class="name">${u.label}</span>
+    <span class="sub">${u.down ? 'caído' : !u.ready ? `en obra · ${Math.ceil(u.left)} s` : idle ? 'sin tráfico' : u.type === 'database' ? (u.upgraded ? 'Medium' : 'Small') : ''}</span>
+    ${u.ready && !u.down ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
 }
-function lane(type, title) {
-  const units = S.units.filter(u => u.type === type);
-  return `<div class="lane"><span class="label">${title}</span>${units.length ? units.map(unitHtml).join('') : `<div class="empty-slot">vacío</div>`}</div>`;
+function zoneInner(zone) {
+  const units = S.units.filter(u => TYPES[u.type].zone === zone);
+  if (!units.length) return `<div class="empty">vacío</div>`;
+  if (layer === 2) {
+    // Layer 2: one card per component, instances folded into × N.
+    return [...new Set(units.map(u => u.type))].map(type => {
+      const all = units.filter(u => u.type === type), live = all.filter(u => u.ready && !u.down);
+      const rho = loadOf(type);
+      return `<button class="unit ${live.length ? 'live' : 'building'}" data-node="${type}" data-unit="${all[0].id}">${building(type, 54)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
+        <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
+    }).join('');
+  }
+  // Layer 3: every instance; app servers sit inside their container.
+  const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer');
+  return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 44)).join('')}</div>` : '');
+}
+function systemHtml() {
+  if (layer === 1) {
+    const counts = Object.keys(TYPES).map(t => [t, S.units.filter(u => u.type === t).length]).filter(([, n]) => n);
+    return `<div class="system" data-node="system" style="min-width:300px"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
+      <div class="ctx-buildings">${counts.length ? counts.map(([t, n]) => `${building(t, 48)}${n > 1 ? `<b>× ${n}</b>` : ''}`).join('') : '<span class="muted">aún sin edificios</span>'}</div>
+      <span class="muted" style="font-size:12px">${S.units.length} edificios · mantenimiento $${upkeepPerS().toFixed(1)}/s · cambia a la capa 3 para ver cada uno</span></div>`;
+  }
+  return `<div class="system"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
+    <div class="zones">${ZONES.map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
 }
 function render() {
-  const w = currentWave(), inBuild = S.t < TUNE.buildPhase, L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS(), served: 0 };
-  const phase = inBuild ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : w ? `${w.name.split(' · ')[0].toUpperCase()} · ${fmt(w.to - S.t)}` : 'FIN';
+  const wave = inWave(), building_ = S.t < TUNE.buildPhase;
+  const L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS(), served: 0 };
+  const phase = building_ ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : wave ? `OLEADA · ${fmt(waveTo() - S.t)}` : 'FIN';
   const sel = S.units.find(u => u.id === S.selected);
-  const flowing = L.rps > 0;
-  const banner = inBuild ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>` : w ? `<div class="banner ${w.incident ? 'bad' : 'warn'}">${w.name} · ${w.rps} req/s</div>` : '';
+  const people = wave ? Math.min(16, Math.ceil(level.wave.rps / 30)) : 0;
+  const banner = building_ ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
+    : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
   document.getElementById('app').innerHTML = `
   <header class="bar">
-    <h1>${LEVEL.title}</h1>
+    <h1>${level.title}</h1>
+    <span class="levels">${LEVELS.map((l, i) => `<button class="btn ${l === level ? 'on' : ''}" data-level="${i}">Nivel ${i + 1}</button>`).join('')}</span>
     <span class="res">💰 <span class="money">$${Math.floor(S.money)}</span><span class="rate ${L.net >= 0 ? 'up' : 'down'}">${L.net >= 0 ? '+' : ''}${L.net.toFixed(1)}/s</span></span>
     <span class="res">⏱ <span class="phase">${phase}</span></span>
-    <span class="res">❤ REPUTACIÓN <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>
-    <button class="btn" data-act="tune">⚙ Números</button>
+    <span class="res">❤ <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>
+    <button class="btn" data-act="tune">⚙</button>
   </header>
   <main class="field">
     <section class="mission">
       <span class="label">Misión</span>
-      <span class="muted">Aguanta las 3 oleadas sin que la reputación llegue a 0. Las estrellas dependen del dinero que te quede.</span>
+      <div class="lesson">${level.lesson}</div>
+      <span class="muted">Una oleada de ${level.wave.rps} req/s durante ${level.wave.length} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero final.</span>
       <ul>
-        <li class="${!L.rps ? '' : L.p95 <= LEVEL.p95 ? 'ok' : 'bad'}"><i></i>p95 ≤ ${LEVEL.p95} ms</li>
-        <li class="${!L.rps ? '' : L.errors <= LEVEL.maxErrors ? 'ok' : 'bad'}"><i></i>Errores ≤ ${LEVEL.maxErrors * 100}%</li>
+        <li class="${!L.rps ? '' : L.p95 <= P95 ? 'ok' : 'bad'}"><i></i>p95 ≤ ${P95} ms</li>
+        <li class="${!L.rps ? '' : L.errors <= MAX_ERR ? 'ok' : 'bad'}"><i></i>Errores ≤ ${MAX_ERR * 100}%</li>
       </ul>
-      <span class="label">Cronología</span>
-      <div class="timeline">
-        <div class="${inBuild ? 'now' : 'past'}"><span>Construcción</span><span>0:00</span></div>
-        ${waves().map(x => `<div class="${S.t >= x.to ? 'past' : x === w ? 'now' : ''}"><span>${x.name.split(' · ')[1]} · ${x.rps} req/s</span><span>${fmt(x.from)}</span></div>`).join('')}
-      </div>
     </section>
+    <div class="c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
     ${banner}
-    <div class="lanes">
-      <div class="lane"><span class="label">Usuarios</span>${person}<span class="name" style="font:800 11px var(--mono)">${L.rps} req/s</span></div>
-      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('loadBalancer', 'Borde')}
-      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('appServer', 'Aplicación')}
-      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('cache', 'Caché')}
-      <span class="arrow ${flowing ? 'flow' : ''}"></span>${lane('database', 'Datos')}
+    <div class="scene">
+      <div class="crowd" data-node="users">
+        <span class="label">Usuarios</span>
+        <div class="people">${Array.from({ length: people }, (_, i) => `<i></i>`).join('')}</div>
+        ${wave ? `<span class="count">${L.rps} req/s</span><span class="wait">${Math.round(S.visits).toLocaleString('es')} visitas atendidas</span>` : `<span class="wait">${building_ ? 'esperando…' : 'se han ido'}</span>`}
+      </div>
+      ${systemHtml()}
     </div>
     <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>
   </main>
@@ -317,8 +414,8 @@ function render() {
     <section class="frame"><span class="label">Resultados en vivo</span>
       <div class="charts">
         <div class="chart">RPS${spark(S.hist.map(h => h.rps), 500, '#3ee0c8')}<b>${L.rps}</b></div>
-        <div class="chart">P95${spark(S.hist.map(h => h.p95), 600, '#fbbf24', LEVEL.p95)}<b class="${L.p95 > LEVEL.p95 ? 'bad' : ''}">${L.p95} ms</b></div>
-        <div class="chart">ERRORES${spark(S.hist.map(h => h.errors), .5, '#f87171', LEVEL.maxErrors)}<b class="${L.errors > LEVEL.maxErrors ? 'bad' : ''}">${(L.errors * 100).toFixed(1)}%</b></div>
+        <div class="chart">P95${spark(S.hist.map(h => h.p95), 600, '#fbbf24', P95)}<b class="${L.p95 > P95 ? 'bad' : ''}">${L.p95} ms</b></div>
+        <div class="chart">ERRORES${spark(S.hist.map(h => h.errors), .5, '#f87171', MAX_ERR)}<b class="${L.errors > MAX_ERR ? 'bad' : ''}">${(L.errors * 100).toFixed(1)}%</b></div>
       </div>
       <div class="econ"><span class="muted">Ingreso fijo</span><span>+$${TUNE.passive.toFixed(1)}/s</span><span class="muted">Visitas atendidas</span><span>+$${L.revenue.toFixed(1)}/s</span><span class="muted">Mantenimiento</span><span>−$${L.upkeep.toFixed(1)}/s</span></div>
     </section>
@@ -330,19 +427,18 @@ function render() {
           ${sel.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
           ${sel.type === 'database' ? `<span class="muted">Capacidad</span><span>${sel.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${sel.upgraded ? 'Medium' : 'Small'})</span>` : ''}
           ${sel.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
-          ${sel.type === 'loadBalancer' ? `<span class="muted">Efecto</span><span>reparte entre ${ready('appServer').length} app servers</span>` : ''}
+          ${sel.type === 'loadBalancer' ? `<span class="muted">Efecto</span><span>reparte entre ${ready('appServer').length} fábricas</span>` : ''}
         </div>
         <div class="controls">
-          ${sel.type === 'database' && !sel.upgraded ? `<button class="btn" data-upgrade="${sel.id}" ${S.money < DB_UPGRADE.price ? 'disabled' : ''}>Mejorar a Medium · $${DB_UPGRADE.price}</button>` : ''}
+          ${sel.type === 'database' && !sel.upgraded ? `<button class="btn" data-upgrade="${sel.id}" ${S.money < DB_UPGRADE.price || level.noUpgrade ? 'disabled' : ''}>${level.noUpgrade ? 'Tier fijo en este nivel' : `Mejorar a Medium · $${DB_UPGRADE.price}`}</button>` : ''}
           <button class="btn" data-remove="${sel.id}">Quitar · +$${Math.round(TYPES[sel.type].price * TUNE.refund)}</button>
         </div>`
-      : `<p class="muted">Selecciona un edificio de tu base para ver su estado. Construye con la tarjeta de la derecha o con las teclas 1–4.</p>
-         <p class="muted">Pista: sin torre de enlace, solo la primera fábrica recibe tráfico.</p>`}
+      : `<p class="muted">Selecciona un edificio para ver su estado. Construye con la tarjeta de la derecha o con las teclas 1–4.</p>`}
     </section>
     <section class="frame build"><span class="label">Construir</span>
-      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over ? 'disabled' : ''}><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${building(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
+      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over || !level.allowed.includes(k) ? 'disabled' : ''} title="${level.allowed.includes(k) ? '' : 'No disponible en este nivel'}"><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${building(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
       <div class="controls">
-        ${inBuild ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
+        ${building_ ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
         <button class="btn ${S.paused ? 'on' : ''}" data-act="pause">${S.paused ? '▶ Seguir' : '⏸ Pausa'}</button>
         ${[1, 2, 4].map(x => `<button class="btn ${S.speed === x ? 'on' : ''}" data-speed="${x}">${x}×</button>`).join('')}
         <button class="btn" data-act="restart">↺</button>
@@ -354,13 +450,14 @@ function render() {
 }
 function endHtml() {
   const won = S.over === 'won';
-  const stars = won ? 1 + LEVEL.starMoney.filter(m => S.money >= m).length : 0;
+  const stars = won ? 1 + level.stars.filter(m => S.money >= m).length : 0;
+  const next = LEVELS[LEVELS.indexOf(level) + 1];
   return `<div class="backdrop"><div class="end">
     <div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
     <h2 style="color:${won ? 'var(--ok)' : 'var(--bad)'}">${won ? 'Base defendida' : 'Base perdida'}</h2>
-    <div class="muted">Dinero final <b style="color:var(--star)">$${Math.floor(S.money)}</b> · Reputación ${Math.round(S.rep)}% · Edificios ${S.units.length}</div>
-    <div class="muted">★★ con $${LEVEL.starMoney[0]} · ★★★ con $${LEVEL.starMoney[1]}</div>
-    <button class="btn go" data-act="restart">↺ Jugar otra vez</button></div></div>`;
+    <div class="muted">Dinero final <b style="color:var(--star)">$${Math.floor(S.money)}</b> · ${Math.round(S.visits).toLocaleString('es')} visitas · reputación ${Math.round(S.rep)}%</div>
+    <div class="muted">★★ con $${level.stars[0]} · ★★★ con $${level.stars[1]}</div>
+    <div class="controls" style="justify-content:center"><button class="btn" data-act="restart">↺ Otra vez</button>${won && next ? `<button class="btn go" data-level="${LEVELS.indexOf(next)}">Nivel ${LEVELS.indexOf(next) + 1} ▶</button>` : ''}</div></div></div>`;
 }
 
 // ───────── Input and loop ─────────
@@ -369,6 +466,8 @@ document.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   const el = e.target.closest('button'); if (!el) return;
   if (el.dataset.build) buildUnit(el.dataset.build);
+  else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); render(); }
+  else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; render(); }
   else if (el.dataset.unit) { S.selected = Number(el.dataset.unit); render(); }
   else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
   else if (el.dataset.upgrade) upgradeDb(Number(el.dataset.upgrade));
@@ -385,7 +484,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; render(); }
   if (e.key === 'Escape') { S.selected = null; render(); }
 });
-reset(); render();
+reset(); render(); requestAnimationFrame(animate);
 let lastFrame = performance.now();
 setInterval(() => {
   const now = performance.now(), real = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
