@@ -7,6 +7,7 @@ import { Stars } from './reportCard';
 import { FeedbackButton } from './feedbackDialog';
 import { archiveHref, baseHref } from './routes';
 import { Building, buildingName } from './componentArt';
+import { newTypesIn } from '../archive/archive';
 
 type Props = { levels: LevelDefinition[]; progress: Progress; notice: string | null; storageWorks: boolean; onReset: () => void };
 
@@ -109,7 +110,6 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
   const [selectedId, setSelectedId] = useState(currentId ?? ids[ids.length - 1] ?? '');
   const selected = levels.find(l => l.id === selectedId) ?? levels[0]!;
   const selectedIndex = ids.indexOf(selected.id);
-  const newTypes = selected.allowedComponents.filter(type => !levels.slice(0, selectedIndex).some(l => l.allowedComponents.includes(type)));
 
   return (
     <main className="campaign">
@@ -158,7 +158,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
                       const number = ids.indexOf(level.id) + 1;
                       const state = stateOf(level);
                       const bestMode = progress.levels[level.id]?.bestMode;
-                      const teaches = level.allowedComponents.find(type => !levels.slice(0, number - 1).some(l => l.allowedComponents.includes(type)));
+                      const teaches = newTypesIn(levels, level.id)[0];
                       const { x, y } = points[i]!;
                       return (
                         <li key={level.id} className={`campaign-node ${state} ${bestMode ? `mode-${bestMode}` : ''} ${level.id === selected.id ? 'selected' : ''}`}
@@ -188,7 +188,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
           })}
           <p className="campaign-soon">{t.levelSelect.moreSectors}</p>
         </div>
-        <Briefing level={selected} number={selectedIndex + 1} state={stateOf(selected)} newTypes={newTypes} progress={progress} />
+        <Briefing level={selected} number={selectedIndex + 1} state={stateOf(selected)} newTypes={newTypesIn(levels, selected.id)} progress={progress} />
       </div>
 
       <footer className="home-footer">

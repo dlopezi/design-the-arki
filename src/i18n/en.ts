@@ -302,14 +302,14 @@ export const en = {
     howItWorks: 'How it works',
     steps: ['Pass a level', 'Its design becomes a district', 'Your base grows'],
     stepNotes: ['In any mode', 'One building per instance you used', 'One district per level passed'],
-    reportLine: (n: number) => `+${n} building${n === 1 ? '' : 's'} in your base`,
+    reportLine: (n: number) => `This level's district in your base: ${n} building${n === 1 ? '' : 's'}`,
     view: 'View your base',
   },
   c4: {
     label: 'C4 view',
     layers: { 1: 'Context', 2: 'Containers', 3: 'Components' } as Record<1 | 2 | 3, string>,
     help: 'C4 model layers: 1 shows the system as one box, 2 its containers, 3 every component and instance.',
-    contextSummary: (n: number) => `${n} building${n === 1 ? '' : 's'}: switch to layer 3 to see each one`,
+    contextSummary: (n: number, cost: number) => `${n} building${n === 1 ? '' : 's'} · $${cost}/month. Switch to layer 3 to see each one.`,
   },
 };
 export type Strings = typeof en;

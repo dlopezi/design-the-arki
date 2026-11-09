@@ -6,6 +6,7 @@ import { t, percent } from '../i18n';
 import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/levels';
 import { CostMeter } from './costMeter';
 import { buildingCount } from '../base/base';
+import { newTypesIn } from '../archive/archive';
 import { componentArt } from './componentArt';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes, type C4Layer } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
@@ -554,7 +555,7 @@ export function App() {
   const next = ids[ids.indexOf(level.id) + 1];
   return (
     <ReactFlowProvider key={`${level.id}/${mode}`}>
-      <Game level={level} newTypes={level.allowedComponents.filter(type => !levels.slice(0, ids.indexOf(level.id)).some(l => l.allowedComponents.includes(type)))} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
+      <Game level={level} newTypes={newTypesIn(levels, level.id)} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
         nextLevelId={next ?? null}
         onDesignChange={design => update(p => withDesign(p, level.id, mode, design))}
         onPassed={(stars, design) => update(p => withPass(p, level.id, stars, mode, design))}

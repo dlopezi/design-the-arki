@@ -1,6 +1,6 @@
 import { BaseEdge, getBezierPath, Handle, Position, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
 import { catalog } from '../catalog/catalog';
-import { hitRateOf } from '../engine/simulate';
+import { designCost, hitRateOf } from '../engine/simulate';
 import type { Design, Presentation, Result } from '../engine/types';
 import { t } from '../i18n';
 import { artStyle, ComponentBadge } from './componentArt';
@@ -252,7 +252,7 @@ function contextDiagram(design: Design, state: DiagramState): { nodes: Node[]; e
     sized<PersonData>({ id: 'client', type: 'person', position: { x: 0, y: CONTEXT.h / 2 - PERSON.h / 2 },
       data: { title: t.clients, selected: state.selected === 'client' }, deletable: false, selectable: false }, PERSON.w, PERSON.h),
     sized<ContextData>({ id: 'system', type: 'context', position: { x: PERSON.w + SYSTEM.gapFromPerson, y: 0 },
-      data: { title: t.systemName, kind: t.softwareSystem, buildings, summary: t.c4.contextSummary(total) },
+      data: { title: t.systemName, kind: t.softwareSystem, buildings, summary: t.c4.contextSummary(total, designCost(design)) },
       deletable: false, selectable: false, connectable: false }, CONTEXT.w, CONTEXT.h),
   ];
   const live = state.live;

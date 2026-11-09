@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progress } from '../progress/progress';
-import { archiveEntries } from './archive';
+import { archiveEntries, newTypesIn } from './archive';
 
 const levels = [
   { id: 'l1', title: 'One', allowedComponents: ['appServer', 'database'] },
@@ -23,5 +23,13 @@ describe('building archive', () => {
 
   it('gives each component its monthly cost from the catalog', () => {
     expect(archiveEntries(levels, progress([])).find(e => e.type === 'appServer')!.monthlyCost).toBe(40);
+  });
+});
+
+describe('buildings a level brings for the first time', () => {
+  it('lists only the types no earlier level used', () => {
+    expect(newTypesIn(levels, 'l1')).toEqual(['appServer', 'database']);
+    expect(newTypesIn(levels, 'l2')).toEqual(['loadBalancer']);
+    expect(newTypesIn(levels, 'l3')).toEqual(['cache']);
   });
 });

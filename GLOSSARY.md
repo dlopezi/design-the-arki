@@ -7,11 +7,11 @@ A browser puzzle game where players design software architectures that must surv
 ### Levels and progression
 
 **Level**:
-A single puzzle: a traffic profile, requirements, a budget, the allowed components and optional failure events.
+A single puzzle: a traffic profile, requirements, a budget, the allowed components and optional failure events. The campaign map presents it to players as a *mission*; in code and docs it stays a level.
 _Avoid_: Stage, mission, puzzle
 
 **Chapter**:
-An ordered group of levels about one topic that introduces new component types.
+An ordered group of levels about one topic that introduces new component types. The campaign map draws it as a *sector* of terrain.
 _Avoid_: World, section
 
 **Mode**:
@@ -69,6 +69,10 @@ _Avoid_: Codex, encyclopedia, help
 **Base**:
 The player's growing infrastructure: one district per passed level, built from the design that passed it.
 _Avoid_: City, world, colony
+
+**C4 Layer**:
+How deep the design's diagram is drawn, after the C4 model: 1 Context (users and the system as one box), 2 Containers (zones and components, instances folded), 3 Components (every instance).
+_Avoid_: Zoom level, view mode
 
 ### Simulation
 

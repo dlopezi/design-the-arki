@@ -11,6 +11,13 @@ export type ArchiveEntry = {
   monthlyCost: number;
 };
 
+/** Component types a level brings for the first time: no earlier level used them. */
+export function newTypesIn(levels: Pick<LevelDefinition, 'id' | 'allowedComponents'>[], levelId: string): string[] {
+  const index = levels.findIndex(l => l.id === levelId);
+  const earlier = new Set(levels.slice(0, Math.max(0, index)).flatMap(l => l.allowedComponents));
+  return (levels[index]?.allowedComponents ?? []).filter(type => !earlier.has(type));
+}
+
 /** The Building Archive: every component the levels use, in the order they introduce it. */
 export function archiveEntries(levels: Pick<LevelDefinition, 'id' | 'title' | 'allowedComponents'>[], progress: Progress): ArchiveEntry[] {
   const ids = levels.map(l => l.id);

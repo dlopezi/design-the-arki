@@ -305,13 +305,13 @@ export const es: Strings = {
     howItWorks: 'Cómo funciona',
     steps: ['Supera un nivel', 'Su diseño se convierte en un distrito', 'Tu base crece'],
     stepNotes: ['En cualquier modo', 'Un edificio por cada instancia que usaste', 'Un distrito por nivel superado'],
-    reportLine: (n: number) => `+${n} edificio${n === 1 ? '' : 's'} en tu base`,
+    reportLine: (n: number) => `Distrito de este nivel en tu base: ${n} edificio${n === 1 ? '' : 's'}`,
     view: 'Ver tu base',
   },
   c4: {
     label: 'Vista C4',
     layers: { 1: 'Contexto', 2: 'Contenedores', 3: 'Componentes' } as Record<1 | 2 | 3, string>,
     help: 'Capas del modelo C4: la 1 muestra el sistema como una caja, la 2 sus contenedores, la 3 cada componente e instancia.',
-    contextSummary: (n: number) => `${n} edificio${n === 1 ? '' : 's'}: cambia a la capa 3 para ver cada uno`,
+    contextSummary: (n: number, cost: number) => `${n} edificio${n === 1 ? '' : 's'} · $${cost}/mes. Cambia a la capa 3 para ver cada uno.`,
   },
 };
