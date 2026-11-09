@@ -40,7 +40,10 @@ export const en = {
     howToPlay: 'How to play',
     howToPlayNote: 'Build · Run · Earn stars',
     close: 'Close',
+    eyebrow: 'System design puzzle game',
     pressEnter: 'Press Enter to start',
+    pressEnterNote: 'or click a menu item',
+    levelsPassed: (n: number) => n === 0 ? 'No levels passed yet: play your first one!' : `${n} level${n === 1 ? '' : 's'} passed`,
     chapterProgress: (chapter: string, passed: number, total: number) => `${chapter}: ${passed} of ${total} levels passed`,
     demo: {
       title: 'Training',

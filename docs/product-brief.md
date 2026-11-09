@@ -52,6 +52,10 @@ Chosen from a three-variant prototype (path, skyline, mobile hub; kept in commit
 
 The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** (Play level 1 / Continue: level N, Level map, How to play) and the playable demo as a **Training** panel, over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). "How to play" opens the three steps (Build, Run, Earn stars) in a dialog. On a computer everything fits without scrolling; on a phone the menu is on the first screen and Training is below it.
 
+## Look and feel
+
+Same family as System Defense ("Defend the Arki"), because both games live on thearki.com (chosen 2026-11-09): its colour palette (navy panels, cyan accent, green / red / yellow for good / bad / numbers), monospace for titles, labels and numbers with system sans-serif for body text, and its title screen (glitching monospace logo, falling 0s and 1s, horizon with a perspective data floor, scanlines, "Press … to start", records and version in the footer). Tokens live in `:root` in `src/ui/styles.css`.
+
 ## Release
 
 - **Early access** with the 8 levels of chapter 1 (Core), then grow to 20+ in updates; chapter 2 (Async) is the first update.

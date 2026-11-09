@@ -83,29 +83,23 @@ function Demo() {
   );
 }
 
-// The title screen's backdrop: a small network with requests travelling between nodes, over a moving grid floor.
-const NET_NODES: [number, number][] = [[90, 110], [320, 60], [560, 150], [800, 70], [1040, 140], [180, 300], [440, 260], [700, 300], [960, 280], [1150, 330]];
-const NET_EDGES: [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [1, 6], [6, 7], [2, 7], [7, 8], [3, 8], [8, 9], [4, 9]];
-const netPath = ([a, b]: [number, number]) => {
-  const [x1, y1] = NET_NODES[a]!, [x2, y2] = NET_NODES[b]!;
-  return `M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`;
-};
+// The title screen's backdrop, as on System Defense: falling 0s and 1s over a sky that meets a moving data floor.
+const rnd = (i: number, k: number) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+const RAIN = Array.from({ length: 26 }, (_, i) => ({
+  left: `${(rnd(i, 1) * 100).toFixed(1)}%`,
+  duration: `${(9 + rnd(i, 2) * 9).toFixed(1)}s`,
+  delay: `${(-rnd(i, 3) * 18).toFixed(1)}s`,
+  digits: Array.from({ length: 5 }, (_, k) => (rnd(i, k + 4) > 0.5 ? '1' : '0')).join('\n'),
+}));
 
 function TitleBackground() {
   return (
     <div className="title-bg" aria-hidden="true">
+      <div className="title-rain">
+        {RAIN.map((d, i) => <span key={i} style={{ left: d.left, animationDuration: d.duration, animationDelay: d.delay }}>{d.digits}</span>)}
+      </div>
+      <div className="title-horizon" />
       <div className="title-floor" />
-      <svg className="title-net" viewBox="0 0 1240 400" preserveAspectRatio="xMidYMin slice">
-        {NET_EDGES.map((e, i) => <path key={i} d={netPath(e)} />)}
-        <g className="title-net-dots">
-          {NET_EDGES.map((e, i) => (
-            <circle key={i} r="3">
-              <animateMotion dur={`${3 + (i % 4) * 0.7}s`} begin={`${(i * 0.45) % 3}s`} repeatCount="indefinite" path={netPath(e)} />
-            </circle>
-          ))}
-        </g>
-        {NET_NODES.map(([x, y], i) => <rect key={i} x={x - 9} y={y - 9} width="18" height="18" rx="5" />)}
-      </svg>
     </div>
   );
 }
@@ -177,6 +171,10 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
   }, [howTo, selected]);
 
   const { chapter } = summary;
+  // "archi-game" → white "archi-", glowing "game" (like "Defend the" + "Arki").
+  const split = t.levelSelect.title.lastIndexOf('-') + 1;
+  const logoA = t.levelSelect.title.slice(0, split), logoB = t.levelSelect.title.slice(split);
+  const passed = levels.filter(lv => (progress.levels[lv.id]?.bestStars ?? 0) > 0).length;
   const chapterName = t.levelSelect.chapter(chapter.number, chapter.name);
   return (
     <div className="title">
@@ -195,8 +193,9 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
 
         <main className="title-main">
           <div className="title-head">
+            <p className="eyebrow">{l.eyebrow}</p>
             <h1>
-              <span className="title-logo">{t.levelSelect.title}</span>
+              <span className="title-logo"><span className="logo-a">{logoA}</span><span className="logo-b">{logoB}</span></span>
               <span className="title-tagline">{l.headline} <span>{l.headlineAccent}</span></span>
             </h1>
             <p className="title-pitch">{l.pitch}</p>
@@ -231,12 +230,16 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
             <Demo />
           </div>
 
-          <p className="title-hint" aria-hidden="true">▸ {l.pressEnter} ◂</p>
+          <p className="title-hint" aria-hidden="true">{l.pressEnter}<small>{l.pressEnterNote}</small></p>
         </main>
 
         <footer className="title-foot">
-          <span>{l.freeNote}</span>
-          <span className="title-badge">{l.earlyAccess}</span>
+          <span className="title-best">🏆 {l.levelsPassed(passed)}</span>
+          <span className="title-foot-right">
+            <span>{l.freeNote}</span>
+            <span className="title-badge">{l.earlyAccess}</span>
+            <span>v{__APP_VERSION__}</span>
+          </span>
         </footer>
       </div>
       {howTo && <HowToPlay onClose={closeHowTo} />}
