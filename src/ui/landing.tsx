@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
-import { en as t, percent } from '../i18n/en';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lang, LANGS, setLang, t, percent } from '../i18n';
+import { FeedbackDialog } from './feedbackDialog';
 import { DEMO, runDemo, type DemoOutcome } from '../landing/demo';
 import { mainAction } from '../landing/mainAction';
+import { playerSummary } from '../landing/summary';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
 import { loadLevel } from './diagram';
@@ -55,7 +57,7 @@ function Demo() {
     : outcome.bottleneck === 'appServer' && instances < DEMO.maxInstances ? d.tipAdd : d.tipOther;
   const slow = outcome.p95 > DEMO.requirements.p95Ms, failing = outcome.errorRate > DEMO.requirements.maxErrorRate;
   return (
-    <section className="demo" aria-label={d.label}>
+    <section className="demo title-panel" aria-label={d.label}>
       <div className="demo-head">
         <span className="eyebrow">{d.title}</span>
         <span className={`demo-verdict ${outcome.passed ? 'ok' : 'bad'}`} role="status">{verdict}</span>
@@ -82,32 +84,181 @@ function Demo() {
   );
 }
 
-/** The first page a visitor sees: what the game is, a tiny playable demo, and one button to start. */
-export function Landing({ levels, progress }: { levels: LevelDefinition[]; progress: Progress }) {
-  const action = mainAction(levels, progress);
-  const l = t.landing;
+// The title screen's backdrop, as on System Defense: falling 0s and 1s over a sky that meets a moving data floor.
+const rnd = (i: number, k: number) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+const RAIN = Array.from({ length: 26 }, (_, i) => ({
+  left: `${(rnd(i, 1) * 100).toFixed(1)}%`,
+  duration: `${(9 + rnd(i, 2) * 9).toFixed(1)}s`,
+  delay: `${(-rnd(i, 3) * 18).toFixed(1)}s`,
+  digits: Array.from({ length: 5 }, (_, k) => (rnd(i, k + 4) > 0.5 ? '1' : '0')).join('\n'),
+}));
+
+function TitleBackground() {
   return (
-    <div className="landing">
-      <header className="landing-bar">
-        <span className="landing-logo">{t.levelSelect.title}</span>
-        <a className="landing-levels" href={levelsHref}>{action.returning ? l.yourLevels : l.allLevels}</a>
-      </header>
-      <main className="landing-hero">
-        <h1>{l.headline}<br /><span>{l.headlineAccent}</span></h1>
-        <p className="landing-pitch">{l.pitch}</p>
-        <Demo />
-        <div className="landing-cta">
-          <a className="landing-play" href={action.href}>▶ {action.label}</a>
-          <span className="muted">{l.freeNote}</span>
+    <div className="title-bg" aria-hidden="true">
+      <div className="title-rain">
+        {RAIN.map((d, i) => <span key={i} style={{ left: d.left, animationDuration: d.duration, animationDelay: d.delay }}>{d.digits}</span>)}
+      </div>
+      <div className="title-horizon" />
+      <div className="title-floor" />
+    </div>
+  );
+}
+
+function HowToPlay({ onClose }: { onClose: () => void }) {
+  const l = t.landing;
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="title-backdrop" onClick={onClose}>
+      <div className="title-dialog title-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}>
+        <h2 id={titleId}>{l.howToPlay}</h2>
+        <div className="title-steps">
+          {l.steps.map(s => <div key={s.title}><h3>{s.title}</h3><p>{s.text}</p></div>)}
         </div>
-      </main>
-      <section className="landing-steps" aria-label={l.stepsLabel}>
-        {l.steps.map(s => <div key={s.title}><h2>{s.title}</h2><p>{s.text}</p></div>)}
-      </section>
-      <footer className="landing-foot">
-        <a className="landing-play" href={action.href}>▶ {action.label}</a>
-        <span className="muted">{l.deviceNote}</span>
-      </footer>
+        <button ref={closeRef} className="title-close" onClick={onClose}>{l.close}</button>
+      </div>
+    </div>
+  );
+}
+
+const REPO_URL = 'https://github.com/dlopezi/design-the-arki';
+
+type MenuItem = { label: string; note: string } & ({ href: string } | { onClick: () => void });
+
+/** The first page a visitor sees, styled as a game's title screen: player bar, logo, main menu and a playable training demo. */
+export function Landing({ levels, progress }: { levels: LevelDefinition[]; progress: Progress }) {
+  const l = t.landing;
+  const action = mainAction(levels, progress);
+  const summary = useMemo(() => playerSummary(levels, progress), [levels, progress]);
+  const [selected, setSelected] = useState(0);
+  const [howTo, setHowTo] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const closeHowTo = useCallback(() => { setHowTo(false); itemRefs.current[2]?.focus(); }, []);
+  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[3]?.focus(); }, []);
+
+  const menu: MenuItem[] = [
+    { href: action.href, label: action.label, note: !summary.next ? l.allPassed : action.returning ? summary.next.title : l.firstNote(summary.next.title) },
+    { href: levelsHref, label: l.levelMap, note: l.levelMapNote },
+    { onClick: () => setHowTo(true), label: l.howToPlay, note: l.howToPlayNote },
+    { onClick: () => setFeedback(true), label: t.feedbackForm.title, note: t.feedbackForm.menuNote },
+  ];
+
+  // Game-style menu: ↑ / ↓ move the selection, Enter starts the selected item when nothing else has focus.
+  useEffect(() => {
+    if (howTo || feedback) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const items = itemRefs.current;
+      const active = document.activeElement;
+      const focused = items.findIndex(item => item === active);
+      const free = !active || active === document.body;
+      if (focused < 0 && !free) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const from = focused < 0 ? selected : focused;
+        const next = (from + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        setSelected(next);
+        items[next]?.focus();
+      } else if (e.key === 'Enter' && free) {
+        e.preventDefault();
+        items[selected]?.click();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [howTo, feedback, selected]);
+
+  const { chapter } = summary;
+  // "Design the Arki" → white "Design the ", glowing "Arki" (like "Defend the" + "Arki").
+  const split = t.levelSelect.title.lastIndexOf(' ') + 1;
+  const logoA = t.levelSelect.title.slice(0, split), logoB = t.levelSelect.title.slice(split);
+  const passed = levels.filter(lv => (progress.levels[lv.id]?.bestStars ?? 0) > 0).length;
+  const chapterName = t.levelSelect.chapter(chapter.number, chapter.name);
+  return (
+    <div className="title">
+      <TitleBackground />
+      <div className="title-screen">
+        <header className="title-bar">
+          <span className="title-pill" role="img" aria-label={t.levelSelect.totalStars(summary.stars, summary.maxStars)}>
+            <span className="home-star">★</span> {summary.stars} / {summary.maxStars}
+          </span>
+          <span className="title-chapter" role="img" aria-label={l.chapterProgress(chapterName, chapter.passed, chapter.levels)}>
+            <span className="title-chapter-name">{chapterName}</span>
+            <span className="title-chapter-bar"><span style={{ width: `${(chapter.passed / Math.max(1, chapter.levels)) * 100}%` }} /></span>
+            <b>{chapter.passed}/{chapter.levels}</b>
+          </span>
+        </header>
+
+        <main className="title-main">
+          <div className="title-head">
+            <p className="eyebrow">{l.eyebrow}</p>
+            <h1>
+              <span className="title-logo"><span className="logo-a">{logoA.trimEnd()}</span>{' '}<span className="logo-b">{logoB}</span></span>
+              <span className="title-tagline">{l.headline} <span>{l.headlineAccent}</span></span>
+            </h1>
+            <p className="title-pitch">{l.pitch}</p>
+          </div>
+
+          <div className="title-panels">
+            <nav className="title-menu title-panel" aria-label={l.menu}>
+              <span className="eyebrow" aria-hidden="true">{l.menu}</span>
+              <ul>
+                {menu.map((item, i) => {
+                  const content = <>
+                    <span className="menu-marker" aria-hidden="true">▶</span>
+                    <span className="menu-label">{item.label}</span>
+                    <span className="menu-note">{item.note}</span>
+                  </>;
+                  const common = {
+                    className: `menu-item${i === 0 ? ' primary' : ''}`,
+                    'data-selected': i === selected,
+                    onMouseEnter: () => setSelected(i),
+                    onFocus: () => setSelected(i),
+                  };
+                  return (
+                    <li key={item.label}>
+                      {'href' in item
+                        ? <a {...common} ref={el => { itemRefs.current[i] = el; }} href={item.href}>{content}</a>
+                        : <button {...common} ref={el => { itemRefs.current[i] = el; }} onClick={item.onClick} aria-haspopup="dialog">{content}</button>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+            <Demo />
+          </div>
+
+          <p className="title-hint" aria-hidden="true">{l.pressEnter}<small>{l.pressEnterNote}</small></p>
+        </main>
+
+        <footer className="title-foot">
+          <span className="title-best">🏆 {l.levelsPassed(passed)}</span>
+          <span className="title-foot-right">
+            <span>{l.freeNote}</span>
+            <span className="title-badge">{l.earlyAccess}</span>
+            <span className="lang-switch" role="group" aria-label={t.footer.language}>
+              {LANGS.map(code => (
+                <button key={code} type="button" aria-pressed={lang() === code} onClick={() => setLang(code)}>{code.toUpperCase()}</button>
+              ))}
+            </span>
+            <span className="title-links">
+              <a href={`${REPO_URL}/releases/tag/v${__APP_VERSION__}`} target="_blank" rel="noopener noreferrer" aria-label={t.footer.release(__APP_VERSION__)}>v{__APP_VERSION__}</a>
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer">{t.footer.github} ↗</a>
+              <span>{t.footer.copyright}</span>
+            </span>
+          </span>
+        </footer>
+      </div>
+      {howTo && <HowToPlay onClose={closeHowTo} />}
+      {feedback && <FeedbackDialog info={{ level: 'none' }} onClose={closeFeedback} />}
     </div>
   );
 }

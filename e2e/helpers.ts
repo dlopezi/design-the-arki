@@ -53,7 +53,7 @@ const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(
 /** Opens a level in a mode (God, the empty canvas, by default) with every level unlocked, for tests not about progress. */
 export async function openLevel(page: Page, id: string, mode: 'guided' | 'normal' | 'hard' | 'god' = 'god') {
   await page.addInitScript(ids => {
-    localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: Object.fromEntries(ids.map(i => [i, { bestStars: 1 }])) }));
+    localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: Object.fromEntries(ids.map(i => [i, { bestStars: 1 }])) }));
   }, levelIds);
   await page.goto(`/#${id}/${mode}`);
 }
@@ -61,6 +61,6 @@ export async function openLevel(page: Page, id: string, mode: 'guided' | 'normal
 /** Marks the tutorial as done for a fresh player, so every mode is available. */
 export async function skipTutorial(page: Page) {
   await page.addInitScript(() => {
-    if (!localStorage.getItem('archi-game:progress')) localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: {} }));
+    if (!localStorage.getItem('design-the-arki:progress')) localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: {} }));
   });
 }

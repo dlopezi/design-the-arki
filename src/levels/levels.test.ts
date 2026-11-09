@@ -2,6 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
 import { simulate } from '../engine/simulate';
 import { allLevels, parseLevel } from './levels';
+import { levelTextEs } from './text.es';
+
+describe('Spanish level texts', () => {
+  for (const level of allLevels('en')) {
+    it(`${level.id}: has a complete Spanish entry`, () => {
+      const es = levelTextEs[level.id];
+      expect(es, 'missing entry in text.es.ts').toBeDefined();
+      expect(es!.tutorial?.length ?? 0).toBe(level.tutorial?.length ?? 0);
+      level.tutorial?.forEach((step, i) => expect(Boolean(es!.tutorial![i]!.textCompact)).toBe(Boolean(step.textCompact)));
+    });
+  }
+
+  it('has no entry for a level that does not exist', () => {
+    const ids = allLevels('en').map(l => l.id);
+    expect(Object.keys(levelTextEs).filter(id => !ids.includes(id))).toEqual([]);
+  });
+
+  it('changes only the texts, never the rules', () => {
+    const en = allLevels('en'), es = allLevels('es');
+    es.forEach((level, i) => {
+      const { chapter: _c, title: _t, brief: _b, guidedHint: _g, tutorial: tutEs, ...rulesEs } = level;
+      const { chapter: _c2, title: _t2, brief: _b2, guidedHint: _g2, tutorial: tutEn, ...rulesEn } = en[i]!;
+      expect(rulesEs).toEqual(rulesEn);
+      expect(tutEs?.map(s => [s.target, s.until])).toEqual(tutEn?.map(s => [s.target, s.until]));
+    });
+  });
+});
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1 in order', () => {

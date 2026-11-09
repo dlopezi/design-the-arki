@@ -1,6 +1,6 @@
 import { catalog } from '../catalog/catalog';
 import type { Design, Result } from '../engine/types';
-import { en as t, percent } from '../i18n/en';
+import { t, percent } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import { instanceNames, loadLevel } from './diagram';
 import { Stars } from './reportCard';

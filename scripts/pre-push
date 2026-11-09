@@ -1,0 +1,11 @@
+#!/bin/sh
+# Git Flow: main only changes through a Pull Request merged on GitHub (develop -> main).
+# Blocks any direct push to main from this machine (all worktrees share this hook).
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: direct push to main is blocked (Git Flow)." >&2
+    echo "Open a Pull Request from develop to main instead." >&2
+    exit 1
+  fi
+done
+exit 0

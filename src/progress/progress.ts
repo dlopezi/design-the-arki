@@ -13,7 +13,7 @@ export type LevelProgress = {
 };
 export type Progress = { version: 1; levels: Record<string, LevelProgress>; tutorialDone?: boolean };
 
-const KEY = 'archi-game:progress';
+const KEY = 'design-the-arki:progress';
 const empty = (): Progress => ({ version: 1, levels: {} });
 
 export function loadProgress(): Progress {

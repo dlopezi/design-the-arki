@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const levelNode = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
 test('the home map shows the mode each level was passed in, a legend, the next level and the star total', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('archi-game:progress', JSON.stringify({
+  await page.addInitScript(() => localStorage.setItem('design-the-arki:progress', JSON.stringify({
     version: 1, tutorialDone: true,
     levels: { '01-hello-world': { bestStars: 3, bestMode: 'god' }, '02-first-spike': { bestStars: 2, bestMode: 'hard' }, '03-bigger-or-more': { bestStars: 1, bestMode: 'normal' } },
   })));

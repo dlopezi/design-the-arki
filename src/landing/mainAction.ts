@@ -1,4 +1,4 @@
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
 import { levelsHref } from '../ui/routes';

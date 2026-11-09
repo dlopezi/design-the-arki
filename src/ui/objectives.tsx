@@ -1,5 +1,5 @@
 import type { Result } from '../engine/types';
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 
 type State = 'met' | 'failed' | 'pending';
