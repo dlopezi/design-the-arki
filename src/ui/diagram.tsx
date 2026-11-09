@@ -24,6 +24,10 @@ export type ComponentData = {
   load: number | null;
 };
 export type InstanceData = { type: string; name: string; detail: string; load: number | null; down: boolean };
+/** C4 layer 1: the whole system as one box, with one building per component type. */
+export type ContextData = { title: string; kind: string; buildings: { type: string; count: number }[]; summary: string };
+/** How deep the diagram goes, as in the C4 model: 1 context, 2 containers, 3 components (every instance). */
+export type C4Layer = 1 | 2 | 3;
 
 export const loadLevel = (load: number) => (load >= 0.9 ? 'high' : load >= 0.7 ? 'medium' : 'low');
 
@@ -87,7 +91,20 @@ function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
   );
 }
 
-export const nodeTypes = { person: PersonNode, boundary: BoundaryNode, component: ComponentNode, instance: InstanceNode };
+function ContextNode({ data }: NodeProps<Node<ContextData>>) {
+  return (
+    <div className="c4-boundary system c4-context">
+      <Handle type="target" position={Position.Left} />
+      <strong>{data.title}</strong> <span className="c4-kind">[{data.kind}]</span>
+      <div className="c4-context-buildings">
+        {data.buildings.map(b => <span key={b.type} className="c4-context-building"><ComponentBadge type={b.type} />{b.count > 1 && <b>× {b.count}</b>}</span>)}
+      </div>
+      <span className="c4-detail">{data.summary}</span>
+    </div>
+  );
+}
+
+export const nodeTypes = { person: PersonNode, boundary: BoundaryNode, component: ComponentNode, instance: InstanceNode, context: ContextNode };
 
 export type FlowEdgeData = { animate: boolean; rps: number };
 
@@ -125,7 +142,11 @@ export type DiagramState = {
   bottleneckId?: string | null;
   /** Component type the tutorial points at. */
   tutorialTargetType?: string | null;
+  /** C4 layer to draw; 3 (every instance) when not given. */
+  c4Layer?: C4Layer;
 };
+
+const CONTEXT = { w: 320, h: 150 };
 
 /** Display names of every instance (app-1, app-2…), numbered per prefix across the design. */
 export function instanceNames(design: Design): Map<string, string[]> {
@@ -146,6 +167,8 @@ export function instanceNames(design: Design): Map<string, string[]> {
 
 /** Turns a design into C4-style nodes: a person, the system boundary, zones, components and one node per instance. */
 export function layoutDiagram(design: Design, state: DiagramState): { nodes: Node[]; edges: Edge[] } {
+  const layer = state.c4Layer ?? 3;
+  if (layer === 1) return contextDiagram(design, state);
   const live = state.live ?? null;
   const liveOf = (id: string) => live?.result.components.find(c => c.id === id) ?? null;
   const names = instanceNames(design);
@@ -154,7 +177,8 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
     const members: Placed[] = design.components
       .filter(c => catalog[c.type]!.presentation?.zone === zone)
       .map(c => {
-        const container = !!catalog[c.type]!.scalesOut;
+        // Layer 2 folds the instances into their component; layer 3 shows each one.
+        const container = layer === 3 && !!catalog[c.type]!.scalesOut;
         const instances = instanceCountOf(c.params);
         const height = container ? CONTAINER_HEAD + instances * (INSTANCE.h + INSTANCE.gap) - INSTANCE.gap + 14 : BOX.h;
         return { id: c.id, type: c.type, params: c.params, height, instances, container };
@@ -188,7 +212,7 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
       const size = sizeOf(member.type, member.params);
       const workers = size && spec.sizes ? spec.sizes[size]!.workers : spec.workers;
       const component = design.components.find(c => c.id === member.id)!;
-      const detail = member.container
+      const detail = spec.scalesOut
         ? `${t.instanceCount(member.instances)}${size ? ` · ${t.inspector.sizes[size]}` : ''}`
         : spec.shortcut
           ? `TTL ${Number(component.params?.[spec.shortcut.param] ?? spec.shortcut.defaultValue)} s · ~${Math.round(hitRateOf(component) * 100)}% hits`
@@ -213,6 +237,29 @@ export function layoutDiagram(design: Design, state: DiagramState): { nodes: Nod
     zoneX += zone.width + ZONE.gap;
   }
   return { nodes, edges: edgesOf(design, state) };
+}
+
+/** C4 layer 1: the users and the system as one box; one connection when the users reach the system. */
+function contextDiagram(design: Design, state: DiagramState): { nodes: Node[]; edges: Edge[] } {
+  const counts = new Map<string, number>();
+  for (const c of design.components) {
+    const count = catalog[c.type]?.scalesOut ? instanceCountOf(c.params) : 1;
+    counts.set(c.type, (counts.get(c.type) ?? 0) + count);
+  }
+  const buildings = [...counts].map(([type, count]) => ({ type, count }));
+  const total = buildings.reduce((sum, b) => sum + b.count, 0);
+  const nodes: Node[] = [
+    sized<PersonData>({ id: 'client', type: 'person', position: { x: 0, y: CONTEXT.h / 2 - PERSON.h / 2 },
+      data: { title: t.clients, selected: state.selected === 'client' }, deletable: false, selectable: false }, PERSON.w, PERSON.h),
+    sized<ContextData>({ id: 'system', type: 'context', position: { x: PERSON.w + SYSTEM.gapFromPerson, y: 0 },
+      data: { title: t.systemName, kind: t.softwareSystem, buildings, summary: t.c4.contextSummary(total) },
+      deletable: false, selectable: false, connectable: false }, CONTEXT.w, CONTEXT.h),
+  ];
+  const live = state.live;
+  const reached = design.connections.some(([from]) => from === 'client');
+  const edges: Edge[] = reached ? [{ id: edgeId('client', 'system'), source: 'client', target: 'system', type: 'flow', selectable: false,
+    data: { animate: !!live?.animate, rps: live ? (live.result.buckets[live.bucket]?.rps ?? 0) : 0 } satisfies FlowEdgeData }] : [];
+  return { nodes, edges };
 }
 
 export const edgeId = (from: string, to: string) => `${from}->${to}`;

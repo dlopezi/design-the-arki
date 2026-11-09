@@ -54,6 +54,12 @@ export function BasePage({ levels, progress }: { levels: LevelDefinition[]; prog
         <h1>{b.title}</h1>
         <p>{b.intro}</p>
       </header>
+      <section className="base-how panel" aria-label={b.howItWorks}>
+        <span className="console-label">{b.howItWorks}</span>
+        <ol>
+          {b.steps.map((step, i) => <li key={step}><b>{i + 1}</b><span><strong>{step}</strong><small>{b.stepNotes[i]}</small></span></li>)}
+        </ol>
+      </section>
 
       {base.districts.length === 0 ? (
         <div className="base-empty panel">

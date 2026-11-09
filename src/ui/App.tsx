@@ -5,8 +5,9 @@ import type { Design, DesignProblem, Result } from '../engine/types';
 import { t, percent } from '../i18n';
 import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/levels';
 import { CostMeter } from './costMeter';
+import { buildingCount } from '../base/base';
 import { componentArt } from './componentArt';
-import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
+import { edgeTypes, instanceNames, layoutDiagram, nodeTypes, type C4Layer } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
 import { ClientsInspector, Inspector } from './inspector';
 import { CLIENTS, connectionTargets, forwardsRequests, targetOf, withConnection } from './connections';
@@ -116,6 +117,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   }, [level.id, mode]);
   const [design, setDesign] = useState<Design>(initialDesign ?? EMPTY);
   const [selected, setSelected] = useState<string | null>(null);
+  const [c4Layer, setC4Layer] = useState<C4Layer>(3);
   const [result, setResult] = useState<Result | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [problem, setProblem] = useState<{ message: string; componentIds: string[] } | null>(null);
@@ -169,8 +171,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   };
   const hint = hintFor(result);
 
-  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType }),
-    [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
+  const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType, c4Layer }),
+    [design, c4Layer, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
   const fitState: FitState = { inspector: panels.inspector, results: panels.results, tutorial: showTutorial, tall, ran: !!result };
   const FIT = fitOptions(layout, fitState);
   const cost = designCost(design);
@@ -180,7 +182,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   useEffect(() => { onDesignChange(design); }, [designKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
   // Keep the whole diagram in view as it grows. Instant, so the view never slides under a drag.
-  const shapeKey = diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
+  const shapeKey = `${c4Layer}|` + diagram.nodes.map(n => `${n.id}:${n.width}x${n.height}`).join('|');
   // The diagram's free area also changes with the layout, the phone sheet and the tutorial card.
   // On a tablet the margins differ a lot (side panel, tall results drawer), so centre the diagram in the free area ourselves.
   useEffect(() => {
@@ -205,6 +207,8 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     const id = `${type}-${++counter.current}`;
     setDesign(d => ({ ...d, components: [...d.components, { id, type, params: {} }] }));
     setSelected(id);
+    // Layer 1 shows no components: building one switches to layer 3, where the player can see and connect it.
+    setC4Layer(layer => (layer === 1 ? 3 : layer));
   }, []);
 
   const removeComponent = useCallback((id: string) => {
@@ -297,6 +301,14 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
 
   const selectedComponent = design.components.find(c => c.id === selected) ?? null;
 
+  const c4Switch = (
+    <div className="hud c4-switch" role="group" aria-label={t.c4.label} title={t.c4.help}>
+      <span className="console-label">{t.c4.label}</span>
+      {([1, 2, 3] as const).map(layer => (
+        <button key={layer} aria-pressed={c4Layer === layer} onClick={() => setC4Layer(layer)}>{layer} {t.c4.layers[layer]}</button>
+      ))}
+    </div>
+  );
   const canvas = (
     <ReactFlow nodes={diagram.nodes} edges={diagram.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onConnect={onConnect}
       onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
@@ -361,7 +373,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     </section>
   );
   const report = result && showReport && (
-    <ReportCard result={result} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
+    <ReportCard result={result} newBuildings={buildingCount(design)} maxStars={1 + level.starCostThresholds.length} hint={hint} nextHref={nextLevelId ? `#${nextLevelId}/${mode}` : null} onClose={() => setShowReport(false)}
       onDetails={() => {
         setShowReport(false);
         setPanels({ inspector: true, results: true });
@@ -383,6 +395,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
         {tutorialCard}
         <div className="canvas-area">
           {canvas}
+          {c4Switch}
           <div className="overlay-stack">{overlays}</div>
         </div>
         <section className="sheet" aria-label={t.panels.title} data-open={sheet.open}>
@@ -415,6 +428,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     return (
       <div className="game medium" data-results={panels.results} data-tall={tall}>
         {canvas}
+        {c4Switch}
         <section className="hud side-panel" aria-label={level.title}>
           <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a>{feedbackLink}</span>
           <h1>{level.title}</h1>
@@ -446,6 +460,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   return (
     <div className="game wide" data-results={panels.results}>
       {canvas}
+      {c4Switch}
 
       <header className="hud rts-bar">
         <a className="back" href={levelsHref}>← {t.levels}</a>

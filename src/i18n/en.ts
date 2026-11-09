@@ -24,6 +24,15 @@ export const en = {
     reset: 'Reset',
     more: 'More',
     home: 'Home',
+    campaign: 'Campaign',
+    briefing: 'Mission briefing',
+    missionState: (n: number, state: string) => `Mission ${n} · ${state}`,
+    states: { done: 'passed', current: 'next', open: 'open', locked: 'locked' } as Record<'done' | 'current' | 'open' | 'locked', string>,
+    newBuilding: 'New building:',
+    buildings: 'Buildings in this mission',
+    lockedHint: 'Pass the mission before it to unlock this one.',
+    lockedMission: (title: string) => `${title} (locked): show briefing`,
+    moreSectors: 'More sectors (async, data at scale, edge) arrive in updates.',
   },
   landing: {
     headline: 'Watch your system break.',
@@ -279,6 +288,7 @@ export const en = {
         when: 'Always: it is where the data lives. When it is full, give it a bigger tier or take reads off it with a cache.',
       },
     } as Record<string, { name: string; role: string; when: string }>,
+    pick: 'Choose a building in the list to read its card.',
   },
   base: {
     title: 'Your base',
@@ -289,6 +299,17 @@ export const en = {
     buildingCount: (n: number) => `${n} building${n === 1 ? '' : 's'}`,
     districtCount: (n: number) => `${n} district${n === 1 ? '' : 's'}`,
     map: 'Map of your base',
+    howItWorks: 'How it works',
+    steps: ['Pass a level', 'Its design becomes a district', 'Your base grows'],
+    stepNotes: ['In any mode', 'One building per instance you used', 'One district per level passed'],
+    reportLine: (n: number) => `+${n} building${n === 1 ? '' : 's'} in your base`,
+    view: 'View your base',
+  },
+  c4: {
+    label: 'C4 view',
+    layers: { 1: 'Context', 2: 'Containers', 3: 'Components' } as Record<1 | 2 | 3, string>,
+    help: 'C4 model layers: 1 shows the system as one box, 2 its containers, 3 every component and instance.',
+    contextSummary: (n: number) => `${n} building${n === 1 ? '' : 's'}: switch to layer 3 to see each one`,
   },
 };
 export type Strings = typeof en;

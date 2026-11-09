@@ -44,9 +44,13 @@ Target 20+ levels covering four component groups:
 3. **Data scale**: read replicas, sharding, object storage.
 4. **Edge/network**: CDN, API gateway, rate limiter, DNS / multi-region.
 
-## Home screen
+## Home screen (level map)
 
-Chosen from a three-variant prototype (path, skyline, mobile hub; kept in commit b671a49): a winding road of big round level buttons, in the spirit of mobile learning and puzzle games but with its own look and no mascot. Passed levels show a tick and are coloured by the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple), with a mode label and a legend; the next level glows with a "Play!" bubble; locked levels are grey with a lock. A top bar shows the stars collected and each chapter has a banner with the next level and a progress bar.
+A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tech tree, mission board; `prototypes/level-map.prototype.html`), replacing the winding road of round buttons:
+
+- Each chapter is a **sector** of terrain with its missions joined by a route; passed parts of the route are green. A mission that brings a new building shows that building as its marker; the ring colour shows the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple) and the next mission glows with a "Play!" bubble.
+- Clicking a mission opens its **briefing** on the right: state, brief, stars and badge, objectives, the new building, the buildings in the mission, and the four mode buttons that start it (only Guided before the tutorial is done). Locked missions show their briefing without the modes.
+- The top bar has "← Home" (title screen), links to Your base and the Building Archive, and the stars collected. On a phone the map becomes a list, with the briefing below it.
 
 ## Title screen
 
@@ -59,6 +63,7 @@ Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense loo
 - **Palette**: dark steel panels with a bevel and cut corners, a teal accent, green for selection and good, red / yellow for bad / warning, gold for money. Monospace, uppercase labels for titles and numbers; system sans-serif for body text. Tokens live in `:root` in `src/ui/styles.css`.
 - **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`): load balancer = relay tower, app server = factory, cache = generator, database = silos. A failed instance is grey with smoke. Every new component type needs a colour and a building.
 - **Command console** (wide screens): a resource bar on top (back, level, monthly cost against the budget, Inspector / Results toggles, Feedback), the mission on the left, the results panel above the console, and at the bottom a console with the minimap (left), the selected building's portrait and settings (centre) and the build card with the buildings and the big Play button (right). Tablet and phone keep their layouts with the same look.
+- **C4 layers**: a switch over the diagram shows the first three layers of the C4 model: 1 Context (the users and the system as one box with its buildings), 2 Containers (zones and components, instances folded into "× N"), 3 Components (every instance; the default). Building something from layer 1 switches to layer 3.
 - **The diagram** sits on a grid floor: the system boundary is the base wall, zones are districts, load bars are segmented like health bars.
 
 ## Building Archive and briefing
@@ -69,7 +74,7 @@ Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense loo
 
 ## Your base
 
-`#base` shows the infrastructure the player has built so far: one **district** per passed level on an isometric map, with one building per instance of the design that passed it (the level's reference design for progress saved before this feature). It opens from the title screen menu and the level map.
+The page explains itself with a "How it works" strip (pass a level → its design becomes a district → your base grows), and the report after a pass says how many buildings the design adds, with a link to the base. `#base` shows the infrastructure the player has built so far: one **district** per passed level on an isometric map, with one building per instance of the design that passed it (the level's reference design for progress saved before this feature). It opens from the title screen menu and the level map.
 
 ## Release
 

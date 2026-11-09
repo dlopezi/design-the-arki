@@ -12,6 +12,9 @@ const buildingsOf = (design: Design) => design.components.map(c => ({
   count: catalog[c.type]?.scalesOut ? Math.max(1, Number(c.params?.instances ?? 1)) : 1,
 }));
 
+/** How many buildings a design adds to the Base: one per instance. */
+export const buildingCount = (design: Design) => buildingsOf(design).reduce((sum, b) => sum + b.count, 0);
+
 /**
  * The player's Base: one district per passed level, built from the design that passed it
  * (the level's reference design when no passing design was stored, e.g. progress from an older version).

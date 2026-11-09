@@ -744,3 +744,102 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .title-menu ul { gap: 6px; }
 .menu-item { padding: 8px 14px; }
 .menu-item.primary { padding: 11px 14px; }
+
+/* C4 layer switch over the diagram: 1 context, 2 containers, 3 components. */
+.c4-switch { display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; }
+.c4-switch .console-label { margin: 0 8px 0 0; }
+.c4-switch button { padding: 3px 9px; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--muted); font: 700 11.5px var(--mono); white-space: nowrap; }
+.c4-switch button[aria-pressed="true"] { background: rgba(62, 224, 200, .16); border-color: var(--accent); color: var(--fg); }
+.game.wide .c4-switch { top: 64px; right: 16px; }
+.game.medium .c4-switch { top: 16px; left: 290px; }
+.compact .c4-switch { left: 8px; bottom: 8px; padding-left: 4px; }
+.compact .c4-switch .console-label { display: none; }
+.c4-context { display: grid; align-content: start; gap: 8px; }
+.c4-context-buildings { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.c4-context-building { display: inline-flex; align-items: center; gap: 2px; font: 800 12px var(--mono); color: var(--fg); letter-spacing: 0; }
+.c4-context .c4-detail { font: 400 12px system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); }
+
+/* Campaign level map: sectors of terrain with missions on a route, and the selected mission's briefing on the right. */
+.campaign { min-height: 100%; width: min(1240px, 100%); margin: 0 auto; padding: 0 16px 40px; display: grid; gap: 14px; align-content: start; }
+.campaign .home-topbar { width: 100%; }
+.campaign-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.campaign-sectors { display: grid; gap: 14px; }
+.campaign-sector { padding: 14px; display: grid; gap: 10px; }
+.campaign-head { display: grid; gap: 6px; }
+.campaign-head .home-eyebrow { color: var(--accent); }
+.campaign-head strong { font: 800 16px var(--mono); }
+.campaign-map { position: relative; width: 100%; }
+.campaign-terrain { position: absolute; inset: 0; width: 100%; height: 100%; }
+.campaign-terrain .terrain { fill: #0a1416; }
+.campaign-terrain .terrain-grid { stroke: rgba(62, 224, 200, .06); }
+.campaign-terrain .route { stroke: rgba(62, 224, 200, .25); stroke-width: 4; stroke-dasharray: 2 8; stroke-linecap: round; }
+.campaign-terrain .route.done { stroke: var(--ok); stroke-dasharray: none; opacity: .7; }
+.campaign-map ol { list-style: none; margin: 0; padding: 0; }
+.campaign-node { --ring: var(--line-strong); position: absolute; transform: translate(-50%, -30px); width: 150px; display: grid; justify-items: center; gap: 2px; text-align: center; }
+.campaign-node.done { --ring: var(--ok); }
+.campaign-node.mode-guided { --ring: var(--guided); } .campaign-node.mode-normal { --ring: var(--normal); }
+.campaign-node.mode-hard { --ring: var(--hard); } .campaign-node.mode-god { --ring: var(--god); }
+.campaign-node.current { --ring: var(--accent); }
+.campaign-marker { width: 60px; height: 60px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #12262a, #070d0e 75%);
+  border: 3px solid var(--ring); box-shadow: 0 0 0 4px rgba(0, 0, 0, .45); transition: transform .12s; }
+.campaign-marker:hover { transform: scale(1.06); }
+.campaign-node.current .campaign-marker { box-shadow: 0 0 0 4px rgba(0, 0, 0, .45), 0 0 18px var(--accent); animation: home-glow-teal 1.6s ease-in-out infinite; }
+@keyframes home-glow-teal { 50% { box-shadow: 0 0 0 4px rgba(0, 0, 0, .45), 0 0 4px var(--accent); } }
+.campaign-node.selected .campaign-marker { outline: 2px solid #fff; outline-offset: 3px; }
+.campaign-node.locked { opacity: .5; }
+.campaign-number { font: 900 18px var(--mono); color: var(--fg); }
+.campaign-node h3 { margin: 4px 0 0; font: 800 11.5px var(--mono); letter-spacing: .04em; text-transform: uppercase; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+.campaign-node .home-meta .stars { font-size: 13px; }
+.campaign-node .home-bubble { bottom: calc(100% + 30px); background: var(--accent); color: #04120f; }
+.campaign-node .home-bubble::after { border-top-color: var(--accent); }
+.campaign-soon { margin: 0; padding: 10px 14px; border: 1px dashed var(--line-strong); color: var(--muted); font: 700 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.campaign-briefing { position: sticky; top: 70px; padding: 18px; display: grid; gap: 8px; }
+.campaign-briefing h2 { margin: 0; font: 900 20px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.campaign-briefing p { margin: 0; font-size: 14px; }
+.campaign-score { display: flex; align-items: center; gap: 8px; }
+.campaign-objectives { margin: 0; padding-left: 18px; font-size: 14px; }
+.campaign-new { display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .3); font-size: 13.5px; }
+.campaign-new strong { color: var(--ok); }
+.campaign-buildings { display: flex; flex-wrap: wrap; }
+.campaign-modes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.campaign-modes a, .campaign-modes .locked-mode { height: 100%; display: grid; gap: 2px; padding: 8px 10px; border-radius: 2px; text-decoration: none; color: var(--fg);
+  background: linear-gradient(180deg, #1a2b2f, #0e181a); border: 1px solid var(--line-strong); box-shadow: var(--bevel); }
+.campaign-modes a:hover, .campaign-modes a:focus-visible { border-color: var(--accent); outline: none; }
+.campaign-modes a.best { border-color: var(--ok); }
+.campaign-modes strong { font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.campaign-modes span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.campaign-modes .locked-mode { opacity: .5; }
+.campaign .home-legend { justify-content: flex-start; }
+/* Narrow screens: the map becomes a plain list of missions, with the briefing below it. */
+@media (max-width: 900px) {
+  .campaign-grid { grid-template-columns: minmax(0, 1fr); }
+  .campaign-briefing { position: static; }
+}
+@media (max-width: 640px) {
+  .campaign-map { aspect-ratio: auto !important; }
+  .campaign-terrain { display: none; }
+  .campaign-map ol { display: grid; gap: 6px; }
+  .campaign-node { position: static; transform: none; width: auto; display: grid; grid-template-columns: 52px 1fr auto; align-items: center; justify-items: start; text-align: left; gap: 0 10px;
+    padding: 6px 8px; background: #0a1416; border: 1px solid var(--line); }
+  .campaign-node h3 { margin: 0; }
+  .campaign-marker { width: 48px; height: 48px; grid-row: span 2; }
+  .campaign-node .home-bubble { display: none; }
+  .campaign-node .home-meta { grid-column: 2; }
+  .campaign-topbar-links { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .campaign-node.current .campaign-marker { animation: none; } .campaign-marker { transition: none; } }
+.home-topbar { flex-wrap: wrap; }
+.campaign { --guided: #5b8cff; --normal: #ffc83d; --hard: #ff8a3d; --god: #b26bff; }
+.campaign a { text-decoration: none; color: inherit; }
+.campaign :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Help: how Your base grows, and the report's link to it. */
+.base-how { padding: 12px 16px; display: grid; gap: 8px; }
+.base-how ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.base-how li { display: flex; align-items: center; gap: 10px; }
+.base-how li + li::before { content: '→'; color: var(--accent); margin-right: 4px; }
+.base-how b { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--accent); color: var(--accent); font: 900 14px var(--mono); }
+.base-how strong { display: block; font-size: 14px; } .base-how small { color: var(--muted); font-size: 12.5px; }
+@media (max-width: 640px) { .base-how ol { grid-template-columns: minmax(0, 1fr); } .base-how li + li::before { display: none; } }
+.base-note { border-left-color: var(--ok); }
+.base-note a { color: var(--accent); }
+.archive-pick { color: var(--accent) !important; font-size: 13.5px; }

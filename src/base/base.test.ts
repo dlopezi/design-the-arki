@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
 import type { Progress } from '../progress/progress';
-import { baseOf } from './base';
+import { baseOf, buildingCount } from './base';
 
 const reference = (components: Design['components']): Design => ({ components, connections: [] });
 const levels = [
@@ -27,5 +27,11 @@ describe('the player\'s Base', () => {
       [2, 'Two', [{ type: 'loadBalancer', count: 1 }, { type: 'appServer', count: 3 }, { type: 'database', count: 1 }]],
     ]);
     expect(base.buildings).toBe(7);
+  });
+});
+
+describe('buildings a design adds to the Base', () => {
+  it('counts one building per instance', () => {
+    expect(buildingCount(reference([{ id: 'lb', type: 'loadBalancer' }, { id: 'a', type: 'appServer', params: { instances: 4 } }, { id: 'db', type: 'database' }]))).toBe(6);
   });
 });

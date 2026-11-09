@@ -6,7 +6,7 @@ const levelCard = (page: Page, title: string) => page.getByRole('listitem').filt
 test('opening a level asks for a mode', async ({ page }) => {
   await skipTutorial(page);
   await page.goto('/#levels');
-  await levelCard(page, 'Hello world').getByRole('link', { name: /Play/ }).click();
+  await levelCard(page, 'Hello world').getByRole('button', { name: /Play/ }).click();
   const modes = page.getByRole('list', { name: 'Modes' });
   await expect(modes.getByRole('link')).toHaveText([/Guided/, /Normal/, /Hard/, /God/]);
   await modes.getByRole('link', { name: /Guided/ }).click();

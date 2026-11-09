@@ -39,6 +39,7 @@ export function Archive({ levels, progress, briefing }: Props) {
         <span className="console-label">{briefing ? a.briefingEyebrow : a.list}</span>
         <h1>{briefing ? a.briefingTitle : a.title}</h1>
         <p>{briefing ? a.briefingIntro : a.intro}</p>
+        <p className="archive-pick">👉 {a.pick}</p>
       </header>
 
       <div className="archive-body">

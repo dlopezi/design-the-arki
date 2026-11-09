@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Result } from '../engine/types';
 import { t, percent } from '../i18n';
+import { baseHref } from './routes';
 
 export function Stars({ earned, max }: { earned: number; max: number }) {
   return (
@@ -13,8 +14,10 @@ export function Stars({ earned, max }: { earned: number; max: number }) {
 const REQUIREMENT_LABEL = { p95: () => t.statP95, errorRate: () => t.statErrors, budget: () => t.statCost } as const;
 
 /** Verdict after a run: stars, the three key numbers, and what to aim for next. */
-export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetails }: {
+export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetails, newBuildings }: {
   result: Result; maxStars: number; hint: string | null; nextHref: string | null; onClose: () => void; onDetails: () => void;
+  /** Buildings this design adds to the player's Base when it passes. */
+  newBuildings: number;
 }) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -39,6 +42,7 @@ export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetail
         </dl>
         {!result.passed && <p className="note">{t.failedObjectives} {failed.map(c => REQUIREMENT_LABEL[c.requirement]()).join(', ')}</p>}
         {hint && !result.passed && <p className="note"><strong>{t.hintLabel}</strong> {hint}</p>}
+        {result.passed && <p className="note base-note">🏗 {t.base.reportLine(newBuildings)} · <a href={baseHref}>{t.base.view} →</a></p>}
         {result.nextStarCost !== null && <p className="note">{t.nextStar(result.nextStarCost, result.stars + 1)}</p>}
         <div className="actions">
           <button ref={closeRef} className="secondary" onClick={onClose}>{t.backToDesign}</button>
