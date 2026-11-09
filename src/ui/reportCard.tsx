@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Result } from '../engine/types';
-import { en as t, percent } from '../i18n/en';
+import { t, percent } from '../i18n';
 
 export function Stars({ earned, max }: { earned: number; max: number }) {
   return (
@@ -10,7 +10,7 @@ export function Stars({ earned, max }: { earned: number; max: number }) {
   );
 }
 
-const REQUIREMENT_LABEL = { p95: t.statP95, errorRate: t.statErrors, budget: t.statCost } as const;
+const REQUIREMENT_LABEL = { p95: () => t.statP95, errorRate: () => t.statErrors, budget: () => t.statCost } as const;
 
 /** Verdict after a run: stars, the three key numbers, and what to aim for next. */
 export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetails }: {
@@ -37,7 +37,7 @@ export function ReportCard({ result, maxStars, hint, nextHref, onClose, onDetail
           <div className={check('errorRate').ok ? 'ok' : 'bad'}><dt>{t.statErrors}</dt><dd>{percent(result.errorRate)}</dd></div>
           <div className={check('budget').ok ? 'ok' : 'bad'}><dt>{t.statCost}</dt><dd>${result.cost}</dd></div>
         </dl>
-        {!result.passed && <p className="note">{t.failedObjectives} {failed.map(c => REQUIREMENT_LABEL[c.requirement]).join(', ')}</p>}
+        {!result.passed && <p className="note">{t.failedObjectives} {failed.map(c => REQUIREMENT_LABEL[c.requirement]()).join(', ')}</p>}
         {hint && !result.passed && <p className="note"><strong>{t.hintLabel}</strong> {hint}</p>}
         {result.nextStarCost !== null && <p className="note">{t.nextStar(result.nextStarCost, result.stars + 1)}</p>}
         <div className="actions">

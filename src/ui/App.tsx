@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type Connection, type Edge, type Node } from '@xyflow/react';
 import { BUCKET_S, DesignError, designCost, simulate } from '../engine/simulate';
 import type { Design, DesignProblem, Result } from '../engine/types';
-import { en as t, percent } from '../i18n/en';
+import { t, percent } from '../i18n';
 import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/levels';
 import { CostMeter } from './costMeter';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
@@ -20,7 +20,8 @@ import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes'
 import { ModePicker } from './modePicker';
 import { LEVELS_HASH, levelsHref } from './routes';
 import { Landing } from './landing';
-import { feedbackUrl, track } from '../analytics/analytics';
+import { track } from '../analytics/analytics';
+import { FeedbackButton } from './feedbackDialog';
 
 const EMPTY: Design = { components: [], connections: [] };
 /** Real seconds the playback of a whole level takes. */
@@ -300,7 +301,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     </ReactFlow>
   );
   const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} compact={compact} />;
-  const feedbackLink = <a className="back" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>;
+  const feedbackLink = <FeedbackButton info={() => ({ level: level.id, mode, result: result ? (result.passed ? `passed ${result.stars}★` : 'failed') : undefined })} />;
   const costMeter = <CostMeter cost={cost} budget={level.budget} thresholds={level.starCostThresholds} />;
   const sendsToFrom = (from: string) => forwardsRequests(design, from)
     ? { from, targets: connectionTargets(design, from), current: targetOf(design, from), onChange: (to: string | null) => connectTo(from, to),

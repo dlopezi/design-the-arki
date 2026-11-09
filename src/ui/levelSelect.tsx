@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { feedbackUrl } from '../analytics/analytics';
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import { MODES } from '../levels/modes';
 import { isUnlocked, type Progress } from '../progress/progress';
 import { Stars } from './reportCard';
+import { FeedbackButton } from './feedbackDialog';
 
 type Props = { levels: LevelDefinition[]; progress: Progress; notice: string | null; storageWorks: boolean; onReset: () => void };
 
@@ -121,7 +121,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
       })}
 
       <footer className="home-footer">
-        <a className="secondary" href={feedbackUrl} target="_blank" rel="noopener noreferrer">{t.feedback}</a>
+        <FeedbackButton className="secondary" info={() => ({ level: 'none' })} />
         <button className="link-button" onClick={() => setConfirming(true)}>{t.levelSelect.resetProgress}</button>
       </footer>
       {confirming && <ConfirmReset onCancel={() => setConfirming(false)} onConfirm={() => { setConfirming(false); onReset(); }} />}

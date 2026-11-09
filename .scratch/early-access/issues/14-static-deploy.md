@@ -6,7 +6,7 @@
 
 **Status:** ready-for-human
 
-- [ ] Pipeline builds, runs the tests and deploys only when they pass
+- [x] Pipeline builds, runs the tests and deploys only when they pass
 - [ ] A human chooses the host (GitHub Pages, Netlify or Cloudflare Pages), connects the domain and adds any deploy secrets
 - [ ] The deployed site loads level 1 and runs it
 
@@ -19,3 +19,5 @@
 **2026-11-05, decided.** Host: Cloudflare Pages (steps in `docs/deployment.md`). Feedback: by email; the address is still to be chosen and must be set as `VITE_FEEDBACK_URL` before publishing. Waiting on the owner's play-test.
 
 **2026-11-05, postponed.** The owner wants a landing page before publishing: see `.scratch/landing-page/`.
+
+**2026-11-07, host changed: Firebase Hosting.** Set up like System Defense ("Defend the Arki"): a Google Cloud project of its own without billing, deploy from GitHub Actions with Workload Identity Federation (no stored key). `ci.yml` has a `deploy` job: only on `main`, only after typecheck, unit and E2E tests pass, and it publishes the tested build. It stays off until `scripts/setup-gcp.sh` creates the repository variables. `deploy-pages.yml` is removed. Remaining human steps (create the project, add Firebase, run the script, set `VITE_FEEDBACK_URL`, domain later) are in `docs/deployment.md`. Status stays `ready-for-human`.

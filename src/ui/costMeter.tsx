@@ -1,4 +1,4 @@
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 
 /** Live monthly cost against the budget, with a tick for each star threshold. */
 export function CostMeter({ cost, budget, thresholds }: { cost: number; budget: number; thresholds: number[] }) {

@@ -4,9 +4,18 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Optional build settings (docs/deployment.md), set as repository variables.
+    # The E2E tests build the site with them, and the deploy job publishes that same build.
+    env:
+      VITE_ANALYTICS_SRC: ${{ vars.VITE_ANALYTICS_SRC }}
+      VITE_ANALYTICS_DOMAIN: ${{ vars.VITE_ANALYTICS_DOMAIN }}
+      VITE_ANALYTICS_WEBSITE_ID: ${{ vars.VITE_ANALYTICS_WEBSITE_ID }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -20,3 +29,53 @@ jobs:
       - run: npm run e2e
         env:
           CI: 'true'
+      # The deploy job publishes these exact files: what was tested is what goes live.
+      - name: Keep the tested build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_PROJECT_ID != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist
+          retention-days: 3
+          if-no-files-found: error
+
+  # Firebase Hosting (Google Cloud), set up like System Defense ("Defend the Arki").
+  # Only on push to main, only after every check passed. It stays off until the one-time
+  # setup (scripts/setup-gcp.sh) has created the repository variables used below.
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_PROJECT_ID != ''
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # lets GitHub ask Google for a short-lived token (no stored key)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - name: Deploy to Firebase Hosting
+        run: >
+          npx --yes firebase-tools@15.34.1 deploy --only hosting --non-interactive
+          --project "${{ vars.GCP_PROJECT_ID }}" --message "${{ github.sha }}"
+      # PRODUCTION_URL (repository variable) is the custom domain, once it is set up.
+      - name: Smoke test production
+        env:
+          URLS: https://${{ vars.GCP_PROJECT_ID }}.web.app ${{ vars.PRODUCTION_URL }}
+        run: |
+          for url in $URLS; do
+            echo "Checking $url"
+            curl -sfI "$url/" | grep -i "content-security-policy"
+            curl -sf "$url/" | grep -q "<title>Design the Arki"
+          done

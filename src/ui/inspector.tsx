@@ -1,7 +1,7 @@
 import { catalog } from '../catalog/catalog';
 import { DEFAULT_QUEUE_SIZE, hitRateOf, TIMEOUT_MS } from '../engine/simulate';
 import type { ComponentResult, DesignComponent } from '../engine/types';
-import { en as t, percent } from '../i18n/en';
+import { t, percent } from '../i18n';
 import type { ComponentOptions } from '../levels/levels';
 import type { ConnectionTarget } from './connections';
 import { instanceCountOf, loadLevel, sizeOf } from './diagram';

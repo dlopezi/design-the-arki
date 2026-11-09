@@ -2,7 +2,7 @@ import { BaseEdge, getBezierPath, Handle, Position, type Edge, type EdgeProps, t
 import { catalog } from '../catalog/catalog';
 import { hitRateOf } from '../engine/simulate';
 import type { Design, Presentation, Result } from '../engine/types';
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 import { ComponentBadge } from './componentArt';
 
 // Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
