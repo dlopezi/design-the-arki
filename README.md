@@ -1,10 +1,19 @@
-# archi-game
+# Design the Arki
 
 A browser puzzle game about software architecture, for developers preparing for system-design interviews.
 
 Each level gives you requirements (throughput, p95 latency, availability) and a budget. You place and connect components (load balancers, app servers, caches, databases), run a simulation of real traffic, and pass if your design meets the SLA. A cheaper design earns more stars. When a design fails, the game highlights the bottleneck and gives a hint.
 
-**Status:** early access, not published yet. Chapter 1 (Core) has 8 levels: Hello world, First spike, Bigger or more?, Flash sale, Popular content, A server goes down, Tight budget and Black Friday. Each level can be played in Guided, Normal, Hard or God mode.
+**Play:** https://design.thearki.com (desktop, tablet or phone; English and Spanish)
+
+**Status:** early access. Chapter 1 (Core) has 8 levels: Hello world, First spike, Bigger or more?, Flash sale, Popular content, A server goes down, Tight budget and Black Friday. Each level can be played in Guided, Normal, Hard or God mode.
+
+## Feedback
+
+- **In the game:** Title screen → **Feedback**, or **Send feedback** in a level. No account needed.
+- **On GitHub:** open an [Issue](../../issues/new/choose) (Bug or Idea).
+
+Please include the version. It is at the bottom right of the title screen.
 
 ## Getting started
 
@@ -39,8 +48,8 @@ npm run dev
 - [Product brief](docs/product-brief.md): what the game is and the decisions behind it
 - [Glossary](GLOSSARY.md): domain terms (Component, Instance, Bottleneck, …)
 - [ADRs](docs/adr/): architecture decisions
-- [Deployment](docs/deployment.md): hosting (Cloudflare Pages) and optional build settings in `.env.example`
+- [Deployment](docs/deployment.md): hosting (Firebase Hosting on Google Cloud) and optional build settings in `.env.example`
 
 ## License
 
-Closed source. All rights reserved.
+[MIT](LICENSE)

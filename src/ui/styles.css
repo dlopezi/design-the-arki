@@ -366,6 +366,27 @@ a.home-coin:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--c-dar
 .title-steps { display: grid; gap: 12px; }
 .title-steps div { padding: 12px 14px; border-radius: 10px; background: var(--panel-2); border-left: 3px solid var(--accent); }
 .title-steps h3 { font: 800 15px var(--mono); } .title-steps p { margin-top: 4px; color: var(--muted); font-size: 14.5px; }
+.title-links { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.title-links > * + *::before { content: '·'; margin-right: 8px; color: var(--muted); }
+.title-links a { text-decoration: none; } .title-links a:hover { color: var(--fg); text-decoration: underline; }
+.lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lang-switch button { min-width: 36px; min-height: 28px; padding: 2px 8px; border: none; background: transparent; color: var(--muted); font: 800 11px var(--mono); letter-spacing: .1em; }
+.lang-switch button[aria-pressed="true"] { background: rgba(56, 189, 248, .18); color: #e0f2fe; }
+
+/* Feedback dialog: also opened over the level select and the game. */
+.feedback-form { display: grid; gap: 10px; }
+.feedback-intro { color: var(--muted); font-size: 14.5px; margin: 0; }
+.feedback-form textarea { width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--fg); font: 15px/1.4 inherit; font-family: inherit; }
+.feedback-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.feedback-trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.feedback-note { margin: 0; color: var(--muted); font-size: 12.5px; }
+.feedback-status { margin: 0; font-size: 14px; } .feedback-status.warn { color: var(--warn); } .feedback-status.ok { color: var(--ok); font-size: 16px; }
+.feedback-foot { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.feedback-count { margin-right: auto; color: var(--muted); font: 600 12px var(--mono); }
+.feedback-foot .link-button { font-size: 14px; }
+.title-close:disabled { opacity: .6; }
+button.back { background: none; border: none; padding: 0; font: inherit; cursor: pointer; }
+
 .title-close { justify-self: end; padding: 10px 22px; border-radius: 10px; border: 1px solid #7dd3fc; background: linear-gradient(180deg, #0284c7, #075985); color: #fff; font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 
 @media (max-width: 899px) { .title-panels { grid-template-columns: minmax(0, 560px); } }

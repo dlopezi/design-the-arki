@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { en as t, percent } from '../i18n/en';
+import { lang, LANGS, setLang, t, percent } from '../i18n';
+import { FeedbackDialog } from './feedbackDialog';
 import { DEMO, runDemo, type DemoOutcome } from '../landing/demo';
 import { mainAction } from '../landing/mainAction';
 import { playerSummary } from '../landing/summary';
@@ -127,6 +128,8 @@ function HowToPlay({ onClose }: { onClose: () => void }) {
   );
 }
 
+const REPO_URL = 'https://github.com/dlopezi/design-the-arki';
+
 type MenuItem = { label: string; note: string } & ({ href: string } | { onClick: () => void });
 
 /** The first page a visitor sees, styled as a game's title screen: player bar, logo, main menu and a playable training demo. */
@@ -136,18 +139,21 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
   const summary = useMemo(() => playerSummary(levels, progress), [levels, progress]);
   const [selected, setSelected] = useState(0);
   const [howTo, setHowTo] = useState(false);
+  const [feedback, setFeedback] = useState(false);
   const itemRefs = useRef<(HTMLElement | null)[]>([]);
   const closeHowTo = useCallback(() => { setHowTo(false); itemRefs.current[2]?.focus(); }, []);
+  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[3]?.focus(); }, []);
 
   const menu: MenuItem[] = [
     { href: action.href, label: action.label, note: !summary.next ? l.allPassed : action.returning ? summary.next.title : l.firstNote(summary.next.title) },
     { href: levelsHref, label: l.levelMap, note: l.levelMapNote },
     { onClick: () => setHowTo(true), label: l.howToPlay, note: l.howToPlayNote },
+    { onClick: () => setFeedback(true), label: t.feedbackForm.title, note: t.feedbackForm.menuNote },
   ];
 
   // Game-style menu: ↑ / ↓ move the selection, Enter starts the selected item when nothing else has focus.
   useEffect(() => {
-    if (howTo) return;
+    if (howTo || feedback) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       const items = itemRefs.current;
@@ -168,11 +174,11 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [howTo, selected]);
+  }, [howTo, feedback, selected]);
 
   const { chapter } = summary;
-  // "archi-game" → white "archi-", glowing "game" (like "Defend the" + "Arki").
-  const split = t.levelSelect.title.lastIndexOf('-') + 1;
+  // "Design the Arki" → white "Design the ", glowing "Arki" (like "Defend the" + "Arki").
+  const split = t.levelSelect.title.lastIndexOf(' ') + 1;
   const logoA = t.levelSelect.title.slice(0, split), logoB = t.levelSelect.title.slice(split);
   const passed = levels.filter(lv => (progress.levels[lv.id]?.bestStars ?? 0) > 0).length;
   const chapterName = t.levelSelect.chapter(chapter.number, chapter.name);
@@ -195,7 +201,7 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
           <div className="title-head">
             <p className="eyebrow">{l.eyebrow}</p>
             <h1>
-              <span className="title-logo"><span className="logo-a">{logoA}</span><span className="logo-b">{logoB}</span></span>
+              <span className="title-logo"><span className="logo-a">{logoA.trimEnd()}</span>{' '}<span className="logo-b">{logoB}</span></span>
               <span className="title-tagline">{l.headline} <span>{l.headlineAccent}</span></span>
             </h1>
             <p className="title-pitch">{l.pitch}</p>
@@ -238,11 +244,21 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
           <span className="title-foot-right">
             <span>{l.freeNote}</span>
             <span className="title-badge">{l.earlyAccess}</span>
-            <span>v{__APP_VERSION__}</span>
+            <span className="lang-switch" role="group" aria-label={t.footer.language}>
+              {LANGS.map(code => (
+                <button key={code} type="button" aria-pressed={lang() === code} onClick={() => setLang(code)}>{code.toUpperCase()}</button>
+              ))}
+            </span>
+            <span className="title-links">
+              <a href={`${REPO_URL}/releases/tag/v${__APP_VERSION__}`} target="_blank" rel="noopener noreferrer" aria-label={t.footer.release(__APP_VERSION__)}>v{__APP_VERSION__}</a>
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer">{t.footer.github} ↗</a>
+              <span>{t.footer.copyright}</span>
+            </span>
           </span>
         </footer>
       </div>
       {howTo && <HowToPlay onClose={closeHowTo} />}
+      {feedback && <FeedbackDialog info={{ level: 'none' }} onClose={closeFeedback} />}
     </div>
   );
 }

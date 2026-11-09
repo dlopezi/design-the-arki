@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { catalog } from '../catalog/catalog';
 import type { Design, Level } from '../engine/types';
+import { lang, type Lang } from '../i18n';
+import { chaptersEs, levelTextEs } from './text.es';
 
 const componentType = z.string().refine(t => t in catalog, { error: issue => `Unknown component type: ${String(issue.input)}` });
 
@@ -75,7 +77,22 @@ export function parseLevel(raw: unknown): LevelDefinition {
 
 const files = import.meta.glob<{ default: unknown }>('./*.json', { eager: true });
 
-/** Every level shipped with the game, ordered by id. */
-export function allLevels(): LevelDefinition[] {
-  return Object.values(files).map(f => parseLevel(f.default)).sort((a, b) => a.id.localeCompare(b.id));
+/** The level with its texts in `language`. Rules and designs never change with the language. */
+export function translateLevel(level: LevelDefinition, language: Lang): LevelDefinition {
+  if (language === 'en') return level;
+  const text = levelTextEs[level.id];
+  if (!text) return level;
+  return {
+    ...level,
+    chapter: chaptersEs[level.chapter] ?? level.chapter,
+    title: text.title,
+    brief: text.brief,
+    guidedHint: text.guidedHint,
+    tutorial: level.tutorial?.map((step, i) => ({ ...step, ...text.tutorial?.[i] })),
+  };
+}
+
+/** Every level shipped with the game, ordered by id, with texts in the current language. */
+export function allLevels(language: Lang = lang()): LevelDefinition[] {
+  return Object.values(files).map(f => translateLevel(parseLevel(f.default), language)).sort((a, b) => a.id.localeCompare(b.id));
 }

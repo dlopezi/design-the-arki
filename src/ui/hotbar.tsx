@@ -1,5 +1,5 @@
 import { catalog } from '../catalog/catalog';
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 import { artStyle, ComponentGlyph } from './componentArt';
 
 export const DRAG_TYPE = 'application/x-archi-component';

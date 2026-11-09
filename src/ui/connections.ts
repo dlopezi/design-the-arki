@@ -1,6 +1,6 @@
 import { catalog } from '../catalog/catalog';
 import type { Design } from '../engine/types';
-import { en as t } from '../i18n/en';
+import { t } from '../i18n';
 
 /** The id of the clients (the C4 person) in a design's connections. */
 export const CLIENTS = 'client';

@@ -25,7 +25,7 @@ test('a new visitor learns what the game is, tries the demo and starts the tutor
 
 test('a returning player continues at the next open level', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('archi-game:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 3 }, '02-first-spike': { bestStars: 2 } } }));
+    localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 3 }, '02-first-spike': { bestStars: 2 } } }));
   });
   await page.goto('/');
   await expect(page.getByRole('img', { name: '5 of 24 stars collected' })).toBeVisible();

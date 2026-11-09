@@ -20,7 +20,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to the Google Cloud project id, for example: PROJECT_ID=my-project scripts/setup-gcp.sh}"
-REPO="${REPO:-dlopezi/archi-game}"
+REPO="${REPO:-dlopezi/design-the-arki}"
 BRANCH="${BRANCH:-main}"
 POOL="github"
 PROVIDER="github"

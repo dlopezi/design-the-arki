@@ -16,7 +16,6 @@ jobs:
       VITE_ANALYTICS_SRC: ${{ vars.VITE_ANALYTICS_SRC }}
       VITE_ANALYTICS_DOMAIN: ${{ vars.VITE_ANALYTICS_DOMAIN }}
       VITE_ANALYTICS_WEBSITE_ID: ${{ vars.VITE_ANALYTICS_WEBSITE_ID }}
-      VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -78,5 +77,5 @@ jobs:
           for url in $URLS; do
             echo "Checking $url"
             curl -sfI "$url/" | grep -i "content-security-policy"
-            curl -sf "$url/" | grep -q "<title>archi-game"
+            curl -sf "$url/" | grep -q "<title>Design the Arki"
           done

@@ -4,7 +4,7 @@ const stars = (n: number) => '★'.repeat(n);
 export const en = {
   play: 'Play',
   levelSelect: {
-    title: 'archi-game',
+    title: 'Design the Arki',
     subtitle: 'Design systems that survive real traffic. Pass a level to unlock the next.',
     chapter: (n: number, name: string) => `Chapter ${n} · ${name}`,
     play: 'Play',
@@ -95,6 +95,22 @@ export const en = {
     lockedMode: 'Finish the tutorial first',
   },
   feedback: 'Send feedback',
+  feedbackForm: {
+    title: 'Feedback',
+    menuNote: 'Bugs, ideas, anything',
+    intro: 'Found a bug? Have an idea? Tell me anything. It comes straight to the developer.',
+    label: 'Your message',
+    placeholder: 'Write your message here…',
+    send: 'Send',
+    sending: 'Sending…',
+    note: 'Also sent: game version, language, level, browser and screen size.',
+    tooShort: 'Write at least 5 characters.',
+    tooLong: (max: number) => `Use at most ${max} characters.`,
+    wait: 'You just sent a message. Try again in a minute.',
+    error: 'Could not send. Try again in a minute.',
+    sent: 'Thanks! Your message was sent.',
+  },
+  footer: { language: 'Language', release: (v: string) => `Release notes for v${v}`, github: 'GitHub', copyright: '© 2026 thearki' },
   levels: 'Levels',
   nextLevel: 'Next level',
   hints: {
@@ -106,6 +122,7 @@ export const en = {
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
   incidents: 'Incidents',
   newComponents: 'New components',
+  newLabel: 'New:',
   componentIntros: {
     appServer: 'runs your application code; each instance handles a limited number of requests at once.',
     database: 'stores the data every request needs; its tier sets how many queries it serves at once.',

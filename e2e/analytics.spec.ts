@@ -48,12 +48,17 @@ test('without an analytics script the game still works', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('a feedback link is visible on the level select and in the game', async ({ page }) => {
+test('Feedback opens from the level select and the game', async ({ page }) => {
   await openLevel(page, '01-hello-world');
-  await expect(page.getByRole('link', { name: 'Send feedback' })).toBeVisible();
-  // A real address even when the build setting is empty (CI passes an unset variable as '').
-  await expect(page.getByRole('link', { name: 'Send feedback' })).toHaveAttribute('href', /^(https:\/\/|mailto:)/);
+  await page.getByRole('button', { name: 'Send feedback' }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Feedback' })).toBeVisible();
+  // Keys typed in the message never reach the game's shortcuts (Delete removes the selection).
+  await page.getByRole('textbox', { name: 'Your message' }).fill('Delete');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByRole('link', { name: 'Levels' }).click();
   await expect(page.getByRole('heading', { name: 'Chapter 1 · Core' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Send feedback' })).toBeVisible();
+  await page.getByRole('button', { name: 'Send feedback' }).click();
+  // The draft survives closing the dialog.
+  await expect(page.getByRole('textbox', { name: 'Your message' })).toHaveValue('Delete');
 });
