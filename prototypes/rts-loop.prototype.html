@@ -125,6 +125,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .end .stars { font-size: 38px; color: var(--star); letter-spacing: 4px; } .end .stars .off { color: var(--line-strong); }
 .proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
+
+/* Map look: no cards. Buildings stand on the ground, a green ring marks the selection, zones are plots inside the base wall. */
+.system { border: 2px solid rgba(62,224,200,.3); border-radius: 36px; background: rgba(10,22,24,.35); padding: 12px 24px 18px; }
+.zones { gap: 40px; }
+.zone { border: 1px dashed rgba(62,224,200,.28); border-radius: 28px; padding: 10px 18px 14px;
+  background: radial-gradient(ellipse at 50% 55%, rgba(62,224,200,.07), rgba(0,0,0,.25) 75%); }
+.unit { background: none; border: 1px solid transparent; min-width: 84px; padding: 0 4px 4px; }
+.unit:hover { border-color: transparent; filter: brightness(1.15); }
+.unit .name { text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+.unit.selected { border-color: transparent; box-shadow: none; }
+.unit.selected::before { content: ''; position: absolute; left: 50%; top: var(--ring, 44px); width: 74px; height: 26px; transform: translateX(-50%);
+  border: 2px solid var(--ok); border-radius: 50%; box-shadow: 0 0 10px var(--ok); pointer-events: none; }
+.unit.small.selected::before { --ring: 34px; width: 60px; height: 22px; }
+.unit.down { border-color: transparent; } .unit.down .name { color: var(--bad); }
+.container { border: none; background: none; padding: 0; justify-items: center; }
+.container > .name { color: var(--muted); font-weight: 700; }
+.build-site { width: 460px; height: 230px; display: grid; place-content: center; gap: 6px; text-align: center; color: var(--muted);
+  border: 2px dashed rgba(251,191,36,.35); border-radius: 36px; background: repeating-linear-gradient(45deg, rgba(251,191,36,.04) 0 14px, transparent 14px 28px); }
+.build-site b { font: 800 14px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.reqmode { top: 52px; }
 </style>
 </head>
 <body>
@@ -259,30 +279,125 @@ function step(dt) {
   if (!S.over && S.t >= waveTo()) S.over = 'won';
 }
 
-// ───────── Requests as dots (canvas over the field) ─────────
+// ───────── Requests on the map (canvas over the field): four ways to draw them ─────────
+const REQ_MODES = [['people', 'Usuarios'], ['dots', 'Puntos'], ['roundtrip', 'Ida y vuelta'], ['flow', 'Flujo']];
+let reqMode = 'people';
 const particles = [];
 let spawnDebt = 0;
-const centerOf = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-function pathFor() {
-  // Where a request goes, as screen points, following the C4 layer on screen.
-  const pts = [centerOf('[data-node="users"]')];
-  if (layer === 1) { pts.push(centerOf('[data-node="system"]')); return { pts, dropAt: null }; }
+const q = (sel) => document.querySelector(sel);
+// The point where a request reaches a building: the middle of its drawing.
+function nodePoint(el) { const d = el.querySelector('svg') ?? el; const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * .6 }; }
+/** The live buildings on screen, following the C4 layer. */
+function graph() {
+  const users = q('[data-node="users"] .people') ?? q('[data-node="users"]');
+  if (!users) return null;
+  const r = users.getBoundingClientRect();
+  const g = { users: { x: r.right - 6, y: r.top + r.height / 2 } };
+  if (layer === 1) { const sys = q('[data-node="system"]'); g.system = sys && nodePoint(sys); return g; }
+  const lb = q('[data-node="loadBalancer"].live'); g.lb = lb && nodePoint(lb);
+  const apps = [...document.querySelectorAll('[data-node="appServer"].live')].map(nodePoint);
+  g.apps = layer === 3 && !lb ? apps.slice(0, 1) : apps; // without a load balancer only one factory gets traffic
+  const c = q('[data-node="cache"].live'); g.cache = c && nodePoint(c);
+  const d = q('[data-node="database"].live'); g.db = d && nodePoint(d);
+  return g;
+}
+/** One request's route; dropAt is the stop where it fails, or null when it is answered. */
+function routeFor(g) {
   const L = S.last ?? {};
-  const lb = document.querySelector('[data-node="loadBalancer"]:not(.building)');
-  if (lb) pts.push(centerOf('[data-node="loadBalancer"]:not(.building)'));
-  const appEls = [...document.querySelectorAll('[data-node="appServer"].live')];
-  const usable = layer === 3 ? (lb ? appEls : appEls.slice(0, 1)) : appEls;
-  if (!usable.length) return { pts, dropAt: pts.length - 1, fail: true };
-  const a = usable[Math.floor(Math.random() * usable.length)].getBoundingClientRect();
-  pts.push({ x: a.left + a.width / 2, y: a.top + a.height / 2 });
-  if (Math.random() < (L.dropAtApps ?? 0)) return { pts, dropAt: pts.length - 1, fail: true };
-  const cache = document.querySelector('[data-node="cache"].live');
-  if (cache) { pts.push(centerOf('[data-node="cache"].live')); if (Math.random() < (L.hit ?? 0)) return { pts, dropAt: null }; }
-  const db = document.querySelector('[data-node="database"].live');
-  if (!db) return { pts, dropAt: pts.length - 1, fail: true };
-  pts.push(centerOf('[data-node="database"].live'));
-  if (Math.random() < (L.dropAtDb ?? 0)) return { pts, dropAt: pts.length - 1, fail: true };
-  return { pts, dropAt: null };
+  const pts = [g.users];
+  if (layer === 1) { if (!g.system) return { pts, dropAt: 0 }; pts.push(g.system); return { pts, dropAt: Math.random() < (L.errors ?? 0) ? 1 : null }; }
+  if (g.lb) pts.push(g.lb);
+  if (!g.apps.length) return { pts, dropAt: pts.length - 1 };
+  pts.push(g.apps[Math.floor(Math.random() * g.apps.length)]);
+  if (Math.random() < (L.dropAtApps ?? 0)) return { pts, dropAt: pts.length - 1 };
+  if (g.cache) { pts.push(g.cache); if (Math.random() < (L.hit ?? 0)) return { pts, dropAt: null }; }
+  if (!g.db) return { pts, dropAt: pts.length - 1 };
+  pts.push(g.db);
+  return { pts, dropAt: Math.random() < (L.dropAtDb ?? 0) ? pts.length - 1 : null };
+}
+const SPEED = { dots: 260, people: 150, roundtrip: 300 };
+const PER = { dots: 25, people: 40, roundtrip: 30 }; // requests one figure stands for
+const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: route.dropAt === 0 });
+function advance(p, dt) {
+  if (p.dead || p.arrived) { p.life -= dt * (p.dead ? 1.4 : 3); return; }
+  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
+  if (!b) { p.arrived = true; onArrive(p); return; }
+  p.f += ((SPEED[reqMode] ?? 260) * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  if (p.f < 1) return;
+  p.seg++; p.f = 0;
+  if (p.dropAt !== null && p.seg >= p.dropAt) onFail(p);
+  else if (!p.pts[p.seg + 1]) { p.arrived = true; onArrive(p); }
+}
+function onFail(p) {
+  if (reqMode === 'people' && p.kind === 'req') {
+    // An unhappy user walks back home.
+    const back = p.pts.slice(0, p.seg + 1).reverse();
+    Object.assign(p, { pts: back, seg: 0, f: 0, dropAt: null, kind: 'angry' });
+  } else if (reqMode === 'roundtrip' && p.kind === 'req') {
+    p.dead = true; spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, 'error');
+  } else p.dead = true;
+}
+function onArrive(p) {
+  if (reqMode === 'roundtrip' && p.kind === 'req') spawn({ pts: [...p.pts].reverse(), dropAt: null }, 'reply');
+  if (reqMode === 'people' && p.kind === 'req') p.kind = 'happy';
+}
+const posOf = (p) => { const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a; return { x: a.x + (b.x - a.x) * p.f, y: a.y + (b.y - a.y) * p.f }; };
+function drawPerson(x, y, color) {
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y - 6, 2.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 3.4, y + 2); ctx.quadraticCurveTo(x, y - 6, x + 3.4, y + 2); ctx.closePath(); ctx.fill();
+}
+function drawParticle(p) {
+  const { x, y } = posOf(p);
+  ctx.globalAlpha = Math.max(0, p.life);
+  if (reqMode === 'people') {
+    const color = p.kind === 'angry' ? '#f87171' : p.kind === 'happy' ? '#4ade80' : '#7ff5e5';
+    ctx.shadowColor = color; ctx.shadowBlur = 6; drawPerson(x, y, color); ctx.shadowBlur = 0;
+    if (p.kind === 'angry') { ctx.font = '800 11px ui-monospace'; ctx.fillText('!', x - 2, y - 11); }
+    if (p.kind === 'happy') { ctx.font = '800 10px ui-monospace'; ctx.fillStyle = '#fde047'; ctx.fillText('+$', x + 5, y - 8 - (1 - p.life) * 14); }
+  } else if (reqMode === 'roundtrip') {
+    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 6;
+    ctx.fillRect(x - 3, y - 3 + (p.kind === 'req' ? -5 : 5), 6, 6); ctx.shadowBlur = 0;
+    if (p.kind === 'error' && p.seg === 0 && p.f < .3) { ctx.font = '800 10px ui-monospace'; ctx.fillText('503', x + 5, y - 2); }
+  } else {
+    const color = p.dead ? '#f87171' : p.arrived ? '#4ade80' : '#b7fff4';
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(x, y + (p.dead ? (1 - p.life) * 18 : 0), p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
+  }
+  ctx.globalAlpha = 1;
+}
+/** "Flujo": pipes whose width is the traffic on them, with the numbers written on top and the losses in red. */
+function drawFlow(g, now) {
+  const L = S.last; if (!L?.rps) return;
+  const servedApps = L.rps * (1 - L.dropAtApps), toDb = servedApps * (1 - L.hit);
+  const segs = [], drops = [];
+  const add = (a, b, v, bad) => a && b && v > 0 && segs.push({ a, b, v, bad });
+  if (layer === 1) { add(g.users, g.system, L.rps * (1 - L.errors), false); if (L.errors > 0) drops.push({ at: g.system ?? g.users, v: L.rps * L.errors }); }
+  else {
+    const n = Math.max(1, g.apps.length);
+    if (g.lb) { add(g.users, g.lb, L.rps); g.apps.forEach(a => add(g.lb, a, L.rps / n, L.dropAtApps > 0)); }
+    else g.apps.forEach(a => add(g.users, a, L.rps, L.dropAtApps > 0));
+    const next = g.cache ?? g.db;
+    g.apps.forEach(a => add(a, next, servedApps / n, false));
+    if (g.cache) add(g.cache, g.db, toDb, L.dropAtDb > 0);
+    if (!g.apps.length) drops.push({ at: g.lb ?? g.users, v: L.rps });
+    else if (L.dropAtApps > 0) drops.push({ at: g.apps[0], v: L.rps * L.dropAtApps });
+    if (L.dropAtDb > 0 && toDb > 0) drops.push({ at: g.db ?? g.cache ?? g.apps[0], v: toDb * L.dropAtDb });
+  }
+  ctx.lineCap = 'round';
+  for (const sgm of segs) {
+    const w = 2 + sgm.v / 45, color = sgm.bad ? '#fbbf24' : '#3ee0c8';
+    ctx.strokeStyle = color; ctx.globalAlpha = .25; ctx.lineWidth = w + 6; ctx.beginPath(); ctx.moveTo(sgm.a.x, sgm.a.y); ctx.lineTo(sgm.b.x, sgm.b.y); ctx.stroke();
+    ctx.globalAlpha = .9; ctx.lineWidth = w; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -(now / 1000) * 60 * S.speed;
+    ctx.beginPath(); ctx.moveTo(sgm.a.x, sgm.a.y); ctx.lineTo(sgm.b.x, sgm.b.y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = 1; ctx.font = '800 11px ui-monospace'; ctx.fillStyle = '#dce8e5';
+    ctx.fillText(`${Math.round(sgm.v)}/s`, (sgm.a.x + sgm.b.x) / 2 - 16, (sgm.a.y + sgm.b.y) / 2 - w / 2 - 6);
+  }
+  for (const d of drops) {
+    ctx.font = '800 12px ui-monospace'; ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 8;
+    ctx.fillText(`✕ −${Math.round(d.v)}/s`, d.at.x - 24, d.at.y + 46); ctx.shadowBlur = 0;
+  }
 }
 const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
 let lastAnim = performance.now();
@@ -295,34 +410,16 @@ function animate(now) {
     Object.assign(fx.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     ctx.setTransform(dpr, 0, 0, dpr, -r.left * dpr, -r.top * dpr);
     ctx.clearRect(r.left, r.top, r.width, r.height);
-    const running = !S.over && !S.paused;
-    // One dot stands for about 25 requests.
-    if (running && S.last?.rps) {
-      spawnDebt += (S.last.rps / 25) * dt * S.speed;
-      while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; const p = pathFor(); if (p.pts.every(Boolean)) particles.push({ ...p, seg: 0, f: 0, life: 1 }); }
-    }
-    for (const p of particles) {
-      if (running) {
-        if (p.dead) p.life -= dt * 2;
-        else {
-          const a = p.pts[p.seg], b = p.pts[p.seg + 1];
-          if (!b) { p.done = true; p.life -= dt * 4; }
-          else {
-            p.f += (260 * dt * Math.min(S.speed, 2)) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-            if (p.f >= 1) { p.seg++; p.f = 0; if (p.dropAt !== null && p.seg >= p.dropAt) p.dead = true; }
-          }
-        }
+    const running = !S.over && !S.paused, g = graph();
+    if (g && reqMode === 'flow') drawFlow(g, now);
+    else if (g) {
+      if (running && S.last?.rps) {
+        spawnDebt += (S.last.rps / PER[reqMode]) * dt * S.speed;
+        while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; spawn(routeFor(g)); }
       }
-      const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a;
-      const x = a.x + (b.x - a.x) * p.f, y = a.y + (b.y - a.y) * p.f + (p.dead ? (1 - p.life) * 18 : 0);
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.fillStyle = p.dead ? '#f87171' : p.done ? '#4ade80' : '#b7fff4';
-      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.arc(x, y, p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill();
-      if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
+      for (const p of particles) { if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt); drawParticle(p); }
+      for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
     }
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
   }
   requestAnimationFrame(animate);
 }
@@ -336,10 +433,10 @@ const spark = (vals, max, color, limit) => {
 };
 const loadOf = (type) => (S.last?.rps ? (type === 'appServer' ? S.last.rhoApp : type === 'database' ? S.last.rhoDb : type === 'cache' ? .1 : .05) : 0);
 const lvl = (rho) => (rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '');
-function unitHtml(u, size = 54) {
+function unitHtml(u, size = 64) {
   const idle = u.type === 'appServer' && u.ready && !u.down && !ready('loadBalancer').length && ready('appServer')[0] !== u;
   const rho = idle ? 0 : loadOf(u.type);
-  return `<button class="unit ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}" ${u.down ? 'data-down' : ''}>
+  return `<button class="unit ${size < 60 ? 'small' : ''} ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}">
     ${building(u.type, size)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / u.total) * 100}%"></span></span>` : ''}
     <span class="name">${u.label}</span>
     <span class="sub">${u.down ? 'caído' : !u.ready ? `en obra · ${Math.ceil(u.left)} s` : idle ? 'sin tráfico' : u.type === 'database' ? (u.upgraded ? 'Medium' : 'Small') : ''}</span>
@@ -353,15 +450,16 @@ function zoneInner(zone) {
     return [...new Set(units.map(u => u.type))].map(type => {
       const all = units.filter(u => u.type === type), live = all.filter(u => u.ready && !u.down);
       const rho = loadOf(type);
-      return `<button class="unit ${live.length ? 'live' : 'building'}" data-node="${type}" data-unit="${all[0].id}">${building(type, 54)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
+      return `<button class="unit ${live.length ? 'live' : 'building'}" data-node="${type}" data-unit="${all[0].id}">${building(type, 64)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
         <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
     }).join('');
   }
   // Layer 3: every instance; app servers sit inside their container.
   const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer');
-  return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 44)).join('')}</div>` : '');
+  return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 52)).join('')}</div>` : '');
 }
 function systemHtml() {
+  if (!S.units.length) return `<div class="build-site" data-node="site"><b>Zona de construcción</b><span>Aquí se levantará tu base.</span><span>Construye tu primer edificio con la tarjeta de abajo o las teclas 1–4.</span></div>`;
   if (layer === 1) {
     const counts = Object.keys(TYPES).map(t => [t, S.units.filter(u => u.type === t).length]).filter(([, n]) => n);
     return `<div class="system" data-node="system" style="min-width:300px"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
@@ -369,7 +467,7 @@ function systemHtml() {
       <span class="muted" style="font-size:12px">${S.units.length} edificios · mantenimiento $${upkeepPerS().toFixed(1)}/s · cambia a la capa 3 para ver cada uno</span></div>`;
   }
   return `<div class="system"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
-    <div class="zones">${ZONES.map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
+    <div class="zones">${ZONES.filter(([z]) => S.units.some(u => TYPES[u.type].zone === z)).map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
 }
 function render() {
   const wave = inWave(), building_ = S.t < TUNE.buildPhase;
@@ -398,6 +496,7 @@ function render() {
         <li class="${!L.rps ? '' : L.errors <= MAX_ERR ? 'ok' : 'bad'}"><i></i>Errores ≤ ${MAX_ERR * 100}%</li>
       </ul>
     </section>
+    <div class="c4 reqmode"><span class="label">Peticiones</span>${REQ_MODES.map(([k, n]) => `<button class="${reqMode === k ? 'on' : ''}" data-req="${k}">${n}</button>`).join('')}</div>
     <div class="c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
     ${banner}
     <div class="scene">
@@ -467,6 +566,7 @@ document.addEventListener('pointerdown', e => {
   const el = e.target.closest('button'); if (!el) return;
   if (el.dataset.build) buildUnit(el.dataset.build);
   else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); render(); }
+  else if (el.dataset.req) { reqMode = el.dataset.req; particles.length = 0; render(); }
   else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; render(); }
   else if (el.dataset.unit) { S.selected = Number(el.dataset.unit); render(); }
   else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
