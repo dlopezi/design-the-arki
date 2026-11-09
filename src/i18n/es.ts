@@ -26,6 +26,7 @@ export const es: Strings = {
     cancel: 'Cancelar',
     reset: 'Borrar',
     more: 'Más',
+    home: 'Inicio',
   },
   landing: {
     headline: 'Mira cómo se rompe tu sistema.',
@@ -249,7 +250,6 @@ export const es: Strings = {
     briefingTitle: 'Antes de tu primera misión',
     briefingIntro: 'Los usuarios envían peticiones a tu base. Cada edificio las atiende a su manera. Estos son los edificios que vas a usar. Léelos y empieza el nivel 1.',
     start: 'Empezar nivel 1',
-    back: 'Volver',
     list: 'Edificios',
     role: 'Para qué sirve',
     when: 'Cuándo construirlo',
@@ -292,6 +292,5 @@ export const es: Strings = {
     buildingCount: (n: number) => `${n} edificio${n === 1 ? '' : 's'}`,
     districtCount: (n: number) => `${n} distrito${n === 1 ? '' : 's'}`,
     map: 'Mapa de tu base',
-    back: 'Volver',
   },
 };

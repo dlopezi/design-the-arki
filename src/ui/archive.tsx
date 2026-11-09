@@ -32,7 +32,8 @@ export function Archive({ levels, progress, briefing }: Props) {
   return (
     <main className="archive">
       <nav className="page-bar">
-        <a href={briefing ? '#' : levelsHref}>← {a.back}</a>
+        <a href="#">← {t.levelSelect.home}</a>
+        {!briefing && <a href={levelsHref}>{t.levels} →</a>}
       </nav>
       <header className="page-head">
         <span className="console-label">{briefing ? a.briefingEyebrow : a.list}</span>

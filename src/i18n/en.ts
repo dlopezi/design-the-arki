@@ -23,6 +23,7 @@ export const en = {
     cancel: 'Cancel',
     reset: 'Reset',
     more: 'More',
+    home: 'Home',
   },
   landing: {
     headline: 'Watch your system break.',
@@ -246,7 +247,6 @@ export const en = {
     briefingTitle: 'Before your first mission',
     briefingIntro: 'Users send requests to your base. Each building handles them in its own way. These are the buildings you will use. Read them, then start level 1.',
     start: 'Start level 1',
-    back: 'Back',
     list: 'Buildings',
     role: 'What it does',
     when: 'When to build it',
@@ -289,7 +289,6 @@ export const en = {
     buildingCount: (n: number) => `${n} building${n === 1 ? '' : 's'}`,
     districtCount: (n: number) => `${n} district${n === 1 ? '' : 's'}`,
     map: 'Map of your base',
-    back: 'Back',
   },
 };
 export type Strings = typeof en;

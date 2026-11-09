@@ -59,6 +59,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
   return (
     <main className="home">
       <header className="home-topbar">
+        <a className="home-back" href="#">← {t.levelSelect.home}</a>
         <h1 className="home-brand">{t.levelSelect.title}</h1>
         <nav className="home-links" aria-label={t.levelSelect.more}>
           <a href={baseHref}>{t.base.title}</a>

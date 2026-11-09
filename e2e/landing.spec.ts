@@ -48,6 +48,9 @@ test('the title screen menu links to the level map', async ({ page }) => {
   await page.getByRole('link', { name: 'Level map' }).click();
   await expect(page).toHaveURL(/#levels$/);
   await expect(page.getByRole('heading', { name: 'Chapter 1 · Core' })).toBeVisible();
+  // …and the level map leads back to the title screen.
+  await page.getByRole('link', { name: '← Home' }).click();
+  await expect(page.getByRole('navigation', { name: 'Main menu' })).toBeVisible();
 });
 
 test('the menu works from the keyboard like a game menu', async ({ page }) => {

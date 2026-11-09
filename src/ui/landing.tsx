@@ -7,10 +7,16 @@ import { playerSummary } from '../landing/summary';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
 import { loadLevel } from './diagram';
+import { Building } from './componentArt';
 import { archiveHref, baseHref, levelsHref } from './routes';
 import { baseOf } from '../base/base';
 
-/** A small C4-style picture of the demo design, with requests travelling along the connections. */
+/** A building drawn inside the demo's SVG, its top-left corner at (x, y). */
+const DemoBuilding = ({ type, x, y, size }: { type: string; x: number; y: number; size: number }) => (
+  <g transform={`translate(${x}, ${y})`}><Building type={type} size={size} /></g>
+);
+
+/** A small C4-style picture of the demo design, with the game's buildings and requests travelling along the connections. */
 function DemoDiagram({ instances, rps, outcome }: { instances: number; rps: number; outcome: DemoOutcome }) {
   const lb = instances > 1;
   const gap = 58, height = Math.max(120, instances * gap + 40), mid = height / 2;
@@ -35,15 +41,25 @@ function DemoDiagram({ instances, rps, outcome }: { instances: number; rps: numb
         )))}
       </g>
       <g className="demo-person"><circle cx="58" cy={mid - 18} r="13" /><rect x="22" y={mid - 2} width="74" height="34" rx="12" /><text x="59" y={mid + 20}>{t.landing.demo.clients}</text></g>
-      {lb && <g className="demo-node"><rect x="160" y={mid - 22} width="80" height="44" rx="8" /><text x="200" y={mid - 3}>{t.landing.demo.loadBalancer[0]}</text><text x="200" y={mid + 12}>{t.landing.demo.loadBalancer[1]}</text></g>}
+      {lb && <g className="demo-node">
+        <rect x="160" y={mid - 22} width="80" height="44" rx="3" />
+        <DemoBuilding type="loadBalancer" x={178} y={mid - 22} size={44} />
+        <text x="200" y={mid + 36} className="demo-sub">{t.landing.demo.loadBalancer.join(' ')}</text>
+      </g>}
       {apps.map((a, i) => (
         <g key={i} className={`demo-node ${loadLevel(a.load)}`}>
-          <rect x={appX} y={a.y - 22} width="100" height="44" rx="8" />
-          <text x={appX + 50} y={a.y - 3}>app-{i + 1}</text>
-          <text x={appX + 50} y={a.y + 13} className="demo-sub">{t.landing.demo.load(Math.round(a.load * 100))}</text>
+          <rect x={appX} y={a.y - 22} width="100" height="44" rx="3" />
+          <DemoBuilding type="appServer" x={appX + 1} y={a.y - 19} size={38} />
+          <text x={appX + 68} y={a.y - 3}>app-{i + 1}</text>
+          <text x={appX + 68} y={a.y + 13} className="demo-sub">{t.landing.demo.load(Math.round(a.load * 100))}</text>
         </g>
       ))}
-      <g className="demo-node"><rect x={dbX} y={mid - 22} width="96" height="44" rx="8" /><text x={dbX + 48} y={mid - 3}>{t.landing.demo.database}</text><text x={dbX + 48} y={mid + 12} className="demo-sub">{t.landing.demo.databaseTech}</text></g>
+      <g className="demo-node">
+        <rect x={dbX} y={mid - 22} width="96" height="44" rx="3" />
+        <DemoBuilding type="database" x={dbX + 1} y={mid - 19} size={38} />
+        <text x={dbX + 64} y={mid - 3}>{t.landing.demo.database}</text>
+        <text x={dbX + 64} y={mid + 12} className="demo-sub">{t.landing.demo.databaseTech}</text>
+      </g>
     </svg>
   );
 }

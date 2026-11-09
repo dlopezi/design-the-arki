@@ -46,8 +46,8 @@ export function BasePage({ levels, progress }: { levels: LevelDefinition[]; prog
   return (
     <main className="base-page">
       <nav className="page-bar">
-        <a href={levelsHref}>← {t.levels}</a>
-        <a href={archiveHref}>{t.archive.title} →</a>
+        <a href="#">← {t.levelSelect.home}</a>
+        <span className="page-links"><a href={levelsHref}>{t.levels}</a><a href={archiveHref}>{t.archive.title}</a></span>
       </nav>
       <header className="page-head">
         <span className="console-label">{t.levelSelect.title}</span>
