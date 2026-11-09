@@ -1,9 +1,9 @@
 <!doctype html>
 <!-- PROTOTYPE, throwaway: does a real-time strategy loop feel right? A build phase, then ONE wave of users per level
-     (each level teaches one idea), money that grows by itself and per visit, reputation, and the base as an isometric map
-     (like "Your base") that you move over, with C4 zones as plots and connections you draw between buildings.
-     Requests travel there and back. Not part of the build and not the real engine: a simple capacity model stands in.
-     Open with the dev server at /prototypes/rts-loop.prototype.html. -->
+     (each level teaches one idea), money that grows by itself and per visit, reputation, the base drawn in C4 layers on a
+     map you can pan and zoom, connection lines between buildings (made automatically, changed by dragging), and every
+     request visible as it travels along those lines. Not part of the build and not the real engine: a simple capacity
+     model stands in. Open with the dev server at /prototypes/rts-loop.prototype.html. Tune the numbers with the ⚙ panel. -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -31,6 +31,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn.on { border-color: var(--accent); color: var(--accent); }
 .app { height: 100%; display: grid; grid-template-rows: 52px minmax(0, 1fr) 230px; }
 
+/* Top bar */
 .bar { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--steel); border-bottom: 2px solid var(--line-strong); }
 .bar h1 { margin: 0; font: 800 16px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 .levels { display: flex; gap: 4px; margin-right: auto; }
@@ -42,56 +43,67 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rep { width: 110px; height: 10px; background: #0a1112; border: 1px solid var(--line-strong); }
 .rep span { display: block; height: 100%; -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px); }
 
-/* The map */
-.field { position: relative; overflow: hidden; background: radial-gradient(900px 520px at 55% 45%, #0c1b1d 0%, #05090b 75%); }
-#world { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
-#world.panning { cursor: grabbing; } #world.linking { cursor: crosshair; }
-.hud { position: absolute; z-index: 2; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); }
-.mission { top: 12px; left: 12px; width: 270px; padding: 12px 14px; display: grid; gap: 6px; }
+/* Field: a map you can pan (drag the ground) and zoom (wheel). The world moves; the panels stay. */
+.field { position: relative; overflow: hidden; cursor: grab; background: radial-gradient(900px 520px at 50% 45%, #0c1b1d 0%, #05090b 75%); }
+.field.panning { cursor: grabbing; }
+.world { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; transform-origin: 0 0;
+  background-image: linear-gradient(rgba(62,224,200,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(62,224,200,.07) 1px, transparent 1px); background-size: 48px 48px; }
+.scene { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; display: flex; align-items: center; justify-content: center; gap: 90px; }
+.mission { position: absolute; top: 12px; left: 12px; width: 270px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); display: grid; gap: 6px; z-index: 5; cursor: default; }
 .mission ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 .mission li { display: flex; gap: 8px; align-items: center; }
 .mission li i { width: 12px; height: 12px; border: 2px solid var(--line-strong); flex: none; }
 .mission li.ok i { background: var(--ok); border-color: var(--ok); } .mission li.bad i { background: var(--bad); border-color: var(--bad); }
 .lesson { padding: 6px 8px; border-left: 3px solid var(--accent); background: rgba(62,224,200,.07); font-size: 13px; }
-.howto { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
-.howto b { color: var(--fg); }
-.c4 { top: 12px; right: 12px; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; }
-.c4 .label { margin-right: 8px; }
-.c4 button { padding: 3px 9px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 11.5px var(--mono); }
-.c4 button.on { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
-.zoombox { top: 52px; right: 12px; display: flex; gap: 2px; padding: 3px; }
-.zoombox button { width: 28px; height: 26px; border: 1px solid var(--line-strong); background: #0b1416; font: 800 14px var(--mono); }
-.banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 3; white-space: nowrap; pointer-events: none; }
+.panel-tr { position: absolute; right: 12px; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; background: var(--steel); border: 1px solid var(--line-strong); cursor: default; }
+.panel-tr .label { margin-right: 8px; }
+.panel-tr button { padding: 3px 9px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 11.5px var(--mono); }
+.panel-tr button.on { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
+.c4 { top: 12px; } .reqmode { top: 52px; } .viewctl { top: 92px; }
+.hint { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 5; padding: 4px 12px; background: rgba(6,11,12,.85); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; pointer-events: none; }
+.hint b { color: var(--fg); }
+.crowd { display: grid; justify-items: center; gap: 4px; min-width: 110px; padding: 6px; border: 1px solid transparent; }
+.crowd .people { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; min-height: 48px; align-content: center; }
+.crowd .people i { width: 22px; height: 22px; background: no-repeat center/contain url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="%232aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="%2313262a" stroke="%233ee0c8" stroke-width="3"/></svg>'); }
+.crowd .count { font: 800 13px var(--mono); }
+.crowd .wait { font-size: 12px; color: var(--muted); text-align: center; }
+.system { border: 2px solid rgba(62,224,200,.3); border-radius: 36px; background: rgba(10,22,24,.35); padding: 12px 24px 18px; display: grid; gap: 8px; box-shadow: inset 0 0 40px rgba(62,224,200,.06); }
+.system > .label { font-size: 12px; } .system .kind { font: 400 11px system-ui; color: var(--muted); letter-spacing: 0; text-transform: none; text-shadow: none; }
+.zones { display: flex; align-items: center; gap: 70px; }
+.zone { border: 1px dashed rgba(62,224,200,.28); border-radius: 28px; padding: 10px 18px 14px; display: grid; gap: 10px; justify-items: center; min-width: 120px;
+  background: radial-gradient(ellipse at 50% 55%, rgba(62,224,200,.07), rgba(0,0,0,.25) 75%); }
+.zone .zname { font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; justify-self: start; }
+.zone .zname small { font: 400 11px system-ui; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.unit { position: relative; display: grid; justify-items: center; padding: 0 4px 4px; border: none; background: none; min-width: 84px; cursor: pointer; }
+.unit:hover { filter: brightness(1.15); }
+.unit .name { font: 800 10.5px var(--mono); text-transform: uppercase; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+.unit .sub { font-size: 10.5px; color: var(--muted); }
+.unit .load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
+.unit .load span { display: block; height: 100%; background: var(--ok); }
+.unit .load.medium span { background: var(--warn); } .unit .load.high span { background: var(--bad); }
+.unit .progress { position: absolute; left: 10px; right: 10px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
+.unit .progress span { display: block; height: 100%; background: var(--warn); }
+.unit.building svg { opacity: .45; filter: grayscale(.6); }
+.unit.down svg { filter: grayscale(1) brightness(.6); } .unit.down .name { color: var(--bad); }
+.unit.deadend .sub { color: var(--warn); }
+/* Selected: the building's own base lights up in neon, in its type's colour. */
+.unit.selected svg > polygon:first-child { stroke: var(--c); stroke-opacity: 1; stroke-width: 2.5; fill: color-mix(in srgb, var(--c) 28%, #111a1e);
+  filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
+.container { display: grid; gap: 10px; justify-items: center; }
+.container > .name { font: 700 10.5px var(--mono); text-transform: uppercase; color: var(--muted); }
+.ctx-buildings { display: flex; gap: 8px; align-items: center; }
+.ctx-buildings b { font: 800 12px var(--mono); }
+.build-site { width: 460px; height: 230px; display: grid; place-content: center; gap: 6px; text-align: center; color: var(--muted);
+  border: 2px dashed rgba(251,191,36,.35); border-radius: 36px; background: repeating-linear-gradient(45deg, rgba(251,191,36,.04) 0 14px, transparent 14px 28px); }
+.build-site b { font: 800 14px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--steel); border: 1px solid var(--accent); font: 800 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; z-index: 5; white-space: nowrap; pointer-events: none; }
 .banner.warn { border-color: var(--warn); color: var(--warn); } .banner.bad { border-color: var(--bad); color: var(--bad); }
-.log { position: absolute; left: 12px; right: 12px; bottom: 8px; display: flex; gap: 6px; overflow: hidden; z-index: 2; font: 12px var(--mono); pointer-events: none; }
+.log { position: absolute; left: 12px; right: 12px; bottom: 8px; display: flex; gap: 6px; overflow: hidden; z-index: 5; font: 12px var(--mono); pointer-events: none; }
 .log div { flex: none; padding: 3px 8px; background: rgba(6,11,12,.9); border-left: 2px solid var(--accent); white-space: nowrap; }
 .log div.warn { border-left-color: var(--warn); } .log div.bad { border-left-color: var(--bad); } .log div.ok { border-left-color: var(--ok); }
+#fx { position: fixed; pointer-events: none; z-index: 4; }
 
-/* SVG world */
-.ground { fill: #08110f; }
-.ground-grid { stroke: rgba(62,224,200,.05); }
-.wall { fill: rgba(10,22,24,.45); stroke: rgba(62,224,200,.35); stroke-width: 3; }
-.plot { fill: rgba(62,224,200,.05); stroke: rgba(62,224,200,.35); stroke-dasharray: 8 6; stroke-width: 1.5; }
-.site { fill: url(#hatch); stroke: rgba(251,191,36,.45); stroke-dasharray: 10 6; stroke-width: 2; }
-.zlabel { fill: var(--accent); font: 800 13px var(--mono); letter-spacing: .12em; }
-.zkind { fill: var(--muted); font: 400 11px system-ui; }
-.ulabel { fill: var(--fg); font: 800 11px var(--mono); text-anchor: middle; paint-order: stroke; stroke: #05090b; stroke-width: 4px; stroke-linejoin: round; }
-.usub { fill: var(--muted); font: 400 10.5px system-ui; text-anchor: middle; paint-order: stroke; stroke: #05090b; stroke-width: 4px; }
-.usub.bad { fill: var(--bad); }
-.unit { cursor: pointer; }
-.unit:hover > svg { filter: brightness(1.18); }
-.unit.building > svg { opacity: .5; }
-.unit.down > svg { filter: grayscale(1) brightness(.55); }
-/* Selected: the building's own base glows in its type's colour. */
-.unit.selected > svg > polygon:first-child { stroke: var(--c); stroke-opacity: 1; stroke-width: 2.5; fill: color-mix(in srgb, var(--c) 28%, #111a1e); filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
-.link { stroke: rgba(62,224,200,.55); stroke-width: 3; fill: none; filter: drop-shadow(0 0 3px rgba(62,224,200,.6)); pointer-events: none; }
-.link-hit { stroke: transparent; stroke-width: 16; fill: none; cursor: pointer; }
-.link.selected { stroke: #fff; }
-.link.temp { stroke: var(--warn); stroke-dasharray: 6 6; }
-.gate { cursor: crosshair; }
-#fx, #temp { pointer-events: none; }
-.gate-pad { fill: rgba(62,224,200,.08); stroke: rgba(62,224,200,.6); stroke-width: 2; }
-
+/* Console */
 .console { display: grid; grid-template-columns: 360px minmax(0, 1fr) 380px; border-top: 2px solid var(--line-strong); }
 .frame { padding: 10px 14px; background: var(--steel); box-shadow: var(--bevel); min-width: 0; overflow: hidden; }
 .frame + .frame { border-left: 2px solid var(--line-strong); }
@@ -116,6 +128,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .card .t { position: absolute; top: 2px; right: 4px; font: 700 9.5px var(--mono); color: var(--muted); }
 .card kbd { position: absolute; top: 2px; left: 4px; font: 700 9.5px var(--mono); color: var(--accent); }
 .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.tune { position: absolute; right: 16px; top: 60px; z-index: 6; width: 300px; padding: 12px 14px; background: var(--steel); border: 1px solid var(--warn); display: grid; gap: 6px; }
+.tune label { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: 12.5px; }
+.tune input { width: 70px; background: #060b0c; color: var(--fg); border: 1px solid var(--line-strong); padding: 2px 4px; font: 12px var(--mono); }
 .backdrop { position: fixed; inset: 0; background: rgba(2,7,6,.75); display: grid; place-items: center; z-index: 10; }
 .end { width: 440px; padding: 24px; background: var(--steel); border: 1px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
 .end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
@@ -124,35 +140,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 </style>
 </head>
 <body>
-<div class="app">
-  <header class="bar" id="bar"></header>
-  <main class="field" id="field">
-    <svg id="world">
-      <defs><pattern id="hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="16" height="16" fill="rgba(251,191,36,.03)"/><rect width="7" height="16" fill="rgba(251,191,36,.07)"/></pattern></defs>
-      <g id="cam"><g id="ground"></g><g id="links"></g><g id="units"></g><g id="fx"></g><g id="temp"></g></g>
-    </svg>
-    <div id="hud"></div>
-  </main>
-  <footer class="console" id="console"></footer>
-</div>
-<div id="overlay"></div>
+<div class="app" id="app"></div>
+<canvas id="fx"></canvas>
 <span class="proto">PROTOTIPO · MODELO SIMPLIFICADO, NO ES EL MOTOR REAL</span>
 <script>
-// ───────── Numbers ─────────
+// ───────── Tunable numbers (⚙ panel) ─────────
 const TUNE = { passive: 2, per100Visits: 1, upkeepFactor: 100, buildPhase: 30, refund: 0.5 };
+const TUNE_LABELS = { passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 visitas', upkeepFactor: 'Mantenimiento: coste/mes ÷', buildPhase: 'Fase de construcción (s)', refund: 'Devolución al quitar (0–1)' };
+
+// ───────── Three mini-levels: ONE wave each, ONE idea each ─────────
 const LEVELS = [
-  { title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
+  { id: 'spike', title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 150, wave: { rps: 300, length: 45 }, stars: [110, 150] },
-  { title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
+  { id: 'cache', title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
     allowed: ['loadBalancer', 'appServer', 'cache', 'database'], start: 200, wave: { rps: 420, length: 45 }, stars: [130, 180], noUpgrade: true },
-  { title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
+  { id: 'n1', title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 220, wave: { rps: 300, length: 50, incidentAt: 20 }, stars: [110, 160] },
 ];
 let level = LEVELS[0];
 const P95 = 200, MAX_ERR = 0.01;
 const waveFrom = () => TUNE.buildPhase, waveTo = () => TUNE.buildPhase + level.wave.length;
 
-// ───────── Buildings and the rules for connecting them ─────────
+// ───────── Buildings ─────────
 const TYPES = {
   loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', zone: 'edge', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
   appServer: { name: 'Fábrica', comp: 'App server', zone: 'app', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
@@ -160,19 +169,11 @@ const TYPES = {
   database: { name: 'Silos', comp: 'Base de datos', zone: 'data', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
 };
 const DB_UPGRADE = { price: 100, monthly: 100, cap: 800 };
-// Who may send requests to whom (as in the game). Connections join component types, like the game's diagram.
-const CAN = { users: ['loadBalancer', 'appServer'], loadBalancer: ['appServer'], appServer: ['cache', 'database'], cache: ['database'] };
-const NAME = { users: 'Usuarios', ...Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [k, v.name])) };
-
-// The map, in units of the isometric world: zones are diamond plots in a row inside the base wall.
-const ZONES = { edge: { name: 'Borde', x: -240, y: 0, w: 120 }, app: { name: 'Aplicación', x: 40, y: 0, w: 175 }, data: { name: 'Datos', x: 340, y: 0, w: 135 } };
-const GATE = { x: -520, y: 0 };
-const WALL = { x: 50, y: 0, w: 500, h: 250 };
-const diamond = (x, y, w, h = w / 2) => `${x - w},${y} ${x},${y - h} ${x + w},${y} ${x},${y + h}`;
+const ZONES = [['edge', 'Borde'], ['app', 'Aplicación'], ['data', 'Datos']];
 
 function shade(hex, f) { const t = f > 0 ? 255 : 0, k = Math.abs(f); return '#' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).map(v => Math.round(v + (t - v) * k).toString(16).padStart(2, '0')).join(''); }
-const PT = (pts) => pts.map(p => p.join(',')).join(' ');
-function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${PT([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${PT([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${PT([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
+const P = (pts) => pts.map(p => p.join(',')).join(' ');
+function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${P([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${P([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${P([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
 function cyl(cx, cy, r, h, p) { const ry = r / 2, top = cy - h; return `<g stroke="${p.dark}" stroke-width=".6"><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx + r},${cy} L${cx + r},${top} Z" fill="${p.base}"/><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx},${cy + ry} L${cx},${top + ry} A${r} ${ry} 0 0 1 ${cx - r},${top} Z" fill="${p.dark}" stroke="none"/><ellipse cx="${cx}" cy="${top}" rx="${r}" ry="${ry}" fill="${p.top}"/></g>`; }
 const DRAW = {
   loadBalancer: p => box(32, 48, 14, 6, p) + box(32, 41, 2.5, 26, p) + `<path d="M32 20 L18 27 M32 20 L46 27" stroke="${p.light}" stroke-width="1.4"/><circle cx="32" cy="12" r="6" fill="${p.glow}" opacity=".3"/><circle cx="32" cy="12" r="2.6" fill="${p.glow}"/>`,
@@ -180,86 +181,160 @@ const DRAW = {
   cache: p => box(32, 50, 16, 7, p) + `<ellipse cx="32" cy="43" rx="9" ry="4.5" fill="${p.glow}" opacity=".55"/><polygon points="32,6 41,22 32,38 23,22" fill="${p.light}"/><polygon points="32,6 41,22 32,38" fill="${p.base}"/><polygon points="32,11 36,22 32,30 28,22" fill="${p.glow}" opacity=".85"/>`,
   database: p => cyl(41, 45, 8, 20, p) + cyl(26, 52, 11, 27, p),
 };
-function building(type, size, x = 0, y = 0) {
+function building(type, size) {
   const c = TYPES[type].color;
   const p = { base: c, light: shade(c, .25), dark: shade(c, -.45), top: shade(c, .45), glow: shade(c, .6) };
-  return `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 64 64" overflow="visible"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
 }
 
 // ───────── State ─────────
-let S, layer = 3, cam = { x: 0, y: 0, k: 1 }, camSet = false;
+let S, layer = 3, tuneOpen = false, reqMode = 'roundtrip';
+const view = { x: 0, y: 0, z: 1 };
 function reset(next = level) {
   level = next;
-  S = { t: 0, money: level.start, rep: 100, units: [], links: {}, nextId: 1, selected: null, speed: 1, paused: false, over: null,
-    hist: [], last: null, log: [], incidentDone: false, waveStarted: false, visits: 0 };
-  log(`${level.title}: construye y conecta tu base. Los usuarios llegan en ${TUNE.buildPhase} s.`, 'ok');
+  S = { t: 0, money: level.start, rep: 100, units: [], links: [], auto: true, nextId: 1, selected: null, selectedLink: null,
+    speed: 1, paused: false, over: null, hist: [], flow: null, last: null, log: [], incidentDone: false, waveStarted: false, visits: 0 };
+  log(`${level.title}: prepara tu base. Los usuarios llegan en ${TUNE.buildPhase} s.`, 'ok');
   particles.length = 0;
+  centerView();
+}
+function centerView() {
+  const field = document.querySelector('.field');
+  const w = field?.clientWidth ?? 1200, h = field?.clientHeight ?? 560;
+  Object.assign(view, { z: 1, x: (w - 1600) / 2 + 120, y: (h - 900) / 2 });
 }
 function log(text, kind = '') { S.log.unshift({ text: `[${fmt(S.t)}] ${text}`, kind }); S.log = S.log.slice(0, 6); }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const ready = (type) => S.units.filter(u => u.type === type && u.ready && !u.down);
+const unitById = (id) => S.units.find(u => u.id === id);
+const isLive = (id) => id === 'users' || (unitById(id)?.ready && !unitById(id)?.down);
+const ofType = (type) => S.units.filter(u => u.type === type);
+const nameOf = (id) => id === 'users' ? 'Usuarios' : unitById(id)?.label ?? '?';
 const upkeepPerS = () => S.units.reduce((sum, u) => sum + (u.upgraded ? DB_UPGRADE.monthly : TYPES[u.type].monthly), 0) / TUNE.upkeepFactor;
 const inWave = () => S.t >= waveFrom() && S.t < waveTo();
+
+// ───────── Connections: made automatically when you build, changed by dragging ─────────
+const linkKey = (l) => `${l.from}>${l.to}`;
+const hasLink = (from, to) => S.links.some(l => l.from === from && l.to === to);
+const reaches = (from, to) => from === to || S.links.some(l => l.from === from && reaches(l.to, to));
+/** Why a link is not allowed, or null when it is. */
+function linkProblem(from, to) {
+  if (from === to) return 'un edificio no se conecta consigo mismo';
+  if (to === 'users') return 'las peticiones no vuelven a los usuarios por una línea';
+  if (from !== 'users' && unitById(from)?.type === 'database') return 'los silos no envían peticiones';
+  if (hasLink(from, to)) return 'ya están conectados';
+  if (reaches(to, from)) return 'eso haría un círculo';
+  return null;
+}
+function addLink(from, to, quiet = false) {
+  const problem = linkProblem(from, to);
+  if (problem) { if (!quiet) log(`No se puede conectar: ${problem}.`, 'warn'); return false; }
+  // The users reach the system through one entrance: a new one replaces the old.
+  if (from === 'users') S.links = S.links.filter(l => l.from !== 'users');
+  S.links.push({ from, to });
+  if (!quiet) log(`Conectado: ${nameOf(from)} → ${nameOf(to)}`, 'ok');
+  return true;
+}
+function removeLink(i) { const l = S.links[i]; if (!l) return; S.links.splice(i, 1); S.selectedLink = null; log(`Conexión quitada: ${nameOf(l.from)} → ${nameOf(l.to)}`); render(); }
+/** Default wiring for a new building: what a player would almost always want. */
+function autoLink(u) {
+  const lbs = ofType('loadBalancer'), apps = ofType('appServer'), caches = ofType('cache'), dbs = ofType('database');
+  const dataTarget = caches[0]?.id ?? dbs[0]?.id;
+  if (u.type === 'loadBalancer') {
+    S.links = S.links.filter(l => !(l.from === 'users'));
+    addLink('users', u.id, true);
+    apps.forEach(a => addLink(u.id, a.id, true));
+  } else if (u.type === 'appServer') {
+    if (lbs[0]) addLink(lbs[0].id, u.id, true); else if (!S.links.some(l => l.from === 'users')) addLink('users', u.id, true);
+    if (dataTarget) addLink(u.id, dataTarget, true);
+  } else if (u.type === 'cache') {
+    // The cache goes in front of the database: factories that went straight to the silos now go through it.
+    const db = dbs[0];
+    if (db) S.links = S.links.filter(l => !(l.to === db.id && unitById(l.from)?.type === 'appServer'));
+    apps.forEach(a => { if (!S.links.some(l => l.from === a.id)) addLink(a.id, u.id, true); });
+    if (db) addLink(u.id, db.id, true);
+  } else if (u.type === 'database') {
+    if (caches[0] && !S.links.some(l => l.from === caches[0].id)) addLink(caches[0].id, u.id, true);
+    else apps.forEach(a => { if (!S.links.some(l => l.from === a.id)) addLink(a.id, u.id, true); });
+  }
+}
+function rewireAll() { S.links = []; for (const u of S.units) autoLink(u); log('Conexiones automáticas restablecidas', 'ok'); render(); }
 
 function buildUnit(type) {
   const spec = TYPES[type];
   if (S.over || S.money < spec.price || !level.allowed.includes(type)) return;
   S.money -= spec.price;
-  const count = S.units.filter(u => u.type === type).length + 1;
-  const id = S.nextId++;
-  S.units.push({ id, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, total: spec.build, ready: false, down: false, upgraded: false });
-  S.selected = { unit: id };
-  if (layer === 1) layer = 3;
+  const count = ofType(type).length + 1;
+  const u = { id: S.nextId++, type, label: type === 'appServer' ? `app-${count}` : spec.comp, left: spec.build, total: spec.build, ready: false, down: false, upgraded: false };
+  S.units.push(u);
+  if (S.auto) autoLink(u);
+  S.selected = u.id; S.selectedLink = null;
+  if (layer === 1) layer = 3; // layer 1 shows no buildings: show the new one
   log(`Construyendo ${spec.name} (${spec.build} s)`);
-  renderAll();
+  render();
 }
 function removeUnit(id) {
-  const u = S.units.find(x => x.id === id); if (!u) return;
+  const u = unitById(id); if (!u) return;
   const back = Math.round(TYPES[u.type].price * TUNE.refund);
-  S.money += back; S.units = S.units.filter(x => x.id !== id); S.selected = null;
-  if (!S.units.some(x => x.type === u.type)) for (const [from, to] of Object.entries(S.links)) if (from === u.type || to === u.type) delete S.links[from];
-  log(`${TYPES[u.type].name} quitado: +$${back}`); renderAll();
-}
-function connect(from, to) {
-  if (from === to) return;
-  if (!(CAN[from] ?? []).includes(to)) { log(`No se puede conectar ${NAME[from]} → ${NAME[to]}`, 'bad'); renderAll(); return; }
-  S.links[from] = to; S.selected = { link: from };
-  log(`Conectado: ${NAME[from]} → ${NAME[to]}`, 'ok'); renderAll();
+  S.money += back; S.units = S.units.filter(x => x.id !== id); S.links = S.links.filter(l => l.from !== id && l.to !== id); S.selected = null;
+  log(`${TYPES[u.type].name} quitado: +$${back}`); render();
 }
 function upgradeDb(id) {
-  const u = S.units.find(x => x.id === id);
+  const u = unitById(id);
   if (!u || u.upgraded || level.noUpgrade || S.money < DB_UPGRADE.price) return;
   S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = u.total = 6;
-  log('Mejorando los silos a tier Medium (6 s)', 'warn'); renderAll();
+  log('Mejorando los silos a tier Medium (6 s)', 'warn'); render();
 }
 function callNow() {
   if (S.t >= TUNE.buildPhase) return;
   const bonus = Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2);
   S.money += bonus; S.t = TUNE.buildPhase;
-  log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); renderAll();
+  log(`¡Que vengan ya! Bonus +$${bonus}`, 'ok'); render();
 }
 
-// ───────── Simplified capacity model, following the player's connections ─────────
-function chain() { const out = []; let cur = S.links.users; while (cur && !out.includes(cur)) { out.push(cur); cur = S.links[cur]; } return out; }
-function flowModel(rps) {
-  const c = chain(), lb = ready('loadBalancer')[0], apps = ready('appServer'), db = ready('database')[0], cache = ready('cache')[0];
-  const ai = c.indexOf('appServer');
-  const viaLb = c[0] === 'loadBalancer' && ai === 1 && !!lb;
-  const reached = ai === 0 || viaLb;
-  const usableApps = !reached ? 0 : viaLb ? apps.length : Math.min(1, apps.length); // without a load balancer only one factory gets traffic
-  const after = ai < 0 ? [] : c.slice(ai + 1);
-  const cacheOn = after[0] === 'cache' && !!cache;
-  const dbOn = !!db && (after[0] === 'database' || (after[0] === 'cache' && after[1] === 'database'));
-  const appCap = usableApps * TYPES.appServer.cap, dbCap = dbOn ? (db.upgraded ? DB_UPGRADE.cap : TYPES.database.cap) : 0;
-  const hit = cacheOn ? TYPES.cache.hit : 0;
-  const byApps = Math.min(rps, appCap), toDb = byApps * (1 - hit), byDb = Math.min(toDb, dbCap);
-  const served = after.length ? byApps * hit + byDb : 0;
-  const rhoApp = appCap ? Math.min(byApps / appCap, .97) : 1, rhoDb = dbCap ? Math.min(toDb / dbCap, .97) : 1;
-  const p95 = rps ? Math.min(2000, Math.round((20 / (1 - rhoApp)) * 1.4 + (1 - hit) * (20 / (1 - rhoDb)) * 1.4 + (hit ? 2 : 0))) : 0;
-  const problem = !S.links.users ? 'Conecta a los usuarios con tu base' : !reached ? 'Las peticiones no llegan a ninguna fábrica'
-    : !after.length ? 'Las fábricas no envían a ningún sitio' : !dbOn ? 'Falta conectar los silos (base de datos)' : null;
-  return { rps, served, errors: rps ? (rps - served) / rps : 0, p95, rhoApp, rhoDb, hit, cacheOn, dbOn, viaLb, usableApps,
-    dropAtApps: rps ? 1 - byApps / rps : 0, dropAtDb: toDb ? 1 - byDb / toDb : 1, problem };
+// ───────── Simplified capacity model that follows the connections ─────────
+/** Sends the users' traffic along the links: who receives how much, who drops what, latency and answers. */
+function solve(rps) {
+  const ids = ['users', ...S.units.map(u => u.id)];
+  const inflow = new Map(ids.map(id => [id, 0])), drop = new Map(), served = new Map(), edge = new Map(), rho = new Map();
+  let answered = 0;
+  inflow.set('users', rps);
+  // Topological order (links never make a circle).
+  const order = [], seen = new Set();
+  const visit = (id) => { if (seen.has(id)) return; seen.add(id); S.links.filter(l => l.from === id).forEach(l => visit(l.to)); order.unshift(id); };
+  ids.forEach(visit);
+  const send = (from, amount) => {
+    const targets = S.links.filter(l => l.from === from && isLive(l.to)).map(l => l.to);
+    if (!targets.length) { drop.set(from, (drop.get(from) ?? 0) + amount); return; }
+    for (const to of targets) { edge.set(`${from}>${to}`, (edge.get(`${from}>${to}`) ?? 0) + amount / targets.length); inflow.set(to, inflow.get(to) + amount / targets.length); }
+  };
+  for (const id of order) {
+    const f = inflow.get(id); if (!f) continue;
+    const u = id === 'users' ? null : unitById(id);
+    if (id === 'users' || u.type === 'loadBalancer') { send(id, f); rho.set(id, id === 'users' ? 0 : .05); continue; }
+    if (u.type === 'appServer') {
+      const ok = Math.min(f, TYPES.appServer.cap); rho.set(id, ok / TYPES.appServer.cap);
+      drop.set(id, f - ok); send(id, ok);
+    } else if (u.type === 'cache') {
+      const hits = f * TYPES.cache.hit; answered += hits; served.set(id, hits); rho.set(id, .1);
+      send(id, f - hits);
+    } else if (u.type === 'database') {
+      const cap = u.upgraded ? DB_UPGRADE.cap : TYPES.database.cap, ok = Math.min(f, cap);
+      answered += ok; served.set(id, ok); drop.set(id, f - ok); rho.set(id, ok / cap);
+    }
+  }
+  // Latency: each building adds its own time; a request's tail follows the slowest busy path below it.
+  const own = (id) => {
+    const u = unitById(id); if (!u) return 0;
+    const r = Math.min(.97, rho.get(id) ?? 0);
+    return u.type === 'appServer' || u.type === 'database' ? (20 / (1 - r)) * 1.4 : u.type === 'cache' ? 2 : 1;
+  };
+  const lat = new Map();
+  for (const id of [...order].reverse()) {
+    const out = S.links.filter(l => l.from === id && (edge.get(linkKey(l)) ?? 0) > (inflow.get(id) || 1) * .05);
+    lat.set(id, own(id) + Math.max(0, ...out.map(l => lat.get(l.to) ?? 0)));
+  }
+  const dropped = [...drop.values()].reduce((a, b) => a + b, 0);
+  return { rps, inflow, drop, served, edge, rho, answered, errors: rps ? Math.min(1, dropped / rps) : 0, p95: rps ? Math.min(2000, Math.round(lat.get('users'))) : 0 };
 }
 function step(dt) {
   if (S.over || S.paused) return;
@@ -267,150 +342,298 @@ function step(dt) {
   for (const u of S.units) if (!u.ready) { u.left -= dt; if (u.left <= 0) { u.ready = true; log(`${TYPES[u.type].name}${u.type === 'appServer' ? ' ' + u.label : ''} lista`, 'ok'); } }
   if (inWave() && !S.waveStarted) { S.waveStarted = true; log(`¡Llegan los usuarios! ${level.wave.rps} req/s`, 'warn'); }
   if (level.wave.incidentAt && !S.incidentDone && S.t >= waveFrom() + level.wave.incidentAt) {
-    const victim = ready('appServer')[0];
+    const victim = ofType('appServer').find(u => u.ready && !u.down);
     if (victim) { victim.down = true; log(`¡${victim.label} se ha caído!`, 'bad'); }
     S.incidentDone = true;
   }
-  const L = flowModel(inWave() ? level.wave.rps : 0);
-  const revenue = (L.served / 100) * TUNE.per100Visits, upkeep = upkeepPerS(), net = TUNE.passive + revenue - upkeep;
-  S.money += net * dt; S.visits += L.served * dt;
-  S.last = { ...L, revenue, upkeep, net };
-  if (L.rps) {
-    S.rep = Math.max(0, Math.min(100, S.rep + (L.errors > MAX_ERR ? -6 : L.p95 > P95 ? -4 : 1) * dt));
+  const F = solve(inWave() ? level.wave.rps : 0);
+  const revenue = (F.answered / 100) * TUNE.per100Visits, upkeep = upkeepPerS(), net = TUNE.passive + revenue - upkeep;
+  S.money += net * dt; S.visits += F.answered * dt;
+  S.flow = F; S.last = { rps: F.rps, errors: F.errors, p95: F.p95, revenue, upkeep, net };
+  if (F.rps) {
+    S.rep += (F.errors > MAX_ERR ? -6 : F.p95 > P95 ? -4 : 1) * dt;
+    S.rep = Math.max(0, Math.min(100, S.rep));
     if (S.rep <= 0) { S.over = 'lost'; log('Reputación a 0: los usuarios se han ido.', 'bad'); }
   }
-  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ rps: L.rps, p95: L.p95, errors: L.errors });
+  if (Math.floor(S.t) !== Math.floor(S.t - dt)) S.hist.push({ rps: F.rps, p95: F.p95, errors: F.errors });
   if (S.money < 0) { S.over = 'lost'; log('Sin dinero para el mantenimiento.', 'bad'); }
   if (!S.over && S.t >= waveTo()) S.over = 'won';
 }
 
-// ───────── Where things are on the map ─────────
-/** Ground points of every building in the current C4 layer: key (unit id, or type in layer 2) → { x, y, size, type }. */
-function layout() {
-  const spots = {};
-  if (!S.units.length || layer === 1) return spots;
-  for (const [zone, z] of Object.entries(ZONES)) {
-    let items = S.units.filter(u => TYPES[u.type].zone === zone);
-    if (layer === 2) items = [...new Set(items.map(u => u.type))].map(type => ({ id: type, type }));
-    const n = items.length; if (!n) continue;
-    const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), cell = (z.w * .78) / cols;
-    const size = Math.min(100, Math.max(64, cell * 1.9));
-    items.forEach((u, k) => {
-      const da = (k % cols) - (cols - 1) / 2, db = Math.floor(k / cols) - (rows - 1) / 2;
-      spots[u.id] = { x: z.x + (da - db) * cell, y: z.y + ((da + db) * cell) / 2, size, type: u.type, unit: layer === 3 ? u : null };
-    });
-  }
-  return spots;
+// ───────── Lines and requests on the map (canvas over the field) ─────────
+const REQ_MODES = [['roundtrip', 'Ida y vuelta'], ['people', 'Usuarios'], ['dots', 'Puntos'], ['flow', 'Flujo']];
+const particles = [];
+let spawnDebt = 0, drag = null;
+const q = (sel) => document.querySelector(sel);
+function nodeEl(id) {
+  if (id === 'users') return q('[data-id="users"]');
+  if (layer === 1) return q('[data-node="system"]');
+  if (layer === 2) return q(`[data-node="${unitById(id)?.type}"]`);
+  return q(`[data-id="${id}"]`);
 }
-const bodyOf = (s) => ({ x: s.x, y: s.y - s.size * .25 });
-const liveSpot = (s) => (s.unit ? s.unit.ready && !s.unit.down : ready(s.type).length > 0);
-
-// ───────── Render: the world (SVG), then the HUD around it ─────────
-const $ = (id) => document.getElementById(id);
-function renderWorld() {
-  const spots = layout(), L = S.last;
-  let g = `<polygon class="ground" points="${diamond(0, 0, 1400, 700)}"/>`;
-  for (let i = -14; i <= 14; i++) g += `<line class="ground-grid" x1="${i * 50 - 700}" y1="${i * 25 + 350}" x2="${i * 50 + 700}" y2="${i * 25 - 350}"/><line class="ground-grid" x1="${i * 50 - 700}" y1="${-i * 25 - 350}" x2="${i * 50 + 700}" y2="${-i * 25 + 350}"/>`;
-  if (!S.units.length) {
-    g += `<polygon class="site" points="${diamond(WALL.x, WALL.y, 380, 190)}"/><text class="zlabel" x="${WALL.x}" y="${WALL.y - 6}" text-anchor="middle" style="fill:#fbbf24">ZONA DE CONSTRUCCIÓN</text>
-      <text class="zkind" x="${WALL.x}" y="${WALL.y + 16}" text-anchor="middle">Construye tu primer edificio con la tarjeta de abajo o las teclas 1–4</text>`;
-  } else if (layer === 1) {
-    g += `<polygon class="wall" points="${diamond(WALL.x, WALL.y, 260, 130)}"/><text class="zlabel" x="${WALL.x - 120}" y="${WALL.y - 80}">TU SISTEMA <tspan class="zkind">[Sistema de software]</tspan></text>`;
-  } else {
-    g += `<polygon class="wall" points="${diamond(WALL.x, WALL.y, WALL.w, WALL.h)}"/><text class="zlabel" x="${WALL.x - 120}" y="${WALL.y - WALL.h + 70}">TU SISTEMA <tspan class="zkind">[Sistema de software]</tspan></text>`;
-    for (const [zone, z] of Object.entries(ZONES)) if (S.units.some(u => TYPES[u.type].zone === zone))
-      g += `<polygon class="plot" points="${diamond(z.x, z.y, z.w)}"/><text class="zlabel" x="${z.x - z.w * .55}" y="${z.y - z.w * .5 - 10}">${z.name.toUpperCase()} <tspan class="zkind">[Contenedor]</tspan></text>`;
+// The point where a line meets a building: the middle of its drawing.
+function pointOf(id) {
+  const el = nodeEl(id); if (!el) return null;
+  const d = id === 'users' ? el.querySelector('.people') ?? el : el.querySelector('svg') ?? el;
+  const r = d.getBoundingClientRect();
+  return id === 'users' ? { x: r.right - 4, y: r.top + r.height / 2 } : { x: r.left + r.width / 2, y: r.top + r.height * .6 };
+}
+/** The lines on screen: in layers 1 and 2 several links share one drawn line. */
+function drawnLinks() {
+  const seen = new Map();
+  S.links.forEach((l, i) => {
+    const a = pointOf(l.from), b = pointOf(l.to); if (!a || !b || (Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2)) return;
+    const key = `${Math.round(a.x)},${Math.round(a.y)}>${Math.round(b.x)},${Math.round(b.y)}`;
+    const flow = S.flow?.edge.get(linkKey(l)) ?? 0;
+    const prev = seen.get(key);
+    if (prev) { prev.flow += flow; prev.indexes.push(i); } else seen.set(key, { a, b, flow, indexes: [i], live: isLive(l.to) });
+  });
+  return [...seen.values()];
+}
+/** One request's route along the links; it stops where it is dropped or answered. */
+function routeFor() {
+  const F = S.flow; if (!F) return null;
+  const ids = ['users']; let id = 'users', fail = false;
+  for (let hop = 0; hop < 12; hop++) {
+    const u = id === 'users' ? null : unitById(id);
+    const inn = F.inflow.get(id) || 0;
+    if (u && Math.random() < (F.drop.get(id) ?? 0) / (inn || 1)) { fail = true; break; }
+    if (u?.type === 'database') break;
+    if (u?.type === 'cache' && Math.random() < TYPES.cache.hit) break;
+    const out = S.links.filter(l => l.from === id).map(l => [l.to, F.edge.get(linkKey(l)) ?? 0]).filter(([, v]) => v > 0);
+    const total = out.reduce((s, [, v]) => s + v, 0);
+    if (!total) { fail = true; break; }
+    let r = Math.random() * total; const next = out.find(([, v]) => (r -= v) <= 0)?.[0] ?? out[0][0];
+    ids.push(next); id = next;
   }
-  const people = inWave() ? Math.min(12, Math.ceil(level.wave.rps / 35)) : 1;
-  g += `<g class="gate" data-type="users"><polygon class="gate-pad" points="${diamond(GATE.x, GATE.y, 70)}"/>
-    ${Array.from({ length: people }, (_, i) => { const x = people === 1 ? GATE.x : GATE.x - 30 + (i % 4) * 20, y = people === 1 ? GATE.y : GATE.y - 14 + Math.floor(i / 4) * 14; return `<circle cx="${x}" cy="${y - 7}" r="4.5" fill="#2aa596"/><path d="M${x - 6} ${y + 5} Q${x} ${y - 6} ${x + 6} ${y + 5} Z" fill="#13262a" stroke="#3ee0c8"/>`; }).join('')}
-    <text class="ulabel" x="${GATE.x}" y="${GATE.y + 56}">USUARIOS</text>
-    <text class="usub" x="${GATE.x}" y="${GATE.y + 70}">${inWave() ? `${level.wave.rps} req/s · ${Math.round(S.visits).toLocaleString('es')} visitas` : S.t < TUNE.buildPhase ? 'arrastra desde aquí para conectar' : 'se han ido'}</text></g>`;
-  $('ground').innerHTML = g;
-
-  // Connections: type to type, drawn from every building of one type to every building of the next.
-  let l = '';
-  const pointsOf = (key) => key === 'users' ? [GATE] : Object.values(spots).filter(s => s.type === key);
-  if (layer === 1) { if (S.links.users && S.units.length) l += `<line class="link" x1="${GATE.x}" y1="${GATE.y}" x2="${WALL.x - 260}" y2="${WALL.y}"/>`; }
-  else for (const [from, to] of Object.entries(S.links)) for (const a of pointsOf(from)) for (const b of pointsOf(to)) {
-    l += `<line class="link ${S.selected?.link === from ? 'selected' : ''}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><line class="link-hit" data-link="${from}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
-  }
-  $('links').innerHTML = l;
-
-  let u = '';
-  if (layer === 1 && S.units.length) {
-    const types = Object.keys(TYPES).filter(t => S.units.some(x => x.type === t));
-    types.forEach((t, i) => { const x = WALL.x + (i - (types.length - 1) / 2) * 90, n = S.units.filter(x => x.type === t).length;
-      u += `<g class="unit" data-type="${t}" data-unit="${S.units.find(x => x.type === t).id}" style="--c:${TYPES[t].color}">${building(t, 80, x - 40, WALL.y - 62)}<text class="ulabel" x="${x}" y="${WALL.y + 32}">${TYPES[t].name.toUpperCase()}${n > 1 ? ` × ${n}` : ''}</text></g>`; });
-    u += `<text class="usub" x="${WALL.x}" y="${WALL.y + 70}">${S.units.length} edificios · cambia a la capa 3 para ver cada uno</text>`;
+  const pts = ids.map(pointOf).filter(Boolean).filter((p, i, all) => !i || Math.hypot(p.x - all[i - 1].x, p.y - all[i - 1].y) > 2);
+  return { pts, dropAt: fail ? pts.length - 1 : null };
+}
+const SPEED = { dots: 260, people: 150, roundtrip: 300 };
+const PER = { dots: 25, people: 40, roundtrip: 30 };
+const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: route.dropAt === 0 && kind === 'req' && reqMode !== 'roundtrip' && reqMode !== 'people' });
+function advance(p, dt) {
+  if (p.dead || p.arrived) { p.life -= dt * (p.dead ? 1.4 : 3); return; }
+  if (p.kind === 'req' && p.dropAt === 0) { onFail(p); return; }
+  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
+  if (!b) { p.arrived = true; onArrive(p); return; }
+  p.f += ((SPEED[reqMode] ?? 260) * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  if (p.f < 1) return;
+  p.seg++; p.f = 0;
+  if (p.dropAt !== null && p.seg >= p.dropAt) onFail(p);
+  else if (!p.pts[p.seg + 1]) { p.arrived = true; onArrive(p); }
+}
+function onFail(p) {
+  if (reqMode === 'people' && p.kind === 'req') Object.assign(p, { pts: p.pts.slice(0, p.seg + 1).reverse(), seg: 0, f: 0, dropAt: null, kind: 'angry' });
+  else if (reqMode === 'roundtrip' && p.kind === 'req') { p.dead = true; spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, 'error'); }
+  else p.dead = true;
+}
+function onArrive(p) {
+  if (reqMode === 'roundtrip' && p.kind === 'req') spawn({ pts: [...p.pts].reverse(), dropAt: null }, 'reply');
+  if (reqMode === 'people' && p.kind === 'req') p.kind = 'happy';
+}
+const posOf = (p) => { const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a; return { x: a.x + (b.x - a.x) * p.f, y: a.y + (b.y - a.y) * p.f }; };
+function drawPerson(x, y, color) {
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y - 6, 2.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 3.4, y + 2); ctx.quadraticCurveTo(x, y - 6, x + 3.4, y + 2); ctx.closePath(); ctx.fill();
+}
+function drawParticle(p) {
+  if (!p.pts.length) return;
+  const { x, y } = posOf(p);
+  ctx.globalAlpha = Math.max(0, p.life);
+  if (reqMode === 'people') {
+    const color = p.kind === 'angry' ? '#f87171' : p.kind === 'happy' ? '#4ade80' : '#7ff5e5';
+    ctx.shadowColor = color; ctx.shadowBlur = 6; drawPerson(x, y, color); ctx.shadowBlur = 0;
+    if (p.kind === 'angry') { ctx.font = '800 11px ui-monospace'; ctx.fillText('!', x - 2, y - 11); }
+    if (p.kind === 'happy') { ctx.font = '800 10px ui-monospace'; ctx.fillStyle = '#fde047'; ctx.fillText('+$', x + 5, y - 8 - (1 - p.life) * 14); }
+  } else if (reqMode === 'roundtrip') {
+    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 6;
+    ctx.fillRect(x - 3, y - 3 + (p.kind === 'req' ? -5 : 5), 6, 6); ctx.shadowBlur = 0;
+    if (p.kind === 'error' && p.seg === 0 && p.f < .3) { ctx.font = '800 10px ui-monospace'; ctx.fillText('503', x + 5, y - 2); }
   } else {
-    for (const s of Object.values(spots).sort((a, b) => a.y - b.y)) {
-      const unit = s.unit, all = S.units.filter(x => x.type === s.type), live = all.filter(x => x.ready && !x.down);
-      const isSel = unit ? S.selected?.unit === unit.id : all.some(x => x.id === S.selected?.unit);
-      const status = unit ? (unit.down ? 'down' : unit.ready ? '' : 'building') : (live.length ? '' : 'building');
-      const label = unit ? unit.label : `${TYPES[s.type].comp}${all.length > 1 ? ` × ${all.length}` : ''}`;
-      const idleApp = unit && s.type === 'appServer' && L?.usableApps === 1 && ready('appServer')[0] !== unit;
-      const rho = !L?.rps ? 0 : s.type === 'appServer' ? (idleApp ? 0 : L.rhoApp) : s.type === 'database' ? (L.dbOn ? L.rhoDb : 0) : s.type === 'cache' ? (L.cacheOn ? .1 : 0) : (L.viaLb ? .05 : 0);
-      const sub = unit ? (unit.down ? 'caído' : !unit.ready ? `en obra · ${Math.ceil(unit.left)} s` : idleApp ? 'sin tráfico' : '') : `${live.length}/${all.length} en servicio`;
-      const sz = s.size, ty = s.y + sz * .2 + 12;
-      u += `<g class="unit ${status} ${isSel ? 'selected' : ''}" data-type="${s.type}" data-unit="${unit ? unit.id : all[0].id}" style="--c:${TYPES[s.type].color}">
-        ${building(s.type, sz, s.x - sz / 2, s.y - sz * 50 / 64)}
-        ${unit && !unit.ready ? `<rect x="${s.x - 28}" y="${s.y - sz * .62}" width="56" height="6" fill="#060b0c" stroke="#fbbf24"/><rect x="${s.x - 28}" y="${s.y - sz * .62}" width="${56 * (1 - unit.left / unit.total)}" height="6" fill="#fbbf24"/>` : ''}
-        <text class="ulabel" x="${s.x}" y="${ty}">${label.toUpperCase()}</text>
-        ${sub ? `<text class="usub ${unit?.down ? 'bad' : ''}" x="${s.x}" y="${ty + 13}">${sub}</text>` : ''}
-        ${status === '' && L?.rps ? `<rect x="${s.x - 26}" y="${ty + (sub ? 18 : 5)}" width="52" height="4" fill="#060b0c"/><rect x="${s.x - 26}" y="${ty + (sub ? 18 : 5)}" width="${52 * rho}" height="4" fill="${rho >= .9 ? '#f87171' : rho >= .7 ? '#fbbf24' : '#4ade80'}"/>` : ''}
-      </g>`;
+    const color = p.dead ? '#f87171' : p.arrived ? '#4ade80' : '#b7fff4';
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(x, y + (p.dead ? (1 - p.life) * 18 : 0), p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawLinks(now, lines) {
+  ctx.lineCap = 'round';
+  for (const ln of lines) {
+    const selected = ln.indexes.includes(S.selectedLink);
+    const flowing = reqMode === 'flow' && ln.flow > 0;
+    const w = flowing ? 2 + ln.flow / 45 : selected ? 3 : 2;
+    ctx.globalAlpha = .25; ctx.strokeStyle = selected ? '#ffffff' : '#3ee0c8'; ctx.lineWidth = w + 6;
+    ctx.beginPath(); ctx.moveTo(ln.a.x, ln.a.y); ctx.lineTo(ln.b.x, ln.b.y); ctx.stroke();
+    ctx.globalAlpha = selected ? 1 : .75; ctx.lineWidth = w;
+    ctx.setLineDash(ln.live ? (flowing ? [10, 8] : []) : [4, 6]);
+    if (flowing) ctx.lineDashOffset = -(now / 1000) * 60 * S.speed;
+    ctx.strokeStyle = selected ? '#ffffff' : ln.live ? '#3ee0c8' : '#fbbf24';
+    ctx.beginPath(); ctx.moveTo(ln.a.x, ln.a.y); ctx.lineTo(ln.b.x, ln.b.y); ctx.stroke(); ctx.setLineDash([]);
+    // Arrow head in the middle, so the direction is clear.
+    const mx = (ln.a.x + ln.b.x) / 2, my = (ln.a.y + ln.b.y) / 2, ang = Math.atan2(ln.b.y - ln.a.y, ln.b.x - ln.a.x);
+    ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(mx + 7 * Math.cos(ang), my + 7 * Math.sin(ang));
+    ctx.lineTo(mx + 7 * Math.cos(ang + 2.5), my + 7 * Math.sin(ang + 2.5)); ctx.lineTo(mx + 7 * Math.cos(ang - 2.5), my + 7 * Math.sin(ang - 2.5)); ctx.fill();
+    if (flowing) { ctx.globalAlpha = 1; ctx.font = '800 11px ui-monospace'; ctx.fillStyle = '#dce8e5'; ctx.fillText(`${Math.round(ln.flow)}/s`, mx + 8, my - 8); }
+    ctx.globalAlpha = 1;
+  }
+  if (reqMode === 'flow' && S.flow?.rps) {
+    for (const [id, v] of S.flow.drop) if (v > 1) {
+      const pt = pointOf(id); if (!pt) continue;
+      ctx.font = '800 12px ui-monospace'; ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 8;
+      ctx.fillText(`✕ −${Math.round(v)}/s`, pt.x - 24, pt.y + 46); ctx.shadowBlur = 0;
     }
   }
-  $('units').innerHTML = u;
+  if (drag?.linking && drag.to) {
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.globalAlpha = .9;
+    ctx.beginPath(); ctx.moveTo(drag.fromPt.x, drag.fromPt.y); ctx.lineTo(drag.to.x, drag.to.y); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
 }
-function applyCam() { $('cam').setAttribute('transform', `translate(${cam.x} ${cam.y}) scale(${cam.k})`); }
-function fitCam() {
-  const r = $('world').getBoundingClientRect();
-  cam.k = Math.min(1, (r.width - 320) / 1250, (r.height - 70) / 560);
-  cam.x = 290 + (r.width - 290) / 2 + 20 * cam.k; cam.y = r.height / 2 - 6; applyCam();
+const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
+let lastAnim = performance.now();
+function animate(now) {
+  const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
+  const field = q('.field');
+  if (field) {
+    const r = field.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    if (fx.width !== Math.round(r.width * dpr) || fx.height !== Math.round(r.height * dpr)) { fx.width = Math.round(r.width * dpr); fx.height = Math.round(r.height * dpr); }
+    Object.assign(fx.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    ctx.setTransform(dpr, 0, 0, dpr, -r.left * dpr, -r.top * dpr);
+    ctx.clearRect(r.left, r.top, r.width, r.height);
+    ctx.save(); ctx.beginPath(); ctx.rect(r.left, r.top, r.width, r.height); ctx.clip();
+    drawLinks(now, drawnLinks());
+    const running = !S.over && !S.paused;
+    if (reqMode !== 'flow') {
+      if (running && S.last?.rps) {
+        spawnDebt += (S.last.rps / PER[reqMode]) * dt * S.speed;
+        while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; const route = routeFor(); if (route?.pts.length) spawn(route); }
+      }
+      for (const p of particles) { if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt); drawParticle(p); }
+      for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    ctx.restore();
+  }
+  requestAnimationFrame(animate);
 }
 
+// ───────── Render ─────────
 const spark = (vals, max, color, limit) => {
   const n = 60, v = vals.slice(-n), w = 200, h = 34;
   const pts = v.map((y, i) => `${(i / (n - 1)) * w},${h - Math.min(1, y / max) * (h - 2) - 1}`).join(' ');
   const lim = limit ? `<line x1="0" x2="${w}" y1="${h - (limit / max) * (h - 2) - 1}" y2="${h - (limit / max) * (h - 2) - 1}" stroke="#f87171" stroke-dasharray="3 3" opacity=".7"/>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${lim}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
 };
-const icon = (type, size) => building(type, size).replace('overflow="visible"', '');
-function renderHud() {
-  const wave = inWave(), building_ = S.t < TUNE.buildPhase;
-  const L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS(), served: 0 };
-  const phase = building_ ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : wave ? `OLEADA · ${fmt(waveTo() - S.t)}` : 'FIN';
-  $('bar').innerHTML = `
+const rhoOf = (id) => Math.min(1, S.flow?.rho.get(id) ?? 0);
+const lvl = (rho) => (rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '');
+const deadEnd = (u) => u.type !== 'database' && !(u.type === 'cache' && false) && !S.links.some(l => l.from === u.id);
+const noEntry = (u) => !S.links.some(l => l.to === u.id);
+function unitHtml(u, size = 64) {
+  const rho = rhoOf(u.id);
+  const warn = noEntry(u) ? 'sin entrada' : deadEnd(u) ? 'sin salida' : '';
+  return `<button class="unit ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${warn ? 'deadend' : ''} ${S.selected === u.id ? 'selected' : ''}" data-id="${u.id}" data-node="${u.type}" style="--c:${TYPES[u.type].color}">
+    ${building(u.type, size)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / u.total) * 100}%"></span></span>` : ''}
+    <span class="name">${u.label}</span>
+    <span class="sub">${u.down ? 'caído' : !u.ready ? `en obra · ${Math.ceil(u.left)} s` : warn ? `⚠ ${warn}` : u.type === 'database' ? (u.upgraded ? 'Medium' : 'Small') : ''}</span>
+    ${u.ready && !u.down ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
+}
+function zoneInner(zone) {
+  const units = S.units.filter(u => TYPES[u.type].zone === zone);
+  if (layer === 2) {
+    return [...new Set(units.map(u => u.type))].map(type => {
+      const all = units.filter(u => u.type === type), live = all.filter(u => u.ready && !u.down);
+      const rho = live.length ? live.reduce((s, u) => s + rhoOf(u.id), 0) / live.length : 0;
+      return `<button class="unit ${live.length ? 'live' : 'building'} ${all.some(u => u.id === S.selected) ? 'selected' : ''}" data-node="${type}" data-pick="${all[0].id}" style="--c:${TYPES[type].color}">${building(type, 64)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
+        <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
+    }).join('');
+  }
+  const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer');
+  return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 52)).join('')}</div>` : '');
+}
+function systemHtml() {
+  if (!S.units.length) return `<div class="build-site"><b>Zona de construcción</b><span>Aquí se levantará tu base.</span><span>Construye tu primer edificio con la tarjeta de abajo o las teclas 1–4.</span></div>`;
+  if (layer === 1) {
+    const counts = Object.keys(TYPES).map(t => [t, ofType(t).length]).filter(([, n]) => n);
+    return `<div class="system" data-node="system" style="min-width:300px"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
+      <div class="ctx-buildings">${counts.map(([t, n]) => `${building(t, 48)}${n > 1 ? `<b>× ${n}</b>` : ''}`).join('')}</div>
+      <span class="muted" style="font-size:12px">${S.units.length} edificios · mantenimiento $${upkeepPerS().toFixed(1)}/s · cambia a la capa 3 para ver cada uno</span></div>`;
+  }
+  return `<div class="system"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
+    <div class="zones">${ZONES.filter(([z]) => S.units.some(u => TYPES[u.type].zone === z)).map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
+}
+function inspectorHtml() {
+  const link = S.links[S.selectedLink];
+  if (link) {
+    const flow = S.flow?.edge.get(linkKey(link)) ?? 0;
+    return `<div class="head"><h3>Conexión</h3></div>
+      <div class="rows"><span class="muted">De</span><span>${nameOf(link.from)}</span><span class="muted">A</span><span>${nameOf(link.to)}</span>
+      <span class="muted">Tráfico ahora</span><span>${Math.round(flow)} req/s</span></div>
+      <div class="controls"><button class="btn" data-unlink="${S.selectedLink}">Quitar conexión (Supr)</button></div>`;
+  }
+  const sel = unitById(S.selected);
+  if (!sel) return `<p class="muted">Selecciona un edificio o una línea. Los edificios se conectan solos al construirlos; para cambiarlo, <b>arrastra desde un edificio a otro</b> o selecciona una línea y pulsa Supr.</p>`;
+  const outs = S.links.filter(l => l.from === sel.id).map(l => nameOf(l.to)).join(', ') || '—';
+  return `<div class="head">${building(sel.type, 56)}<div><h3>${sel.label}</h3><span class="muted">${TYPES[sel.type].name} · ${TYPES[sel.type].comp}</span></div></div>
+    <div class="rows">
+      <span class="muted">Estado</span><span>${sel.down ? 'caído' : sel.ready ? 'en servicio' : `en obra · ${Math.ceil(sel.left)} s`}</span>
+      <span class="muted">Envía a</span><span>${sel.type === 'database' ? '— (responde)' : outs}</span>
+      <span class="muted">Recibe ahora</span><span>${Math.round(S.flow?.inflow.get(sel.id) ?? 0)} req/s</span>
+      <span class="muted">Mantenimiento</span><span>$${((sel.upgraded ? DB_UPGRADE.monthly : TYPES[sel.type].monthly) / TUNE.upkeepFactor).toFixed(1)}/s</span>
+      ${sel.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
+      ${sel.type === 'database' ? `<span class="muted">Capacidad</span><span>${sel.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${sel.upgraded ? 'Medium' : 'Small'})</span>` : ''}
+      ${sel.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
+    </div>
+    <div class="controls">
+      ${sel.type === 'database' && !sel.upgraded ? `<button class="btn" data-upgrade="${sel.id}" ${S.money < DB_UPGRADE.price || level.noUpgrade ? 'disabled' : ''}>${level.noUpgrade ? 'Tier fijo en este nivel' : `Mejorar a Medium · $${DB_UPGRADE.price}`}</button>` : ''}
+      <button class="btn" data-remove="${sel.id}">Quitar · +$${Math.round(TYPES[sel.type].price * TUNE.refund)}</button>
+    </div>`;
+}
+function render() {
+  const wave = inWave(), inBuild = S.t < TUNE.buildPhase;
+  const L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS() };
+  const phase = inBuild ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : wave ? `OLEADA · ${fmt(waveTo() - S.t)}` : 'FIN';
+  const people = wave ? Math.min(16, Math.ceil(level.wave.rps / 30)) : 0;
+  const banner = inBuild ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
+    : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
+  document.getElementById('app').innerHTML = `
+  <header class="bar">
     <h1>${level.title}</h1>
     <span class="levels">${LEVELS.map((l, i) => `<button class="btn ${l === level ? 'on' : ''}" data-level="${i}">Nivel ${i + 1}</button>`).join('')}</span>
     <span class="res">💰 <span class="money">$${Math.floor(S.money)}</span><span class="rate ${L.net >= 0 ? 'up' : 'down'}">${L.net >= 0 ? '+' : ''}${L.net.toFixed(1)}/s</span></span>
     <span class="res">⏱ <span class="phase">${phase}</span></span>
-    <span class="res">❤ <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>`;
-  const problem = S.units.length ? flowModel(1).problem : null;
-  const banner = building_ ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
-    : wave && L.problem ? `<div class="banner bad">⚠ ${L.problem}</div>`
-    : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
-  $('hud').innerHTML = `
-    <section class="hud mission">
+    <span class="res">❤ <span class="rep"><span style="width:${S.rep}%;background:${S.rep < 35 ? 'var(--bad)' : S.rep < 70 ? 'var(--warn)' : 'var(--ok)'}"></span></span>${Math.round(S.rep)}%</span>
+    <button class="btn" data-act="tune">⚙</button>
+  </header>
+  <main class="field ${drag?.panning ? 'panning' : ''}">
+    <div class="world" style="transform: translate(${view.x}px, ${view.y}px) scale(${view.z})">
+      <div class="scene">
+        <div class="crowd" data-id="users">
+          <span class="label">Usuarios</span>
+          <div class="people">${Array.from({ length: people }, () => '<i></i>').join('')}</div>
+          ${wave ? `<span class="count">${L.rps} req/s</span><span class="wait">${Math.round(S.visits).toLocaleString('es')} visitas atendidas</span>` : `<span class="wait">${inBuild ? 'esperando…' : 'se han ido'}</span>`}
+        </div>
+        ${systemHtml()}
+      </div>
+    </div>
+    <section class="mission">
       <span class="label">Misión</span>
       <div class="lesson">${level.lesson}</div>
-      <span class="muted">Una oleada de ${level.wave.rps} req/s durante ${level.wave.length} s.</span>
+      <span class="muted">Una oleada de ${level.wave.rps} req/s durante ${level.wave.length} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero final.</span>
       <ul>
         <li class="${!L.rps ? '' : L.p95 <= P95 ? 'ok' : 'bad'}"><i></i>p95 ≤ ${P95} ms</li>
         <li class="${!L.rps ? '' : L.errors <= MAX_ERR ? 'ok' : 'bad'}"><i></i>Errores ≤ ${MAX_ERR * 100}%</li>
       </ul>
-      ${problem ? `<span style="color:var(--warn);font-size:13px">⚠ ${problem}</span>` : ''}
-      <div class="howto"><span><b>Conectar:</b> arrastra de un edificio (o de los usuarios) a otro.</span><span><b>Moverte:</b> arrastra el suelo · rueda para zoom.</span><span><b>Quitar conexión:</b> clic en la línea y Supr.</span></div>
     </section>
-    <div class="hud c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
-    <div class="hud zoombox"><button data-zoom="1.2" title="Acercar">+</button><button data-zoom="0.83" title="Alejar">−</button><button data-act="fit" title="Encuadrar">⌂</button></div>
+    <div class="panel-tr c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
+    <div class="panel-tr reqmode"><span class="label">Peticiones</span>${REQ_MODES.map(([k, n]) => `<button class="${reqMode === k ? 'on' : ''}" data-req="${k}">${n}</button>`).join('')}</div>
+    <div class="panel-tr viewctl"><span class="label">Mapa</span><button data-act="zoomout">−</button><button data-act="zoomin">+</button><button data-act="center">Centrar</button>
+      <button class="${S.auto ? 'on' : ''}" data-act="auto">Auto-conectar ${S.auto ? 'sí' : 'no'}</button><button data-act="rewire">⟲ Reconectar</button></div>
     ${banner}
-    <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>`;
-
-  const selUnit = S.units.find(u => u.id === S.selected?.unit), selLink = S.selected?.link;
-  $('console').innerHTML = `
+    <div class="hint"><b>Arrastra el suelo</b> para moverte · <b>rueda</b> para zoom · <b>arrastra de un edificio a otro</b> para conectarlos · <b>clic en una línea</b> y Supr para quitarla</div>
+    <div class="log">${S.log.map(l => `<div class="${l.kind}">${l.text}</div>`).join('')}</div>
+  </main>
+  <footer class="console">
     <section class="frame"><span class="label">Resultados en vivo</span>
       <div class="charts">
         <div class="chart">RPS${spark(S.hist.map(h => h.rps), 500, '#3ee0c8')}<b>${L.rps}</b></div>
@@ -419,37 +642,24 @@ function renderHud() {
       </div>
       <div class="econ"><span class="muted">Ingreso fijo</span><span>+$${TUNE.passive.toFixed(1)}/s</span><span class="muted">Visitas atendidas</span><span>+$${L.revenue.toFixed(1)}/s</span><span class="muted">Mantenimiento</span><span>−$${L.upkeep.toFixed(1)}/s</span></div>
     </section>
-    <section class="frame inspector"><span class="label">Inspector</span>
-      ${selLink && S.links[selLink] ? `<div class="head"><div><h3>Conexión</h3><span class="muted">${NAME[selLink]} → ${NAME[S.links[selLink]]}</span></div></div>
-          <div class="controls"><button class="btn" data-unlink="${selLink}">Quitar conexión (Supr)</button></div>`
-      : selUnit ? `<div class="head">${icon(selUnit.type, 56)}<div><h3>${selUnit.label}</h3><span class="muted">${TYPES[selUnit.type].name} · ${TYPES[selUnit.type].comp}</span></div></div>
-        <div class="rows">
-          <span class="muted">Estado</span><span>${selUnit.down ? 'caído' : selUnit.ready ? 'en servicio' : `en obra · ${Math.ceil(selUnit.left)} s`}</span>
-          <span class="muted">Envía peticiones a</span><span>${S.links[selUnit.type] ? NAME[S.links[selUnit.type]] : CAN[selUnit.type] ? '— arrástralo a otro edificio' : 'responde (fin del camino)'}</span>
-          <span class="muted">Mantenimiento</span><span>$${((selUnit.upgraded ? DB_UPGRADE.monthly : TYPES[selUnit.type].monthly) / TUNE.upkeepFactor).toFixed(1)}/s</span>
-          ${selUnit.type === 'appServer' ? `<span class="muted">Capacidad</span><span>${TYPES.appServer.cap} req/s</span>` : ''}
-          ${selUnit.type === 'database' ? `<span class="muted">Capacidad</span><span>${selUnit.upgraded ? DB_UPGRADE.cap : TYPES.database.cap} req/s (${selUnit.upgraded ? 'Medium' : 'Small'})</span>` : ''}
-          ${selUnit.type === 'cache' ? `<span class="muted">Aciertos</span><span>${TYPES.cache.hit * 100}% de lecturas</span>` : ''}
-        </div>
-        <div class="controls">
-          ${selUnit.type === 'database' && !selUnit.upgraded ? `<button class="btn" data-upgrade="${selUnit.id}" ${S.money < DB_UPGRADE.price || level.noUpgrade ? 'disabled' : ''}>${level.noUpgrade ? 'Tier fijo en este nivel' : `Mejorar a Medium · $${DB_UPGRADE.price}`}</button>` : ''}
-          <button class="btn" data-remove="${selUnit.id}">Quitar · +$${Math.round(TYPES[selUnit.type].price * TUNE.refund)}</button>
-        </div>`
-      : `<p class="muted">Selecciona un edificio o una conexión. Para conectar, arrastra de un edificio a otro (también desde los usuarios).</p>`}
-    </section>
+    <section class="frame inspector"><span class="label">Inspector</span>${inspectorHtml()}</section>
     <section class="frame build"><span class="label">Construir</span>
-      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over || !level.allowed.includes(k) ? 'disabled' : ''}><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${icon(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
+      <div class="cards">${Object.entries(TYPES).map(([k, v]) => `<button class="card" data-build="${k}" ${S.money < v.price || S.over || !level.allowed.includes(k) ? 'disabled' : ''} title="${level.allowed.includes(k) ? '' : 'No disponible en este nivel'}"><kbd>${v.key}</kbd><span class="t">${v.build}s</span>${building(k, 46)}<span class="n">${v.comp}</span><span class="c">$${v.price}</span></button>`).join('')}</div>
       <div class="controls">
-        ${building_ ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
+        ${inBuild ? `<button class="btn go" data-act="call">⏩ ¡Que vengan ya! +$${Math.round((TUNE.buildPhase - S.t) * TUNE.passive * 2)}</button>` : ''}
         <button class="btn ${S.paused ? 'on' : ''}" data-act="pause">${S.paused ? '▶ Seguir' : '⏸ Pausa'}</button>
         ${[1, 2, 4].map(x => `<button class="btn ${S.speed === x ? 'on' : ''}" data-speed="${x}">${x}×</button>`).join('')}
         <button class="btn" data-act="restart">↺</button>
       </div>
-    </section>`;
-  $('overlay').innerHTML = S.over ? endHtml() : '';
+    </section>
+  </footer>
+  ${tuneOpen ? `<div class="tune"><span class="label">Números (para ajustar)</span>${Object.entries(TUNE).map(([k, v]) => `<label>${TUNE_LABELS[k]}<input type="number" step="any" data-tune="${k}" value="${v}"></label>`).join('')}<span class="muted" style="font-size:12px">Los cambios se aplican al reiniciar (↺).</span></div>` : ''}
+  ${S.over ? endHtml() : ''}`;
 }
 function endHtml() {
-  const won = S.over === 'won', stars = won ? 1 + level.stars.filter(m => S.money >= m).length : 0, next = LEVELS[LEVELS.indexOf(level) + 1];
+  const won = S.over === 'won';
+  const stars = won ? 1 + level.stars.filter(m => S.money >= m).length : 0;
+  const next = LEVELS[LEVELS.indexOf(level) + 1];
   return `<div class="backdrop"><div class="end">
     <div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
     <h2 style="color:${won ? 'var(--ok)' : 'var(--bad)'}">${won ? 'Base defendida' : 'Base perdida'}</h2>
@@ -457,141 +667,100 @@ function endHtml() {
     <div class="muted">★★ con $${level.stars[0]} · ★★★ con $${level.stars[1]}</div>
     <div class="controls" style="justify-content:center"><button class="btn" data-act="restart">↺ Otra vez</button>${won && next ? `<button class="btn go" data-level="${LEVELS.indexOf(next)}">Nivel ${LEVELS.indexOf(next) + 1} ▶</button>` : ''}</div></div></div>`;
 }
-function renderAll() { renderWorld(); renderHud(); }
 
-// ───────── Requests: there and back (in world units, drawn inside the SVG) ─────────
-const particles = [];
-let spawnDebt = 0;
-function routeFor(spots, L) {
-  const pts = [{ x: GATE.x + 40, y: GATE.y - 10 }];
-  if (layer === 1) { if (!S.links.users || !S.units.length) return { pts, dropAt: 0 }; pts.push({ x: WALL.x, y: WALL.y - 20 }); return { pts, dropAt: Math.random() < L.errors ? 1 : null }; }
-  const live = (type) => Object.values(spots).filter(s => s.type === type && liveSpot(s)).map(bodyOf);
-  if (L.viaLb) { const lb = live('loadBalancer')[0]; if (lb) pts.push(lb); }
-  let apps = live('appServer'); if (!L.viaLb) apps = apps.slice(0, 1);
-  if (!L.usableApps || !apps.length) return { pts, dropAt: pts.length > 1 ? pts.length - 1 : 0 };
-  pts.push(apps[Math.floor(Math.random() * apps.length)]);
-  if (Math.random() < L.dropAtApps) return { pts, dropAt: pts.length - 1 };
-  if (L.cacheOn) { const c = live('cache')[0]; if (c) pts.push(c); if (Math.random() < L.hit) return { pts, dropAt: null }; }
-  if (!L.dbOn) return { pts, dropAt: pts.length - 1 };
-  const db = live('database')[0]; if (db) pts.push(db);
-  return { pts, dropAt: Math.random() < L.dropAtDb ? pts.length - 1 : null };
+// ───────── Input ─────────
+function applyView() { const w = q('.world'); if (w) w.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`; }
+function zoomAt(factor, cx, cy) {
+  const z = Math.max(.5, Math.min(1.8, view.z * factor)), k = z / view.z;
+  const r = q('.field').getBoundingClientRect(), px = cx - r.left, py = cy - r.top;
+  view.x = px - (px - view.x) * k; view.y = py - (py - view.y) * k; view.z = z; applyView();
 }
-const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: kind === 'req' && route.dropAt === 0 });
-function bounce(p) { // a request reached its last stop: the answer (or the error) travels back
-  if (p.kind !== 'req') return;
-  const failed = p.dropAt !== null;
-  spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, failed ? 'error' : 'reply');
-}
-function advance(p, dt) {
-  if (p.dead || p.arrived) { p.life -= dt * 2.5; return; }
-  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
-  if (!b) { p.arrived = true; bounce(p); return; }
-  p.f += (320 * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-  if (p.f < 1) return;
-  p.seg++; p.f = 0;
-  if ((p.dropAt !== null && p.seg >= p.dropAt) || !p.pts[p.seg + 1]) { p.arrived = true; bounce(p); }
-}
-let lastAnim = performance.now();
-function animate(now) {
-  const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
-  const running = !S.over && !S.paused, L = S.last;
-  if (running && L?.rps) {
-    spawnDebt += (L.rps / 30) * dt * S.speed;
-    const spots = layout();
-    while (spawnDebt >= 1 && particles.length < 300) { spawnDebt--; spawn(routeFor(spots, L)); }
+/** The line closest to a screen point, if it is near enough to be clicked. */
+function linkAt(x, y) {
+  let best = null, bestD = 8;
+  for (const ln of drawnLinks()) {
+    const dx = ln.b.x - ln.a.x, dy = ln.b.y - ln.a.y, len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((x - ln.a.x) * dx + (y - ln.a.y) * dy) / len2));
+    const d = Math.hypot(x - (ln.a.x + t * dx), y - (ln.a.y + t * dy));
+    if (d < bestD) { bestD = d; best = ln.indexes[0]; }
   }
-  let out = '';
-  for (const p of particles) {
-    if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt);
-    if (p.dead && p.kind === 'req') { bounce(p); p.kind = 'gone'; }
-    const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a;
-    const x = a.x + (b.x - a.x) * p.f, y = a.y + (b.y - a.y) * p.f + (p.kind === 'req' ? -5 : 5);
-    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
-    if (p.kind !== 'gone') out += `<rect x="${(x - 3.5).toFixed(1)}" y="${(y - 3.5).toFixed(1)}" width="7" height="7" fill="${color}" opacity="${Math.max(0, p.life).toFixed(2)}" style="filter:drop-shadow(0 0 4px ${color})"/>`;
-    if (p.kind === 'error' && p.seg === 0 && p.f < .25) out += `<text x="${x + 6}" y="${y - 4}" fill="#f87171" font-family="ui-monospace" font-size="11" font-weight="800">503</text>`;
-  }
-  for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0 || particles[i].kind === 'gone') particles.splice(i, 1);
-  $('fx').innerHTML = out;
-  requestAnimationFrame(animate);
+  return best;
 }
-
-// ───────── Map input: pan, zoom, select, connect ─────────
-const world = $('world');
-let drag = null;
-const toWorld = (e) => { const r = world.getBoundingClientRect(); return { x: (e.clientX - r.left - cam.x) / cam.k, y: (e.clientY - r.top - cam.y) / cam.k }; };
-world.addEventListener('pointerdown', e => {
+document.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  camSet = true;
-  world.setPointerCapture(e.pointerId);
-  const node = e.target.closest('[data-type]'), link = e.target.closest('[data-link]');
-  if (link) { S.selected = { link: link.dataset.link }; renderAll(); return; }
-  if (node && (node.dataset.type === 'users' || CAN[node.dataset.type])) drag = { kind: 'link', from: node.dataset.type, unit: node.dataset.unit, sx: e.clientX, sy: e.clientY, start: toWorld(e) };
-  else if (node) drag = { kind: 'select', unit: node.dataset.unit, sx: e.clientX, sy: e.clientY };
-  else drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y, moved: false };
-});
-world.addEventListener('pointermove', e => {
-  if (!drag) return;
-  const moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 5;
-  if (drag.kind === 'pan') { if (moved) drag.moved = true; cam.x = drag.cx + e.clientX - drag.sx; cam.y = drag.cy + e.clientY - drag.sy; applyCam(); world.classList.add('panning'); }
-  if (drag.kind === 'link' && moved) {
-    drag.linking = true; world.classList.add('linking');
-    const p = toWorld(e);
-    $('temp').innerHTML = `<line class="link temp" x1="${drag.start.x}" y1="${drag.start.y}" x2="${p.x}" y2="${p.y}"/>`;
-  }
-});
-world.addEventListener('pointerup', e => {
-  if (!drag) return;
-  const d = drag; drag = null; world.classList.remove('panning', 'linking'); $('temp').innerHTML = '';
-  if (d.kind === 'link' && d.linking) {
-    world.releasePointerCapture(e.pointerId);
-    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-type]');
-    if (target && target.dataset.type !== 'users') connect(d.from, target.dataset.type);
+  const el = e.target.closest('button, [data-id]');
+  const onPanel = e.target.closest('.mission, .panel-tr, .console, .bar, .tune, .backdrop');
+  // Buildings and the users: start a possible link (or a selection, if the pointer does not move).
+  const node = e.target.closest('[data-id]');
+  if (node && !onPanel) {
+    const id = node.dataset.id === 'users' ? 'users' : Number(node.dataset.id);
+    drag = { kind: 'node', id, x: e.clientX, y: e.clientY, fromPt: pointOf(id) };
     return;
   }
-  if (d.kind === 'pan' && !d.moved) { S.selected = null; renderAll(); return; }
-  if ((d.kind === 'link' || d.kind === 'select') && d.unit) { S.selected = { unit: Number(d.unit) }; renderAll(); }
+  const pick = e.target.closest('[data-pick]');
+  if (pick && !onPanel) { S.selected = Number(pick.dataset.pick); S.selectedLink = null; render(); return; }
+  if (el && el.tagName === 'BUTTON') {
+    // pointerdown, not click: the screen redraws 10 times a second, which can swallow a click.
+    if (el.dataset.build) buildUnit(el.dataset.build);
+    else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); render(); }
+    else if (el.dataset.req) { reqMode = el.dataset.req; particles.length = 0; render(); }
+    else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; render(); }
+    else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
+    else if (el.dataset.unlink) removeLink(Number(el.dataset.unlink));
+    else if (el.dataset.upgrade) upgradeDb(Number(el.dataset.upgrade));
+    else if (el.dataset.speed) { S.speed = Number(el.dataset.speed); render(); }
+    else if (el.dataset.act === 'call') callNow();
+    else if (el.dataset.act === 'pause') { S.paused = !S.paused; render(); }
+    else if (el.dataset.act === 'restart') { reset(); render(); }
+    else if (el.dataset.act === 'tune') { tuneOpen = !tuneOpen; render(); }
+    else if (el.dataset.act === 'zoomin') { const r = q('.field').getBoundingClientRect(); zoomAt(1.2, r.left + r.width / 2, r.top + r.height / 2); }
+    else if (el.dataset.act === 'zoomout') { const r = q('.field').getBoundingClientRect(); zoomAt(1 / 1.2, r.left + r.width / 2, r.top + r.height / 2); }
+    else if (el.dataset.act === 'center') { centerView(); applyView(); }
+    else if (el.dataset.act === 'auto') { S.auto = !S.auto; render(); }
+    else if (el.dataset.act === 'rewire') rewireAll();
+    return;
+  }
+  if (onPanel || !e.target.closest('.field')) return;
+  // The ground: a line under the pointer is selected; otherwise the map is dragged.
+  const li = linkAt(e.clientX, e.clientY);
+  if (li !== null) { S.selectedLink = li; S.selected = null; render(); return; }
+  drag = { kind: 'pan', x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, panning: true };
+  q('.field')?.classList.add('panning');
 });
-world.addEventListener('wheel', e => {
-  e.preventDefault(); camSet = true;
-  const r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-  const k = Math.min(2.2, Math.max(.35, cam.k * (e.deltaY < 0 ? 1.1 : .9)));
-  cam.x = mx - (mx - cam.x) * (k / cam.k); cam.y = my - (my - cam.y) * (k / cam.k); cam.k = k; applyCam();
-}, { passive: false });
-
-// Buttons around the map
-document.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.target.closest('#world')) return;
-  const el = e.target.closest('button'); if (!el) return;
-  if (el.dataset.build) buildUnit(el.dataset.build);
-  else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); renderAll(); }
-  else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; renderAll(); }
-  else if (el.dataset.zoom) { const r = world.getBoundingClientRect(), k = Math.min(2.2, Math.max(.35, cam.k * Number(el.dataset.zoom))); cam.x = r.width / 2 - (r.width / 2 - cam.x) * (k / cam.k); cam.y = r.height / 2 - (r.height / 2 - cam.y) * (k / cam.k); cam.k = k; camSet = true; applyCam(); }
-  else if (el.dataset.act === 'fit') { camSet = false; fitCam(); }
-  else if (el.dataset.unlink) { delete S.links[el.dataset.unlink]; S.selected = null; log('Conexión quitada'); renderAll(); }
-  else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
-  else if (el.dataset.upgrade) upgradeDb(Number(el.dataset.upgrade));
-  else if (el.dataset.speed) { S.speed = Number(el.dataset.speed); renderHud(); }
-  else if (el.dataset.act === 'call') callNow();
-  else if (el.dataset.act === 'pause') { S.paused = !S.paused; renderHud(); }
-  else if (el.dataset.act === 'restart') { reset(); renderAll(); }
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.kind === 'pan') { view.x = drag.vx + e.clientX - drag.x; view.y = drag.vy + e.clientY - drag.y; applyView(); return; }
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
+    if (layer !== 3) { log('Cambia a la capa 3 (Componentes) para conectar edificios.', 'warn'); drag = null; render(); return; }
+    drag.linking = true; drag.to = { x: e.clientX, y: e.clientY };
+  }
 });
+document.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  q('.field')?.classList.remove('panning');
+  if (d.kind !== 'node') return;
+  if (!d.linking) { if (d.id !== 'users') { S.selected = d.id; S.selectedLink = null; } render(); return; }
+  const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-id]');
+  if (target) { const to = target.dataset.id === 'users' ? 'users' : Number(target.dataset.id); addLink(d.id, to); }
+  render();
+});
+q('#app').addEventListener('wheel', e => { if (!e.target.closest('.field') || e.target.closest('.mission, .panel-tr')) return; e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY); }, { passive: false });
+document.addEventListener('change', e => { const k = e.target.dataset?.tune; if (k) TUNE[k] = Number(e.target.value); });
 document.addEventListener('keydown', e => {
+  if (e.target.closest('input')) return;
   const t = Object.entries(TYPES).find(([, v]) => v.key === e.key); if (t) buildUnit(t[0]);
-  if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; renderHud(); }
-  if (e.key === 'Escape') { S.selected = null; renderAll(); }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selected?.link) { delete S.links[S.selected.link]; S.selected = null; log('Conexión quitada'); renderAll(); }
+  if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; render(); }
+  if (e.key === 'Escape') { S.selected = null; S.selectedLink = null; render(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedLink !== null) removeLink(S.selectedLink);
 });
-addEventListener('resize', () => { if (!camSet) fitCam(); });
 
-reset(); fitCam(); renderAll(); requestAnimationFrame(animate);
+reset(); render(); centerView(); render(); requestAnimationFrame(animate);
 let lastFrame = performance.now();
 setInterval(() => {
   const now = performance.now(), real = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
-  if (S.over || S.paused) { if (S.over && !$('overlay').innerHTML) renderHud(); return; }
-  const sim = real * S.speed, n = Math.ceil(sim / 0.1);
-  for (let i = 0; i < n; i++) step(sim / n);
-  if (!drag) renderWorld();
-  renderHud();
+  if (!S.over && !S.paused) { const sim = real * S.speed, n = Math.ceil(sim / 0.1); for (let i = 0; i < n; i++) step(sim / n); }
+  if (!document.querySelector('.tune input:focus') && !drag?.panning) render();
 }, 100);
 </script>
 </body>
