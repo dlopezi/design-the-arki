@@ -135,9 +135,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .unit:hover { border-color: transparent; filter: brightness(1.15); }
 .unit .name { text-shadow: 0 1px 3px #000, 0 0 6px #000; }
 .unit.selected { border-color: transparent; box-shadow: none; }
-.unit.selected::before { content: ''; position: absolute; left: 50%; top: var(--ring, 44px); width: 74px; height: 26px; transform: translateX(-50%);
-  border: 2px solid var(--ok); border-radius: 50%; box-shadow: 0 0 10px var(--ok); pointer-events: none; }
-.unit.small.selected::before { --ring: 34px; width: 60px; height: 22px; }
+/* Selected: the building's own base lights up in neon, in its type's colour. */
+.unit.selected svg > polygon:first-child { stroke: var(--c); stroke-opacity: 1; stroke-width: 2.5; fill: color-mix(in srgb, var(--c) 28%, #111a1e);
+  filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
 .unit.down { border-color: transparent; } .unit.down .name { color: var(--bad); }
 .container { border: none; background: none; padding: 0; justify-items: center; }
 .container > .name { color: var(--muted); font-weight: 700; }
@@ -436,7 +436,7 @@ const lvl = (rho) => (rho >= .9 ? 'high' : rho >= .7 ? 'medium' : '');
 function unitHtml(u, size = 64) {
   const idle = u.type === 'appServer' && u.ready && !u.down && !ready('loadBalancer').length && ready('appServer')[0] !== u;
   const rho = idle ? 0 : loadOf(u.type);
-  return `<button class="unit ${size < 60 ? 'small' : ''} ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}">
+  return `<button class="unit ${size < 60 ? 'small' : ''} ${u.ready ? 'live' : 'building'} ${u.down ? 'down' : ''} ${S.selected === u.id ? 'selected' : ''}" data-unit="${u.id}" data-node="${u.type}" style="--c:${TYPES[u.type].color}">
     ${building(u.type, size)}${!u.ready ? `<span class="progress"><span style="width:${100 - (u.left / u.total) * 100}%"></span></span>` : ''}
     <span class="name">${u.label}</span>
     <span class="sub">${u.down ? 'caído' : !u.ready ? `en obra · ${Math.ceil(u.left)} s` : idle ? 'sin tráfico' : u.type === 'database' ? (u.upgraded ? 'Medium' : 'Small') : ''}</span>
@@ -450,7 +450,7 @@ function zoneInner(zone) {
     return [...new Set(units.map(u => u.type))].map(type => {
       const all = units.filter(u => u.type === type), live = all.filter(u => u.ready && !u.down);
       const rho = loadOf(type);
-      return `<button class="unit ${live.length ? 'live' : 'building'}" data-node="${type}" data-unit="${all[0].id}">${building(type, 64)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
+      return `<button class="unit ${live.length ? 'live' : 'building'} ${all.some(u => u.id === S.selected) ? 'selected' : ''}" data-node="${type}" data-unit="${all[0].id}" style="--c:${TYPES[type].color}">${building(type, 64)}<span class="name">${TYPES[type].comp}${all.length > 1 ? ` × ${all.length}` : ''}</span>
         <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
     }).join('');
   }
