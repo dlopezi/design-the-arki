@@ -1,7 +1,10 @@
 :root {
-  /* Same palette and fonts as System Defense, so the games on thearki.com look like one family. */
-  --bg: #030712; --panel: #0b1224; --panel-2: #0f1a33; --line: #1e2b4d; --line-strong: #2c3f66;
-  --fg: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --ok: #34d399; --warn: #fbbf24; --bad: #f87171; --star: #fde047;
+  /* Strategy-game command console: dark steel panels, a teal accent, green selection, red / yellow for bad / warning. */
+  --bg: #04080a; --panel: #0c1517; --panel-2: #122023; --line: #1f3438; --line-strong: #2f4b51;
+  --fg: #dce8e5; --muted: #8ca5a1; --accent: #3ee0c8; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --star: #fde047;
+  --steel: linear-gradient(180deg, #172629 0%, #0c1517 55%, #091012 100%);
+  --bevel: inset 0 1px 0 rgba(255, 255, 255, .07), inset 0 -2px 0 rgba(0, 0, 0, .55);
+  --chamfer: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
@@ -518,3 +521,202 @@ button.back { background: none; border: none; padding: 0; font: inherit; cursor:
 .home-brand, .home-pill, .home-eyebrow, .home-banner strong, .home-node h3 { font-family: var(--mono); }
 .cost-label, .home-eyebrow { letter-spacing: .12em; }
 .home-brand { background: none; color: #f1f5f9; -webkit-text-fill-color: currentColor; text-shadow: 0 0 18px rgba(56, 189, 248, .45); }
+
+/* ───────────── Strategy-game look (RTS): steel panels, a command console, buildings on a grid floor ───────────── */
+body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg) 65%) fixed var(--bg); }
+.game { background: radial-gradient(900px 520px at 50% 35%, #0c1b1d 0%, #05090b 70%), var(--bg); }
+.hud { background: var(--steel); border: 1px solid var(--line-strong); border-radius: 0; box-shadow: var(--bevel), 0 10px 30px -12px rgba(0, 0, 0, .9);
+  clip-path: var(--chamfer); backdrop-filter: none; }
+.console-label, .inspector .eyebrow, .results .eyebrow, .inspector h4, .cost-label, .tutorial .eyebrow, .chart figcaption {
+  font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 8px rgba(62, 224, 200, .35); }
+.console-label { display: block; margin: 0 0 6px; }
+.secondary { border-radius: 2px; background: linear-gradient(180deg, #1a2b2f, #0e181a); border-color: var(--line-strong); box-shadow: var(--bevel); }
+.primary-link { border-radius: 2px; background: linear-gradient(180deg, #5ee69a, #22a35a); border-color: #86efac; color: #03140a; box-shadow: var(--bevel), 0 0 18px -4px rgba(74, 222, 128, .7); }
+.danger { border-radius: 2px; }
+.stepper button { border-radius: 2px; background: linear-gradient(180deg, #1a2b2f, #0e181a); }
+.stepper input { border-radius: 2px; background: #060b0c; }
+.segmented label { border-radius: 2px; }
+.segmented label.on { background: rgba(62, 224, 200, .14); }
+.badge { border-radius: 2px; font-family: var(--mono); letter-spacing: .06em; }
+
+/* Wide game: resource bar, mission, results above the console, and the console. Sizes match WIDE in App.tsx. */
+.game.wide .rts-bar { top: 0; left: 0; right: 0; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 18px; clip-path: none; border-width: 0 0 2px; }
+.rts-bar .back { color: var(--muted); font: 700 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; text-decoration: none; white-space: nowrap; }
+.rts-bar .back:hover { color: var(--fg); }
+.rts-bar h1 { margin: 0; font: 800 17px var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  text-shadow: 0 0 14px rgba(62, 224, 200, .35); }
+.rts-resources { margin-left: auto; padding: 4px 12px; background: #060b0c; border: 1px solid var(--line); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6); }
+.rts-resources .cost { display: flex; align-items: center; gap: 12px; }
+.rts-resources .cost-value strong { font-size: 18px; color: var(--star); text-shadow: 0 0 10px rgba(253, 224, 71, .35); }
+.rts-resources .meter { width: 150px; margin: 0; height: 6px; border-radius: 0; }
+.rts-resources .meter .fill { border-radius: 0; }
+.game.wide .panel-toggles { position: static; padding: 0; background: none; border: none; box-shadow: none; clip-path: none; }
+.panel-toggles button { border-radius: 2px; font-family: var(--mono); letter-spacing: .06em; }
+.rts-bar .link-button { white-space: nowrap; }
+.game.wide .mission { top: 64px; left: 16px; width: 300px; max-height: calc(100% - 64px - 216px - 24px); overflow: auto; }
+.game.wide[data-results="true"] .mission { max-height: calc(100% - 64px - 216px - 196px - 36px); }
+.game.wide .results { left: 16px; right: 16px; bottom: 228px; height: 196px; }
+.game.wide .problem { bottom: 240px; }
+.game.wide[data-results="true"] .problem { bottom: 436px; }
+.game.wide .tutorial, .game.wide .clock { top: 64px; }
+.game.wide .tutorial { width: min(460px, calc(100% - 700px)); }
+
+.console { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; height: 216px; display: grid; grid-template-columns: 220px minmax(0, 1fr) auto; gap: 0;
+  pointer-events: none; }
+.console-frame { position: relative; min-width: 0; padding: 12px 14px; pointer-events: auto; background: var(--steel); border: 2px solid var(--line-strong); border-bottom: 0;
+  box-shadow: var(--bevel); }
+.console-frame + .console-frame { border-left-width: 0; }
+/* The minimap (drawn by React Flow underneath) shows through this frame. */
+.console-map { background: none; pointer-events: none; box-shadow: inset 0 0 0 6px #0b1416, inset 0 0 0 7px var(--line-strong); }
+.console-map .console-label { position: absolute; top: 8px; left: 12px; z-index: 1; padding: 0 6px; background: #0b1416; }
+.game.wide .react-flow__minimap.rts-minimap { margin: 0; left: 0; bottom: 0; border: 0; }
+.rts-minimap svg { display: block; }
+.console-unit { overflow: hidden; display: flex; }
+.game.wide .console-unit > .inspector { position: static; width: 100%; max-height: none; height: 100%; padding: 0 6px 0 0; background: none; border: none; box-shadow: none; clip-path: none;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px 28px; align-content: start; align-items: start; overflow-y: auto; }
+.game.wide .console-unit > .inspector > .eyebrow { grid-column: 1 / -1; margin: 0; }
+.game.wide .console-unit > .inspector > * { margin: 0; }
+.console-empty { margin: auto; font-size: 13px; }
+.console-command { display: grid; align-content: start; }
+.console .controls { position: static; transform: none; padding: 0; display: flex; align-items: center; gap: 12px; }
+.game.wide .controls.above-results { bottom: auto; }
+
+/* Inspector: the selected building's portrait next to its name. */
+.inspector .title { display: flex; align-items: center; gap: 10px; height: auto; overflow: visible; background: none; isolation: auto; }
+.inspector .title > div { display: grid; }
+.unit-portrait { flex: none; display: grid; place-items: center; width: 64px; height: 64px; background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--art) 30%, #0a1214), #060b0c 75%);
+  border: 1px solid color-mix(in srgb, var(--art) 55%, #000); box-shadow: inset 0 0 12px rgba(0, 0, 0, .8); }
+.inspector .title h3 { font: 800 15px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+/* Build card: dark slots with the building, its name and cost; Play is the big green command button. */
+.hotbar { gap: 6px; }
+.hot-tile { width: 76px; height: 92px; border-radius: 2px; background: linear-gradient(180deg, #16262a, #0a1214); border: 1px solid color-mix(in srgb, var(--art) 55%, #000);
+  box-shadow: var(--bevel); color: var(--fg); }
+.hot-tile:hover { transform: none; border-color: var(--art); box-shadow: var(--bevel), 0 0 14px -2px color-mix(in srgb, var(--art) 70%, transparent); }
+.hot-art { margin: 4px 4px 0; border-radius: 0; background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--art) 28%, transparent), transparent 70%); }
+.hot-name { font: 700 9.5px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.hot-tile .hot-cost { color: var(--star); background: #060b0c; border-top: 1px solid color-mix(in srgb, var(--art) 40%, #000); }
+.hot-tile kbd { color: var(--accent); opacity: 1; }
+.play { width: 88px; height: 88px; border-radius: 0; clip-path: var(--chamfer); background: linear-gradient(180deg, #6ef0a6 0%, #22a35a 60%, #16723f 100%);
+  font: 900 15px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #03140a; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -4px 0 rgba(0, 0, 0, .35); }
+.play:hover:not(:disabled) { filter: brightness(1.1); }
+.play:disabled { background: linear-gradient(180deg, #2a3b3f, #172326); }
+.game.medium .play, .compact .bottom-bar .play { clip-path: var(--chamfer); }
+
+/* Diagram: the system is a walled base, zones are districts, components are buildings tinted with their type colour. */
+.react-flow__edge-path { stroke: rgba(62, 224, 200, .45); }
+.flow-dot { fill: #b7fff4; filter: drop-shadow(0 0 3px var(--accent)); }
+.c4-boundary { border-radius: 0; }
+.c4-boundary.system { border: 1px solid rgba(62, 224, 200, .4); background: rgba(62, 224, 200, .03); font: 800 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+  box-shadow: inset 0 0 40px rgba(62, 224, 200, .06); }
+.c4-boundary.zone { border: 1px dashed rgba(140, 165, 161, .35); background: rgba(0, 0, 0, .28); font: 700 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.c4-boundary .c4-kind { text-transform: none; letter-spacing: 0; font-family: system-ui, sans-serif; font-weight: 400; }
+.c4-component, .c4-instance { --art: var(--accent); border-radius: 2px; }
+.c4-component.box, .c4-component.container, .c4-instance { background: linear-gradient(180deg, #132326, #0a1315); border: 1px solid color-mix(in srgb, var(--art) 45%, #000); box-shadow: var(--bevel); }
+.c4-component.container { background: linear-gradient(180deg, rgba(19, 35, 38, .7), rgba(10, 19, 21, .5)); }
+.c4-component.selected, .c4-person.selected { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(74, 222, 128, .45), 0 0 18px rgba(74, 222, 128, .35); }
+.c4-text > strong { font-family: var(--mono); font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; }
+.art-badge, .art-badge.small { width: auto; height: auto; background: none; box-shadow: none; border-radius: 0; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .6)); }
+.c4-main { gap: 6px; }
+.c4-instance { gap: 4px; padding-left: 4px; }
+.c4-instance.down { background: #15191c; border-color: #2a3036; }
+.c4-person { background: linear-gradient(180deg, #13262a, #0a1416); border: 1px solid rgba(62, 224, 200, .5); border-radius: 50% 50% 4px 4px / 40% 40% 4px 4px; }
+.c4-person .c4-head { background: radial-gradient(circle at 40% 35%, #b7fff4, #2aa596); box-shadow: 0 0 14px rgba(62, 224, 200, .55); }
+.react-flow__handle { background: var(--accent); border-color: #04120f; }
+/* Load as a segmented health bar. */
+.load-bar { height: 5px; border-radius: 0; background: #060b0c; border: 1px solid #1d2c2f; }
+.load-bar span { -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 5px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 5px); }
+
+/* Panels everywhere else. */
+.report { border-radius: 0; background: var(--steel); border: 1px solid var(--line-strong); clip-path: var(--chamfer); box-shadow: var(--bevel); }
+.report h2 { font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.stats div, .demo-stats div { border-radius: 0; background: #070d0e; border: 1px solid var(--line); }
+.note, .guided-hint, .incidents, .new-components { border-radius: 0; }
+.tutorial { border-color: var(--accent); }
+.objectives .box { border-radius: 2px; }
+.meter { border-radius: 0; } .meter .fill { border-radius: 0; }
+
+/* Mission: new buildings with their art and a link to the archive. */
+.new-components li { display: flex; align-items: center; gap: 8px; }
+.new-components .building { flex: none; }
+.new-components a { color: var(--accent); }
+
+/* Building archive and briefing */
+.archive, .base-page { min-height: 100%; width: min(1040px, 100%); margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 18px; align-content: start; }
+.page-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.page-bar a { color: var(--muted); font: 700 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
+.page-bar a:hover { color: var(--fg); }
+.page-head { display: grid; gap: 6px; }
+.page-head h1 { margin: 0; font: 900 clamp(24px, 4vw, 36px) var(--mono); letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 18px rgba(62, 224, 200, .35); }
+.page-head p { margin: 0; color: var(--muted); max-width: 70ch; }
+.archive-body { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
+.archive-list { list-style: none; margin: 0; padding: 10px; display: grid; gap: 6px; }
+.archive-list button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; text-align: left; color: var(--fg); background: linear-gradient(180deg, #132326, #0a1315);
+  border: 1px solid var(--line); border-radius: 2px; }
+.archive-list button[aria-current="true"] { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(74, 222, 128, .4), 0 0 14px rgba(74, 222, 128, .25); }
+.archive-list button:hover { border-color: var(--line-strong); }
+.archive-list .name { display: grid; font: 700 12.5px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+.archive-list .name small { font: 400 12px system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.archive-list .locked { opacity: .55; }
+.archive-detail { padding: 20px 22px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 8px 24px; align-items: start; }
+.archive-art { grid-row: span 3; display: grid; place-items: center; aspect-ratio: 1; background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--art) 25%, #0a1214), #050a0b 75%);
+  border: 1px solid color-mix(in srgb, var(--art) 50%, #000); box-shadow: inset 0 0 30px rgba(0, 0, 0, .8); }
+.archive-detail h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--art); text-shadow: 0 0 14px color-mix(in srgb, var(--art) 50%, transparent); }
+.archive-detail .kind { color: var(--muted); font-size: 13.5px; }
+.archive-detail dl { margin: 0; display: grid; gap: 12px; }
+.archive-detail dt { font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.archive-detail dd { margin: 2px 0 0; }
+.archive-facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.archive-facts span { padding: 4px 10px; background: #070d0e; border: 1px solid var(--line); font: 700 12px var(--mono); }
+.archive-facts .cost { color: var(--star); }
+.archive-detail.is-locked .archive-art { filter: grayscale(1) brightness(.6); }
+.archive-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+.archive-actions .primary-link { padding: 12px 24px; font: 900 15px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.panel { background: var(--steel); border: 1px solid var(--line-strong); clip-path: var(--chamfer); box-shadow: var(--bevel); }
+@media (max-width: 760px) {
+  .archive-body { grid-template-columns: minmax(0, 1fr); }
+  .archive-list { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .archive-detail { grid-template-columns: minmax(0, 1fr); }
+  .archive-art { grid-row: auto; width: 160px; justify-self: center; }
+}
+
+/* Your base: an isometric map of districts, one per passed level. */
+.base-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.base-stats span { padding: 6px 12px; background: #070d0e; border: 1px solid var(--line); font: 800 13px var(--mono); letter-spacing: .06em; }
+.base-stats b { color: var(--ok); }
+.base-map { position: relative; padding: 18px; overflow-x: auto; }
+.base-map svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.base-ground { fill: #0a1416; stroke: rgba(62, 224, 200, .25); }
+.base-district-floor { fill: rgba(62, 224, 200, .05); stroke: rgba(62, 224, 200, .45); stroke-dasharray: 4 3; }
+.base-district-label { paint-order: stroke; stroke: #070d0e; stroke-width: 5px; stroke-linejoin: round; fill: var(--accent); font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.base-road { stroke: rgba(62, 224, 200, .25); stroke-width: 3; fill: none; stroke-dasharray: 2 6; }
+.base-empty { padding: 28px; text-align: center; color: var(--muted); display: grid; gap: 14px; justify-items: center; }
+.base-districts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.base-districts li { padding: 10px 12px; display: grid; gap: 6px; }
+.base-districts h3 { margin: 0; font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.base-districts ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--muted); }
+.base-districts ul li { padding: 0; display: inline-flex; align-items: center; gap: 4px; }
+
+/* Level map and title screen: the same steel and teal. */
+.home-topbar { background: var(--bg); }
+.home-links { display: flex; gap: 8px; }
+.home-links a { padding: 6px 10px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #172629, #0c1517); font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fg); box-shadow: var(--bevel); }
+.home-links a:hover { border-color: var(--accent); }
+.home-banner { border-radius: 0; background: var(--steel); border: 1px solid var(--line-strong); clip-path: var(--chamfer); }
+.home-pill { border-radius: 2px; background: #070d0e; }
+.title-floor::before { background-image: linear-gradient(rgba(62, 224, 200, .35) 1px, transparent 1px), linear-gradient(90deg, rgba(62, 224, 200, .35) 1px, transparent 1px); }
+.title-horizon { background: linear-gradient(90deg, transparent, #3ee0c8 20%, #e0fff9 50%, #4ade80 80%, transparent); box-shadow: 0 0 18px #3ee0c8; }
+.title-panel { border-radius: 0; background: var(--steel); border-color: var(--line-strong); clip-path: var(--chamfer); }
+.menu-item { border-radius: 2px; border-color: var(--line-strong); background: linear-gradient(180deg, #152427, #0a1315); }
+.menu-item.primary { background: linear-gradient(180deg, #2fbf9f, #126b5b); border-color: #8ff5e3; box-shadow: 0 0 30px -6px rgba(62, 224, 200, .75); }
+.menu-item.primary .menu-note { color: #dffcf6; }
+.menu-item[data-selected="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(62, 224, 200, .35), 0 0 28px -6px rgba(62, 224, 200, .7); }
+.menu-item:not(.primary)[data-selected="true"] { background: linear-gradient(180deg, rgba(18, 107, 91, .55), rgba(6, 40, 36, .75)); }
+.title-logo .logo-b { background-image: linear-gradient(110deg, #3ee0c8 35%, #e0fff9 50%, #3ee0c8 65%); filter: drop-shadow(0 0 18px rgba(62, 224, 200, .55)); }
+.title .eyebrow { color: #8ff5e3; }
+.title-close { border-radius: 2px; border-color: #8ff5e3; background: linear-gradient(180deg, #2fbf9f, #126b5b); }
+.title-steps div { border-radius: 0; }
+/* Before the first run the results panel only holds one line. */
+.game.wide .results.empty { height: auto; }
+/* While a run plays, Skip sits in the build card's corner, so the console keeps its width. */
+.console .controls > .secondary { position: absolute; top: 6px; right: 12px; padding: 2px 12px; font-size: 12.5px; }

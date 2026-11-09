@@ -58,6 +58,18 @@ _Avoid_: Replica (reserved for database read replicas), node, server
 A directed link along which requests flow from one component to another.
 _Avoid_: Edge, wire, link
 
+**Building**:
+How a component type is drawn and named for players (e.g. the app server is a factory); every instance is one building.
+_Avoid_: Unit, structure
+
+**Building Archive**:
+The page that explains what each building (component) does, when to build it and which level brings it; shown as a **Briefing** before level 1.
+_Avoid_: Codex, encyclopedia, help
+
+**Base**:
+The player's growing infrastructure: one district per passed level, built from the design that passed it.
+_Avoid_: City, world, colony
+
 ### Simulation
 
 **Primitive**:

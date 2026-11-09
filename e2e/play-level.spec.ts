@@ -34,7 +34,7 @@ test('a player builds level 1 from an empty canvas and passes it', async ({ page
 
 test('a component can be dragged from the bar onto the canvas', async ({ page }) => {
   await page.getByRole('toolbar', { name: 'Components' }).getByRole('button', { name: /Database/ })
-    .dragTo(page.locator('.react-flow__pane'), { targetPosition: { x: 900, y: 420 } });
+    .dragTo(page.locator('.react-flow__pane'), { targetPosition: { x: 900, y: 300 } });
   await expect(node(page, 'Database')).toHaveCount(1);
 });
 

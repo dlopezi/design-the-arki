@@ -5,6 +5,7 @@ import { MODES } from '../levels/modes';
 import { isUnlocked, type Progress } from '../progress/progress';
 import { Stars } from './reportCard';
 import { FeedbackButton } from './feedbackDialog';
+import { archiveHref, baseHref } from './routes';
 
 type Props = { levels: LevelDefinition[]; progress: Progress; notice: string | null; storageWorks: boolean; onReset: () => void };
 
@@ -59,6 +60,10 @@ export function LevelSelect({ levels, progress, notice, storageWorks, onReset }:
     <main className="home">
       <header className="home-topbar">
         <h1 className="home-brand">{t.levelSelect.title}</h1>
+        <nav className="home-links" aria-label={t.levelSelect.more}>
+          <a href={baseHref}>{t.base.title}</a>
+          <a href={archiveHref}>{t.archive.title}</a>
+        </nav>
         <span className="home-pill" role="img" aria-label={t.levelSelect.totalStars(totalStars, maxStars)}><span className="home-star">★</span> {totalStars} / {maxStars}</span>
       </header>
       {notice && <p role="status" className="notice">{notice}</p>}

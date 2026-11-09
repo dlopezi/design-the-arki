@@ -1,6 +1,6 @@
 import { catalog } from '../catalog/catalog';
 import { t } from '../i18n';
-import { artStyle, ComponentGlyph } from './componentArt';
+import { artStyle, Building } from './componentArt';
 
 export const DRAG_TYPE = 'application/x-archi-component';
 
@@ -18,7 +18,7 @@ export function Hotbar({ types, onAdd }: { types: string[]; onAdd: (type: string
           <button key={type} className="hot-tile" style={artStyle(type)} aria-label={t.hotbarItem(i + 1, label, cost)} draggable
             onClick={() => onAdd(type)} onDragStart={e => { e.dataTransfer.setData(DRAG_TYPE, type); e.dataTransfer.effectAllowed = 'copy'; }}>
             <kbd aria-hidden="true">{i + 1}</kbd>
-            <span className="hot-art"><ComponentGlyph type={type} size={28} /></span>
+            <span className="hot-art"><Building type={type} size={46} /></span>
             <span className="hot-name">{label}</span>
             <small className="hot-cost" aria-hidden="true">${cost}</small>
           </button>

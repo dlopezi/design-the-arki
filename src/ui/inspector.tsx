@@ -5,6 +5,7 @@ import { t, percent } from '../i18n';
 import type { ComponentOptions } from '../levels/levels';
 import type { ConnectionTarget } from './connections';
 import { instanceCountOf, loadLevel, sizeOf } from './diagram';
+import { artStyle, Building } from './componentArt';
 
 const MAX_INSTANCES = 8;
 const QUEUE_STEP = 10;
@@ -114,8 +115,11 @@ export function Inspector({ component, options, onChange, onRemove, lastRun, ins
     <aside className="hud inspector" aria-label={t.inspector.title}>
       <h2 className="eyebrow">{t.inspector.title}</h2>
       <div className="title">
-        <h3>{t.componentTypes[component.type] ?? component.type}</h3>
-        <span className="muted">[{t.container}: {spec.presentation?.technology}]</span>
+        <span className="unit-portrait" style={artStyle(component.type)}><Building type={component.type} size={58} /></span>
+        <div>
+          <h3>{t.componentTypes[component.type] ?? component.type}</h3>
+          <span className="muted">{t.archive.buildings[component.type]?.name} · [{t.container}: {spec.presentation?.technology}]</span>
+        </div>
       </div>
 
       {sendsTo && <SendsTo {...sendsTo} />}

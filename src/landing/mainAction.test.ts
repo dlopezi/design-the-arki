@@ -6,8 +6,8 @@ const levels = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
 const progress = (passed: string[]): Progress => ({ version: 1, levels: Object.fromEntries(passed.map(id => [id, { bestStars: 1 }])) });
 
 describe('landing main button', () => {
-  it('sends a new player to level 1 in guided mode (the tutorial)', () => {
-    expect(mainAction(levels, progress([]))).toEqual({ href: '#a/guided', label: 'Play level 1', returning: false });
+  it('sends a new player to the briefing, which explains each building before level 1', () => {
+    expect(mainAction(levels, progress([]))).toEqual({ href: '#briefing', label: 'Play level 1', returning: false });
   });
 
   it('sends a returning player to the first level not passed yet', () => {

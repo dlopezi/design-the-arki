@@ -20,7 +20,7 @@ Decisions settled in the initial design grilling session (2026-11-04).
 - **Failure events**: scripted per level (traffic spikes, node or zone outages), introduced in advanced levels.
 - **Feedback on failure**: metrics charts, the **Bottleneck** highlighted on the diagram, and a short **Hint** naming the concept.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
-- **Visual style**: clean, modern architecture-diagram look, dark mode, requests animated along connections.
+- **Visual style**: strategy-game look (see *Look and feel*): components drawn as buildings of a base, dark mode, requests animated along connections.
 
 ## Game screen
 
@@ -54,7 +54,22 @@ The landing page at the site root (`#`) looks like a game's title screen (chosen
 
 ## Look and feel
 
-Same family as System Defense ("Defend the Arki"), because both games live on thearki.com (chosen 2026-11-09): its colour palette (navy panels, cyan accent, green / red / yellow for good / bad / numbers), monospace for titles, labels and numbers with system sans-serif for body text, and its title screen (glitching monospace logo, falling 0s and 1s, horizon with a perspective data floor, scanlines, "Press … to start", records and version in the footer). Tokens live in `:root` in `src/ui/styles.css`.
+Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense look chosen the same day: the player builds and runs a base. Original art and names, inspired by the genre, not by any one game.
+
+- **Palette**: dark steel panels with a bevel and cut corners, a teal accent, green for selection and good, red / yellow for bad / warning, gold for money. Monospace, uppercase labels for titles and numbers; system sans-serif for body text. Tokens live in `:root` in `src/ui/styles.css`.
+- **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`): load balancer = relay tower, app server = factory, cache = generator, database = silos. A failed instance is grey with smoke. Every new component type needs a colour and a building.
+- **Command console** (wide screens): a resource bar on top (back, level, monthly cost against the budget, Inspector / Results toggles, Feedback), the mission on the left, the results panel above the console, and at the bottom a console with the minimap (left), the selected building's portrait and settings (centre) and the build card with the buildings and the big Play button (right). Tablet and phone keep their layouts with the same look.
+- **The diagram** sits on a grid floor: the system boundary is the base wall, zones are districts, load bars are segmented like health bars.
+
+## Building Archive and briefing
+
+- The **Building Archive** (`#archive`) explains each component as a building: what it does, when to build it, its cost and the level that first uses it. Buildings of levels the player cannot reach yet are locked.
+- A new player's "Play level 1" opens the archive as a **briefing** (`#briefing`) with "Start level 1", so they know every building before the first level.
+- The mission panel shows new buildings with their art and a link to the archive.
+
+## Your base
+
+`#base` shows the infrastructure the player has built so far: one **district** per passed level on an isometric map, with one building per instance of the design that passed it (the level's reference design for progress saved before this feature). It opens from the title screen menu and the level map.
 
 ## Release
 

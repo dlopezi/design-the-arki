@@ -7,7 +7,8 @@ import { playerSummary } from '../landing/summary';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
 import { loadLevel } from './diagram';
-import { levelsHref } from './routes';
+import { archiveHref, baseHref, levelsHref } from './routes';
+import { baseOf } from '../base/base';
 
 /** A small C4-style picture of the demo design, with requests travelling along the connections. */
 function DemoDiagram({ instances, rps, outcome }: { instances: number; rps: number; outcome: DemoOutcome }) {
@@ -141,13 +142,16 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
   const [howTo, setHowTo] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const buildings = useMemo(() => baseOf(levels, progress).buildings, [levels, progress]);
   const closeHowTo = useCallback(() => { setHowTo(false); itemRefs.current[2]?.focus(); }, []);
-  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[3]?.focus(); }, []);
+  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[5]?.focus(); }, []);
 
   const menu: MenuItem[] = [
     { href: action.href, label: action.label, note: !summary.next ? l.allPassed : action.returning ? summary.next.title : l.firstNote(summary.next.title) },
     { href: levelsHref, label: l.levelMap, note: l.levelMapNote },
     { onClick: () => setHowTo(true), label: l.howToPlay, note: l.howToPlayNote },
+    { href: archiveHref, label: t.archive.title, note: t.archive.menuNote },
+    { href: baseHref, label: t.base.title, note: t.base.menuNote(buildings) },
     { onClick: () => setFeedback(true), label: t.feedbackForm.title, note: t.feedbackForm.menuNote },
   ];
 

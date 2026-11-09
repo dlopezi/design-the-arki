@@ -18,7 +18,15 @@ test('a new visitor learns what the game is, tries the demo and starts the tutor
   await expect(demo(page).getByText('700 req/s')).toBeVisible();
   await expect(demo(page).getByRole('status')).toHaveText('✗ The app server is overloaded');
 
+  // A new player first reads the briefing: what each building is for.
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Play level 1' }).click();
+  await expect(page).toHaveURL(/#briefing$/);
+  await expect(page.getByRole('heading', { name: 'Before your first mission' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Factory' })).toBeVisible();
+  await expect(page.getByText('Runs your application code')).toBeVisible();
+  await page.getByRole('button', { name: /Relay tower/ }).click();
+  await expect(page.getByRole('heading', { name: 'Relay tower' })).toBeVisible();
+  await page.getByRole('link', { name: 'Start level 1' }).click();
   await expect(page).toHaveURL(/#01-hello-world\/guided$/);
   await expect(page.getByRole('region', { name: 'Tutorial' })).toContainText('Step 1 of 4');
 });
@@ -68,5 +76,24 @@ test('Enter on a fresh title screen starts the selected first item', async ({ pa
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Play level 1' })).toHaveAttribute('data-selected', 'true');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/#01-hello-world\/guided$/);
+  await expect(page).toHaveURL(/#briefing$/);
+});
+
+test('the title screen menu opens the building archive and the player\'s base', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 1 } } }));
+  });
+  await page.goto('/');
+  const menu = page.getByRole('navigation', { name: 'Main menu' });
+  await menu.getByRole('link', { name: /Building archive/ }).click();
+  await expect(page.getByRole('heading', { name: 'Building archive' })).toBeVisible();
+  // The load balancer arrives in level 2, which is open; the cache, in a later level, is still locked.
+  await expect(page.getByRole('button', { name: /Relay tower/ })).not.toContainText('Locked');
+  await expect(page.getByRole('button', { name: /Generator/ })).toContainText('Locked');
+
+  await page.goto('/');
+  await menu.getByRole('link', { name: /Your base/ }).click();
+  await expect(page.getByRole('heading', { name: 'Your base' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('1 district');
+  await expect(page.getByRole('heading', { name: 'Level 1 · Hello world' })).toBeVisible();
 });

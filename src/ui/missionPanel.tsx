@@ -3,6 +3,8 @@ import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import type { Mode } from '../levels/modes';
 import { Objectives } from './objectives';
+import { Building } from './componentArt';
+import { archiveHref } from './routes';
 
 type Props = {
   level: LevelDefinition;
@@ -27,7 +29,10 @@ export function MissionPanel({ level, mode, newTypes, cost, result, compact }: P
       <ul className="traffic">{level.traffic.map(s => <li key={s.fromS}>{t.traffic(s.rps, s.fromS, s.toS)}</li>)}</ul>
       {newTypes.length > 0 && (
         <ul className="new-components" aria-label={t.newComponents}>
-          {newTypes.map(type => <li key={type}><strong>{t.newLabel} {t.componentTypes[type] ?? type}</strong> {t.componentIntros[type]}</li>)}
+          {newTypes.map(type => (
+            <li key={type}><Building type={type} size={40} /><span><strong>{t.newLabel} {t.componentTypes[type] ?? type}</strong> {t.componentIntros[type]}</span></li>
+          ))}
+          <li><a href={archiveHref}>{t.archive.seeArchive} →</a></li>
         </ul>
       )}
       {(level.failureEvents?.length ?? 0) > 0 && (

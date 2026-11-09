@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type Connection, type Edge, type Node } from '@xyflow/react';
+import { Background, BackgroundVariant, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type Connection, type Edge, type Node } from '@xyflow/react';
 import { BUCKET_S, DesignError, designCost, simulate } from '../engine/simulate';
 import type { Design, DesignProblem, Result } from '../engine/types';
 import { t, percent } from '../i18n';
 import { allLevels, type LevelDefinition, type TutorialStep } from '../levels/levels';
 import { CostMeter } from './costMeter';
+import { componentArt } from './componentArt';
 import { edgeTypes, instanceNames, layoutDiagram, nodeTypes } from './diagram';
 import { DRAG_TYPE, Hotbar } from './hotbar';
 import { ClientsInspector, Inspector } from './inspector';
@@ -18,7 +19,9 @@ import { LevelSelect } from './levelSelect';
 import { isUnlocked, loadProgress, resetProgress, saveProgress, withDesign, withPass, withTutorialDone, type Progress } from '../progress/progress';
 import { hintAllowed, isMode, startingDesign, type Mode } from '../levels/modes';
 import { ModePicker } from './modePicker';
-import { LEVELS_HASH, levelsHref } from './routes';
+import { ARCHIVE_HASH, BASE_HASH, BRIEFING_HASH, LEVELS_HASH, levelsHref } from './routes';
+import { Archive } from './archive';
+import { BasePage } from './basePage';
 import { Landing } from './landing';
 import { track } from '../analytics/analytics';
 import { FeedbackButton } from './feedbackDialog';
@@ -38,7 +41,7 @@ const px = (n: number) => `${n}px` as const;
  * Medium: the side panel (left), cost and tutorial (top), controls and results (bottom).
  * Compact: the diagram has its own area between the bars, so a small margin is enough.
  */
-type FitState = { inspector: boolean; results: boolean; tutorial: boolean; tall: boolean };
+type FitState = { inspector: boolean; results: boolean; tutorial: boolean; tall: boolean; ran: boolean };
 const mediumMargins = ({ results, tutorial, tall }: FitState): Margins => ({
   top: tutorial ? MEDIUM.topWithTutorial : MEDIUM.top,
   left: MEDIUM.side + 8,
@@ -47,14 +50,19 @@ const mediumMargins = ({ results, tutorial, tall }: FitState): Margins => ({
 });
 const MAX_ZOOM = 1.1;
 const fitOptions = (layout: Layout, state: FitState) => {
-  const { inspector, results } = state;
+  const { inspector, results, tutorial, ran } = state;
   if (layout === 'compact') return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: px(16) };
   if (layout === 'medium') {
     const m = mediumMargins(state);
     return { maxZoom: MAX_ZOOM, minZoom: COMPACT_MIN_ZOOM, padding: { top: px(m.top), right: px(m.right), bottom: px(m.bottom), left: px(m.left) } };
   }
-  return { maxZoom: 1.1, padding: { top: px(40), left: px(340), right: px(inspector ? 340 : 40), bottom: px(results ? 352 : 160) } };
+  void inspector; // Wide: the inspector lives in the console, so it never covers the diagram.
+  // Before the first run the results panel is one line high; the tutorial card sits under the top bar.
+  const resultsHeight = results ? (ran ? WIDE.results : WIDE.resultsEmpty) + 12 : 0;
+  return { maxZoom: 1.1, padding: { top: px(WIDE.bar + 24 + (tutorial ? WIDE.tutorial : 0)), left: px(WIDE.mission + 40), right: px(32), bottom: px(WIDE.console + 24 + resultsHeight) } };
 };
+/** Wide layout sizes (px), kept in step with `.game.wide` in styles.css: top bar, mission width, console and results heights. */
+const WIDE = { bar: 52, mission: 300, console: 216, results: 196, resultsEmpty: 72, tutorial: 110, map: 220 };
 /** A phone is narrower than the diagram at React Flow's default minimum zoom (0.5); the player can pinch to zoom in. */
 const COMPACT_MIN_ZOOM = 0.25;
 type SheetTab = 'mission' | 'inspector' | 'results';
@@ -88,7 +96,8 @@ type GameProps = {
   initialDesign: Design | null;
   nextLevelId: string | null;
   onDesignChange: (design: Design) => void;
-  onPassed: (stars: number) => void;
+  /** The level was passed with this many stars, by this design. */
+  onPassed: (stars: number, design: Design) => void;
   /** Steps to walk through, or null when there is no tutorial to show. */
   tutorial: TutorialStep[] | null;
   onTutorialDone: () => void;
@@ -162,7 +171,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
 
   const diagram = useMemo(() => layoutDiagram(design, { selected, problemIds: problem?.componentIds ?? [], live, bottleneckId, tutorialTargetType }),
     [design, selected, problem, live?.result, live?.bucket, live?.animate, live && Math.floor(live.t), bottleneckId, tutorialTargetType]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fitState: FitState = { inspector: panels.inspector, results: panels.results, tutorial: showTutorial, tall };
+  const fitState: FitState = { inspector: panels.inspector, results: panels.results, tutorial: showTutorial, tall, ran: !!result };
   const FIT = fitOptions(layout, fitState);
   const cost = designCost(design);
   const designKey = JSON.stringify(design);
@@ -183,7 +192,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       }
     }, 30);
     return () => clearTimeout(timer);
-  }, [shapeKey, fitView, panels.inspector, panels.results, layout, tall, sheet.open, showTutorial, tutorialStep, flowWidth, flowHeight]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shapeKey, fitView, panels.inspector, panels.results, layout, tall, sheet.open, showTutorial, tutorialStep, flowWidth, flowHeight, !!result]); // eslint-disable-line react-hooks/exhaustive-deps
   // On a phone or tablet, selecting a component shows its settings.
   const selectedIsComponent = selected === CLIENTS || design.components.some(c => c.id === selected);
   useEffect(() => {
@@ -237,7 +246,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       setResult(run);
       track('Run', { level: level.id, mode, passed: run.passed ? 'yes' : 'no' });
       if (run.passed) {
-        onPassed(run.stars);
+        onPassed(run.stars, design);
         if (!passedOnce.current) track('Level passed', { level: level.id, mode, stars: run.stars });
         passedOnce.current = true;
       }
@@ -297,7 +306,13 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
       fitView fitViewOptions={FIT} minZoom={compact ? COMPACT_MIN_ZOOM : 0.5} proOptions={{ hideAttribution: true }}
       onDragOver={e => { if (e.dataTransfer.types.includes(DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }}
       onDrop={e => { const type = e.dataTransfer.getData(DRAG_TYPE); if (type) { e.preventDefault(); addComponent(type); } }}>
-      <Background variant={BackgroundVariant.Dots} gap={26} size={1.5} />
+      <Background variant={BackgroundVariant.Lines} gap={48} lineWidth={1} color="rgba(62, 224, 200, .07)" />
+      {layout === 'wide' && (
+        <MiniMap position="bottom-left" pannable zoomable ariaLabel={t.console.minimap} className="rts-minimap"
+          style={{ width: WIDE.map, height: WIDE.console - 2 }} bgColor="#060b0d" maskColor="rgba(3, 8, 10, .7)" maskStrokeColor="#3ee0c8" maskStrokeWidth={2}
+          nodeColor={n => n.type === 'component' || n.type === 'instance' ? (componentArt[(n.data as { type: string }).type]?.color ?? '#5b6577') : n.type === 'person' ? '#e2e8f0' : 'transparent'}
+          nodeStrokeColor={n => (n.type === 'boundary' ? 'rgba(62, 224, 200, .35)' : 'transparent')} nodeBorderRadius={2} />
+      )}
     </ReactFlow>
   );
   const mission = <MissionPanel level={level} mode={mode} newTypes={newTypes} cost={cost} result={running ? null : result} compact={compact} />;
@@ -427,27 +442,40 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
     );
   }
 
+  // Wide: a resource bar on top, the mission on the left, and a command console at the bottom
+  // (minimap, the selected building's details, and the build card with Play), like a strategy game.
   return (
-    <div className="game" data-results={panels.results}>
+    <div className="game wide" data-results={panels.results}>
       {canvas}
 
-      <section className="hud mission">
-        <span className="mission-links"><a className="back" href={levelsHref}>← {t.levels}</a>{feedbackLink}</span>
+      <header className="hud rts-bar">
+        <a className="back" href={levelsHref}>← {t.levels}</a>
         <h1>{level.title}</h1>
+        <div className="rts-resources">{costMeter}</div>
+        <div className="panel-toggles">
+          <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
+          <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
+        </div>
+        {feedbackLink}
+      </header>
+
+      <section className="hud mission" aria-label={t.panels.mission}>
+        <h2 className="console-label">{t.panels.mission}</h2>
         {mission}
       </section>
 
-      <section className="hud cost-hud">{costMeter}</section>
-
-      <div className="hud panel-toggles">
-        <button aria-pressed={panels.inspector} onClick={() => togglePanel('inspector')} title="I">{t.panels.inspector}</button>
-        <button aria-pressed={panels.results} onClick={() => togglePanel('results')} title="R">{t.panels.results}</button>
-      </div>
-
-      {panels.inspector && inspector}
       {panels.results && results}
 
-      <div className={`hud controls ${panels.results ? 'above-results' : ''}`}>{controls}</div>
+      <div className="console">
+        <div className="console-frame console-map"><span className="console-label">{t.console.map}</span></div>
+        <div className="console-frame console-unit">
+          {panels.inspector ? inspector : <p className="muted console-empty">{t.console.inspectorHidden}</p>}
+        </div>
+        <div className="console-frame console-command">
+          <span className="console-label">{t.console.build}</span>
+          <div className="controls">{controls}</div>
+        </div>
+      </div>
       {overlays}
       {tutorialCard}
       {report}
@@ -455,7 +483,7 @@ function Game({ level, newTypes, mode, initialDesign, nextLevelId, onDesignChang
   );
 }
 
-/** `#` is the landing page, `#levels` the level select, `#<level>` the mode picker, `#<level>/<mode>` the game. */
+/** `#` is the landing page, `#levels` the level select, `#archive` / `#briefing` the Building Archive, `#base` the player's Base, `#<level>` the mode picker, `#<level>/<mode>` the game. */
 const routeFromHash = () => {
   const [levelId = '', mode = ''] = decodeURIComponent(location.hash.slice(1)).split('/');
   return { levelId, mode: isMode(mode) ? mode : null };
@@ -495,6 +523,10 @@ export function App() {
   }, [level, locked]);
 
   if (!level && route.levelId === '') return <Landing levels={levels} progress={progress} />;
+  if (route.levelId === ARCHIVE_HASH || route.levelId === BRIEFING_HASH) {
+    return <Archive key={route.levelId} levels={levels} progress={progress} briefing={route.levelId === BRIEFING_HASH} />;
+  }
+  if (route.levelId === BASE_HASH) return <BasePage levels={levels} progress={progress} />;
   if (!level || locked) {
     return <LevelSelect levels={levels} progress={progress} notice={notice} storageWorks={storageWorks}
       onReset={() => { setProgress(resetProgress()); setNotice(null); }} />;
@@ -509,7 +541,7 @@ export function App() {
       <Game level={level} newTypes={level.allowedComponents.filter(type => !levels.slice(0, ids.indexOf(level.id)).some(l => l.allowedComponents.includes(type)))} mode={mode} initialDesign={progress.levels[level.id]?.designs?.[mode] ?? startingDesign(level, mode)}
         nextLevelId={next ?? null}
         onDesignChange={design => update(p => withDesign(p, level.id, mode, design))}
-        onPassed={stars => update(p => withPass(p, level.id, stars, mode))}
+        onPassed={(stars, design) => update(p => withPass(p, level.id, stars, mode, design))}
         tutorial={!tutorialDone && mode === 'guided' && level.tutorial ? level.tutorial : null}
         onTutorialDone={() => update(withTutorialDone)} />
     </ReactFlowProvider>

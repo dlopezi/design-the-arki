@@ -10,6 +10,8 @@ export type LevelProgress = {
   bestMode?: Mode;
   /** Last design per mode, so each mode resumes where the player left it. */
   designs?: Partial<Record<Mode, Design>>;
+  /** The latest design that passed the level: what the player's Base shows for it. */
+  passedDesign?: Design;
 };
 export type Progress = { version: 1; levels: Record<string, LevelProgress>; tutorialDone?: boolean };
 
@@ -50,13 +52,14 @@ export function isUnlocked(levelIds: string[], id: string, progress: Progress): 
   return (progress.levels[levelIds[index - 1]!]?.bestStars ?? 0) > 0;
 }
 
-/** Records a pass: keeps the best stars and the hardest mode. */
-export function withPass(progress: Progress, id: string, stars: number, mode: Mode): Progress {
+/** Records a pass: keeps the best stars, the hardest mode and the design that passed. */
+export function withPass(progress: Progress, id: string, stars: number, mode: Mode, design?: Design): Progress {
   const current = progress.levels[id] ?? { bestStars: 0 };
   const bestStars = Math.max(current.bestStars, stars);
   const bestMode = !current.bestMode || modeRank(mode) > modeRank(current.bestMode) ? mode : current.bestMode;
-  if (bestStars === current.bestStars && bestMode === current.bestMode) return progress;
-  return { ...progress, levels: { ...progress.levels, [id]: { ...current, bestStars, bestMode } } };
+  const passedDesign = design ?? current.passedDesign;
+  if (bestStars === current.bestStars && bestMode === current.bestMode && passedDesign === current.passedDesign) return progress;
+  return { ...progress, levels: { ...progress.levels, [id]: { ...current, bestStars, bestMode, ...(passedDesign && { passedDesign }) } } };
 }
 
 export function withDesign(progress: Progress, id: string, mode: Mode, design: Design): Progress {

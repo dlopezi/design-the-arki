@@ -3,7 +3,7 @@ import { catalog } from '../catalog/catalog';
 import { hitRateOf } from '../engine/simulate';
 import type { Design, Presentation, Result } from '../engine/types';
 import { t } from '../i18n';
-import { ComponentBadge } from './componentArt';
+import { artStyle, ComponentBadge } from './componentArt';
 
 // Layout is automatic: the player decides what exists and how it connects; the game decides where it goes.
 const PERSON = { w: 150, h: 112 };
@@ -58,7 +58,7 @@ function BoundaryNode({ data }: NodeProps<Node<BoundaryData>>) {
 
 function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
   return (
-    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''} ${data.tutorialTarget ? 'tutorial-target' : ''}`}>
+    <div className={`c4-component ${data.container ? 'container' : 'box'} ${data.selected ? 'selected' : ''} ${data.problem ? 'problem' : ''} ${data.bottleneck ? 'bottleneck' : ''} ${data.tutorialTarget ? 'tutorial-target' : ''}`} style={artStyle(data.type)}>
       <Handle type="target" position={Position.Left} />
       <div className="c4-main">
         <ComponentBadge type={data.type} />
@@ -76,7 +76,7 @@ function ComponentNode({ data }: NodeProps<Node<ComponentData>>) {
 
 function InstanceNode({ data }: NodeProps<Node<InstanceData>>) {
   return (
-    <div className={`c4-instance ${data.down ? 'down' : data.load === null ? '' : loadLevel(data.load)}`}>
+    <div className={`c4-instance ${data.down ? 'down' : data.load === null ? '' : loadLevel(data.load)}`} style={artStyle(data.type, data.down)}>
       <ComponentBadge type={data.type} small down={data.down} />
       <div className="c4-text">
         <strong>{data.name}{data.down && <span className="badge down">{t.down}</span>}</strong>
