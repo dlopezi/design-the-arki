@@ -63,8 +63,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .hint { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 5; padding: 4px 12px; background: rgba(6,11,12,.85); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; pointer-events: none; }
 .hint b { color: var(--fg); }
 .crowd { display: grid; justify-items: center; gap: 4px; min-width: 110px; padding: 6px; border: 1px solid transparent; }
-.crowd .people { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; min-height: 48px; align-content: center; }
-.crowd .people i { width: 22px; height: 22px; background: no-repeat center/contain url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="%232aa596"/><path d="M12 58c0-14 9-22 20-22s20 8 20 22z" fill="%2313262a" stroke="%233ee0c8" stroke-width="3"/></svg>'); }
 .crowd .count { font: 800 13px var(--mono); }
 .crowd .wait { font-size: 12px; color: var(--muted); text-align: center; }
 .system { border: 2px solid rgba(62,224,200,.3); border-radius: 36px; background: rgba(10,22,24,.35); padding: 12px 24px 18px; display: grid; gap: 8px; box-shadow: inset 0 0 40px rgba(62,224,200,.06); }
@@ -139,6 +137,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
 .zone-data { grid-template-columns: auto auto; column-gap: 60px; }
 .zone-data .zname { grid-column: 1 / -1; }
+.globe-wrap { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; }
+.globe-wrap.busy { box-shadow: 0 0 0 2px rgba(62,224,200,.25), 0 0 26px rgba(62,224,200,.45); }
 </style>
 </head>
 <body>
@@ -152,11 +152,11 @@ const TUNE_LABELS = { passive: 'Ingreso fijo ($/s)', per100Visits: '$ por 100 vi
 
 // ───────── Three mini-levels: ONE wave each, ONE idea each ─────────
 const LEVELS = [
-  { id: 'spike', title: 'Primer pico', lesson: 'Una sola fábrica no basta: necesitas varias y una torre de enlace que reparta el tráfico.',
+  { id: 'spike', title: 'Primer pico', lesson: 'Un solo app server no basta: necesitas varios y un load balancer que reparta el tráfico.',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 150, wave: { rps: 300, length: 45 }, stars: [110, 150] },
-  { id: 'cache', title: 'Venta flash', lesson: 'Los silos (base de datos) están fijos en tamaño pequeño: pon un generador (caché) delante.',
+  { id: 'cache', title: 'Venta flash', lesson: 'La base de datos está fija en tamaño pequeño: pon una caché delante.',
     allowed: ['loadBalancer', 'appServer', 'cache', 'database'], start: 200, wave: { rps: 420, length: 45 }, stars: [130, 180], noUpgrade: true },
-  { id: 'n1', title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae una fábrica. Construye una más de las que necesitas (N+1).',
+  { id: 'n1', title: 'Se cae un servidor', lesson: 'A mitad de la oleada se cae un app server. Construye uno más de los que necesitas (N+1).',
     allowed: ['loadBalancer', 'appServer', 'database'], start: 220, wave: { rps: 300, length: 50, incidentAt: 20 }, stars: [110, 160] },
 ];
 let level = LEVELS[0];
@@ -165,10 +165,10 @@ const waveFrom = () => TUNE.buildPhase, waveTo = () => TUNE.buildPhase + level.w
 
 // ───────── Buildings ─────────
 const TYPES = {
-  loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', zone: 'edge', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
-  appServer: { name: 'Fábrica', comp: 'App server', zone: 'app', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
-  cache: { name: 'Generador', comp: 'Caché', zone: 'data', color: '#f59e0b', price: 30, monthly: 30, build: 6, hit: 0.6, key: '3' },
-  database: { name: 'Silos', comp: 'Base de datos', zone: 'data', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
+  loadBalancer: { name: 'Load balancer', comp: 'Load balancer', zone: 'edge', color: '#4f8ef7', price: 20, monthly: 20, build: 4, key: '1' },
+  appServer: { name: 'App server', comp: 'App server', zone: 'app', color: '#34b97a', price: 40, monthly: 40, build: 5, cap: 200, key: '2' },
+  cache: { name: 'Caché', comp: 'Caché', zone: 'data', color: '#f59e0b', price: 30, monthly: 30, build: 6, hit: 0.6, key: '3' },
+  database: { name: 'Base de datos', comp: 'Base de datos', zone: 'data', color: '#9b6bff', price: 50, monthly: 50, build: 8, cap: 400, key: '4' },
 };
 const DB_UPGRADE = { price: 100, monthly: 100, cap: 800 };
 const ZONES = [['edge', 'Borde'], ['app', 'Aplicación'], ['data', 'Datos']];
@@ -210,7 +210,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 const unitById = (id) => S.units.find(u => u.id === id);
 const isLive = (id) => id === 'users' || (unitById(id)?.ready && !unitById(id)?.down);
 const ofType = (type) => S.units.filter(u => u.type === type);
-const nameOf = (id) => id === 'users' ? 'Usuarios' : unitById(id)?.label ?? '?';
+const nameOf = (id) => id === 'users' ? 'Internet' : unitById(id)?.label ?? '?';
 const upkeepPerS = () => S.units.reduce((sum, u) => sum + (u.upgraded ? DB_UPGRADE.monthly : TYPES[u.type].monthly), 0) / TUNE.upkeepFactor;
 const inWave = () => S.t >= waveFrom() && S.t < waveTo();
 
@@ -222,7 +222,7 @@ const reaches = (from, to) => from === to || S.links.some(l => l.from === from &
 function linkProblem(from, to) {
   if (from === to) return 'un edificio no se conecta consigo mismo';
   if (to === 'users') return 'las peticiones no vuelven a los usuarios por una línea';
-  if (from !== 'users' && unitById(from)?.type === 'database') return 'los silos no envían peticiones';
+  if (from !== 'users' && unitById(from)?.type === 'database') return 'la base de datos no envía peticiones';
   if (hasLink(from, to)) return 'ya están conectados';
   if (reaches(to, from)) return 'eso haría un círculo';
   return null;
@@ -249,7 +249,7 @@ function autoLink(u) {
     if (lbs[0]) addLink(lbs[0].id, u.id, true); else if (!S.links.some(l => l.from === 'users')) addLink('users', u.id, true);
     if (dataTarget) addLink(u.id, dataTarget, true);
   } else if (u.type === 'cache') {
-    // The cache goes in front of the database: factories that went straight to the silos now go through it.
+    // The cache goes in front of the database: app servers that went straight to the database now go through it.
     const db = dbs[0];
     if (db) S.links = S.links.filter(l => !(l.to === db.id && unitById(l.from)?.type === 'appServer'));
     apps.forEach(a => { if (!S.links.some(l => l.from === a.id)) addLink(a.id, u.id, true); });
@@ -271,7 +271,7 @@ function buildUnit(type) {
   if (S.auto) autoLink(u);
   S.selected = u.id; S.selectedLink = null;
   if (layer === 1) layer = 3; // layer 1 shows no buildings: show the new one
-  log(`Construyendo ${spec.name} (${spec.build} s)`);
+  log(`Construyendo ${u.label} (${spec.build} s)`);
   render();
 }
 function removeUnit(id) {
@@ -284,7 +284,7 @@ function upgradeDb(id) {
   const u = unitById(id);
   if (!u || u.upgraded || level.noUpgrade || S.money < DB_UPGRADE.price) return;
   S.money -= DB_UPGRADE.price; u.upgraded = true; u.ready = false; u.left = u.total = 6;
-  log('Mejorando los silos a tier Medium (6 s)', 'warn'); render();
+  log('Mejorando la base de datos a tier Medium (6 s)', 'warn'); render();
 }
 function callNow() {
   if (S.t >= TUNE.buildPhase) return;
@@ -341,7 +341,7 @@ function solve(rps) {
 function step(dt) {
   if (S.over || S.paused) return;
   S.t += dt;
-  for (const u of S.units) if (!u.ready) { u.left -= dt; if (u.left <= 0) { u.ready = true; log(`${TYPES[u.type].name}${u.type === 'appServer' ? ' ' + u.label : ''} lista`, 'ok'); } }
+  for (const u of S.units) if (!u.ready) { u.left -= dt; if (u.left <= 0) { u.ready = true; log(`${u.type === 'appServer' ? u.label : TYPES[u.type].name} en servicio`, 'ok'); } }
   if (inWave() && !S.waveStarted) { S.waveStarted = true; log(`¡Llegan los usuarios! ${level.wave.rps} req/s`, 'warn'); }
   if (level.wave.incidentAt && !S.incidentDone && S.t >= waveFrom() + level.wave.incidentAt) {
     const victim = ofType('appServer').find(u => u.ready && !u.down);
@@ -379,7 +379,7 @@ function nodeEl(id) {
 /** The drawing of a node on screen: the building's picture, the crowd, or the system box. */
 function nodeRect(id) {
   const el = nodeEl(id); if (!el) return null;
-  const d = id === 'users' ? el.querySelector('.people') ?? el : layer === 1 ? el : el.querySelector('svg') ?? el;
+  const d = id === 'users' ? el.querySelector('.globe') ?? el : layer === 1 ? el : el.querySelector('svg') ?? el;
   return d.getBoundingClientRect();
 }
 /** Where a line leaves (out) or reaches (in) a node: the side of its drawing, at the height of its base. */
@@ -526,7 +526,6 @@ function drawLinks(now, lines) {
     const w = 2 + Math.min(14, ln.flow / 45);
     const color = selected ? '#ffffff' : !ln.live ? '#fbbf24' : '#3ee0c8';
     ctx.strokeStyle = color;
-    ctx.globalAlpha = flowing ? .22 : .12; ctx.lineWidth = w + 7; strokeCurve(ln.c);
     ctx.globalAlpha = selected ? 1 : flowing ? .9 : .55; ctx.lineWidth = w;
     ctx.setLineDash(!ln.live ? [4, 6] : [10, 8]);
     ctx.lineDashOffset = flowing ? -(now / 1000) * 60 * Math.max(1, S.speed) : 0;
@@ -616,7 +615,7 @@ function zoneInner(zone) {
         <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
     }).join('');
   }
-  const ORDER = ['loadBalancer', 'cache', 'database']; // the cache sits before the silos, so the line between them runs forward
+  const ORDER = ['loadBalancer', 'cache', 'database']; // the cache sits before the database, so the line between them runs forward
   const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer').sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
   return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 52)).join('')}</div>` : '');
 }
@@ -643,7 +642,7 @@ function inspectorHtml() {
   const sel = unitById(S.selected);
   if (!sel) return `<p class="muted">Selecciona un edificio o una línea. Los edificios se conectan solos al construirlos; para cambiarlo, <b>arrastra desde un edificio a otro</b> o selecciona una línea y pulsa Supr.</p>`;
   const outs = S.links.filter(l => l.from === sel.id).map(l => nameOf(l.to)).join(', ') || '—';
-  return `<div class="head">${building(sel.type, 56)}<div><h3>${sel.label}</h3><span class="muted">${TYPES[sel.type].name} · ${TYPES[sel.type].comp}</span></div></div>
+  return `<div class="head">${building(sel.type, 56)}<div><h3>${sel.label}</h3><span class="muted">${TYPES[sel.type].comp} · zona ${ZONES.find(([z]) => z === TYPES[sel.type].zone)[1]}</span></div></div>
     <div class="rows">
       <span class="muted">Estado</span><span>${sel.down ? 'caído' : sel.ready ? 'en servicio' : `en obra · ${Math.ceil(sel.left)} s`}</span>
       <span class="muted">Envía a</span><span>${sel.type === 'database' ? '— (responde)' : outs}</span>
@@ -662,8 +661,7 @@ function render() {
   const wave = inWave(), inBuild = S.t < TUNE.buildPhase;
   const L = S.last ?? { rps: 0, p95: 0, errors: 0, revenue: 0, upkeep: upkeepPerS(), net: TUNE.passive - upkeepPerS() };
   const phase = inBuild ? `CONSTRUCCIÓN ${fmt(TUNE.buildPhase - S.t)}` : wave ? `OLEADA · ${fmt(waveTo() - S.t)}` : 'FIN';
-  const people = wave ? Math.min(16, Math.ceil(level.wave.rps / 30)) : 0;
-  const banner = inBuild ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
+    const banner = inBuild ? `<div class="banner">⏱ Los usuarios llegan en ${Math.ceil(TUNE.buildPhase - S.t)} s</div>`
     : wave ? `<div class="banner ${S.incidentDone && level.wave.incidentAt ? 'bad' : 'warn'}">${S.incidentDone && level.wave.incidentAt ? '¡Se ha caído un servidor!' : `¡Llegan los usuarios! · ${level.wave.rps} req/s`}</div>` : '';
   document.getElementById('app').innerHTML = `
   <header class="bar">
@@ -678,8 +676,8 @@ function render() {
     <div class="world" style="transform: translate(${view.x}px, ${view.y}px) scale(${view.z})">
       <div class="scene">
         <div class="crowd" data-id="users">
-          <span class="label">Usuarios</span>
-          <div class="people">${Array.from({ length: people }, () => '<i></i>').join('')}</div>
+          <span class="label">Internet</span>
+          <div class="globe-wrap ${wave ? 'busy' : ''}"><svg class="globe" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="#0b1d20" stroke="#3ee0c8" stroke-width="2.5"/><ellipse cx="32" cy="32" rx="12" ry="27" fill="none" stroke="#3ee0c8" stroke-width="2"/><path d="M5 32h54M9 18h46M9 46h46M32 5v54" fill="none" stroke="#3ee0c8" stroke-width="2"/></svg></div>
           ${wave ? `<span class="count">${L.rps} req/s</span><span class="wait">${Math.round(S.visits).toLocaleString('es')} visitas atendidas</span>` : `<span class="wait">${inBuild ? 'esperando…' : 'se han ido'}</span>`}
         </div>
         ${systemHtml()}
