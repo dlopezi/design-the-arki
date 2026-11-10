@@ -137,6 +137,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .end h2 { margin: 0; font: 900 24px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .end .stars { font-size: 38px; color: var(--star); letter-spacing: 4px; } .end .stars .off { color: var(--line-strong); }
 .proto { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 20; font: 800 10px var(--mono); letter-spacing: .14em; padding: 2px 8px; background: var(--warn); color: #241a00; }
+.zone-data { grid-template-columns: auto auto; column-gap: 60px; }
+.zone-data .zname { grid-column: 1 / -1; }
 </style>
 </head>
 <body>
@@ -361,7 +363,10 @@ function step(dt) {
 }
 
 // ───────── Lines and requests on the map (canvas over the field) ─────────
-const REQ_MODES = [['roundtrip', 'Ida y vuelta'], ['people', 'Usuarios'], ['dots', 'Puntos'], ['flow', 'Flujo']];
+// Lines leave a building from its right side and reach the next one on its left side, as curves that bend around
+// any other building in the way. They are always drawn as flows: thicker with more traffic, with moving dashes and req/s.
+// Requests travel along those same curves, by building id, so they follow the map when it moves.
+const REQ_MODES = [['roundtrip', 'Ida y vuelta'], ['people', 'Usuarios'], ['dots', 'Puntos'], ['flow', 'Solo flujo']];
 const particles = [];
 let spawnDebt = 0, drag = null;
 const q = (sel) => document.querySelector(sel);
@@ -371,26 +376,72 @@ function nodeEl(id) {
   if (layer === 2) return q(`[data-node="${unitById(id)?.type}"]`);
   return q(`[data-id="${id}"]`);
 }
-// The point where a line meets a building: the middle of its drawing.
-function pointOf(id) {
+/** The drawing of a node on screen: the building's picture, the crowd, or the system box. */
+function nodeRect(id) {
   const el = nodeEl(id); if (!el) return null;
-  const d = id === 'users' ? el.querySelector('.people') ?? el : el.querySelector('svg') ?? el;
-  const r = d.getBoundingClientRect();
-  return id === 'users' ? { x: r.right - 4, y: r.top + r.height / 2 } : { x: r.left + r.width / 2, y: r.top + r.height * .6 };
+  const d = id === 'users' ? el.querySelector('.people') ?? el : layer === 1 ? el : el.querySelector('svg') ?? el;
+  return d.getBoundingClientRect();
+}
+/** Where a line leaves (out) or reaches (in) a node: the side of its drawing, at the height of its base. */
+function anchor(id, side) {
+  const r = nodeRect(id); if (!r) return null;
+  const y = id === 'users' || layer === 1 ? r.top + r.height / 2 : r.top + r.height * .62;
+  return { x: side === 'out' ? r.right - 4 : r.left + 4, y };
+}
+const bez = (c, t) => {
+  const u = 1 - t;
+  return { x: u * u * u * c[0].x + 3 * u * u * t * c[1].x + 3 * u * t * t * c[2].x + t * t * t * c[3].x,
+           y: u * u * u * c[0].y + 3 * u * u * t * c[1].y + 3 * u * t * t * c[2].y + t * t * t * c[3].y };
+};
+const sample = (c, n = 24) => Array.from({ length: n + 1 }, (_, i) => bez(c, i / n));
+const curveLength = (c) => { const pts = sample(c, 16); let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return l; };
+let curveCache = new Map(), obstacleCache = null;
+/** Rectangles of every drawn building, to keep lines off them. */
+function obstacles() {
+  if (obstacleCache) return obstacleCache;
+  const els = layer === 3 ? [...document.querySelectorAll('.scene [data-id]:not([data-id="users"])')] : layer === 2 ? [...document.querySelectorAll('.scene [data-node]:not([data-node="system"])')] : [];
+  obstacleCache = els.map(el => ({ el, r: (el.querySelector('svg') ?? el).getBoundingClientRect() }));
+  return obstacleCache;
+}
+/** The curve of the line from one node to another, bent up or down until it clears the other buildings. */
+function linkCurve(from, to) {
+  const key = `${from}>${to}`;
+  if (curveCache.has(key)) return curveCache.get(key);
+  const a = anchor(from, 'out'), b = anchor(to, 'in');
+  let curve = null;
+  if (a && b && Math.hypot(a.x - b.x, a.y - b.y) > 3) {
+    const skip = new Set([nodeEl(from), nodeEl(to)]);
+    const blocks = obstacles().filter(o => !skip.has(o.el)).map(o => o.r);
+    const reach = Math.max(50, Math.abs(b.x - a.x) * .5);
+    const backwards = b.x < a.x + 20;
+    const make = (bend) => [a, { x: a.x + reach, y: a.y + bend }, { x: b.x - reach, y: b.y + bend }, b];
+    const hits = (c) => sample(c).some(pt => blocks.some(r => pt.x > r.left - 6 && pt.x < r.right + 6 && pt.y > r.top - 6 && pt.y < r.bottom + 6));
+    const tries = [0, -40, 40, -80, 80, -120, 120, -170, 170, -230, 230].map(v => (backwards ? v - 120 : v));
+    curve = make(tries[0]);
+    for (const bend of tries) { const c = make(bend); if (!hits(c)) { curve = c; break; } }
+  }
+  curveCache.set(key, curve);
+  return curve;
+}
+/** The curve a request follows from one node to the next: the link's own curve, or that curve backwards for answers. */
+function hopCurve(from, to) {
+  if (hasLink(from, to)) return linkCurve(from, to);
+  const c = linkCurve(to, from);
+  return c ? [c[3], c[2], c[1], c[0]] : null;
 }
 /** The lines on screen: in layers 1 and 2 several links share one drawn line. */
 function drawnLinks() {
   const seen = new Map();
   S.links.forEach((l, i) => {
-    const a = pointOf(l.from), b = pointOf(l.to); if (!a || !b || (Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2)) return;
-    const key = `${Math.round(a.x)},${Math.round(a.y)}>${Math.round(b.x)},${Math.round(b.y)}`;
+    const c = linkCurve(l.from, l.to); if (!c) return;
+    const key = `${Math.round(c[0].x)},${Math.round(c[0].y)}>${Math.round(c[3].x)},${Math.round(c[3].y)}`;
     const flow = S.flow?.edge.get(linkKey(l)) ?? 0;
     const prev = seen.get(key);
-    if (prev) { prev.flow += flow; prev.indexes.push(i); } else seen.set(key, { a, b, flow, indexes: [i], live: isLive(l.to) });
+    if (prev) { prev.flow += flow; prev.indexes.push(i); } else seen.set(key, { c, flow, indexes: [i], live: isLive(l.to) });
   });
   return [...seen.values()];
 }
-/** One request's route along the links; it stops where it is dropped or answered. */
+/** One request's route along the links, as node ids; it stops where it is dropped or answered. */
 function routeFor() {
   const F = S.flow; if (!F) return null;
   const ids = ['users']; let id = 'users', fail = false;
@@ -401,45 +452,52 @@ function routeFor() {
     if (u?.type === 'database') break;
     if (u?.type === 'cache' && Math.random() < TYPES.cache.hit) break;
     const out = S.links.filter(l => l.from === id).map(l => [l.to, F.edge.get(linkKey(l)) ?? 0]).filter(([, v]) => v > 0);
-    const total = out.reduce((s, [, v]) => s + v, 0);
+    const total = out.reduce((sum, [, v]) => sum + v, 0);
     if (!total) { fail = true; break; }
     let r = Math.random() * total; const next = out.find(([, v]) => (r -= v) <= 0)?.[0] ?? out[0][0];
     ids.push(next); id = next;
   }
-  const pts = ids.map(pointOf).filter(Boolean).filter((p, i, all) => !i || Math.hypot(p.x - all[i - 1].x, p.y - all[i - 1].y) > 2);
-  return { pts, dropAt: fail ? pts.length - 1 : null };
+  return { ids, dropAt: fail ? ids.length - 1 : null };
 }
 const SPEED = { dots: 260, people: 150, roundtrip: 300 };
 const PER = { dots: 25, people: 40, roundtrip: 30 };
-const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind, dead: route.dropAt === 0 && kind === 'req' && reqMode !== 'roundtrip' && reqMode !== 'people' });
+const spawn = (route, kind = 'req') => particles.push({ ...route, seg: 0, f: 0, life: 1, kind });
 function advance(p, dt) {
   if (p.dead || p.arrived) { p.life -= dt * (p.dead ? 1.4 : 3); return; }
   if (p.kind === 'req' && p.dropAt === 0) { onFail(p); return; }
-  const a = p.pts[p.seg], b = p.pts[p.seg + 1];
-  if (!b) { p.arrived = true; onArrive(p); return; }
-  p.f += ((SPEED[reqMode] ?? 260) * dt) / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  const from = p.ids[p.seg], to = p.ids[p.seg + 1];
+  if (to === undefined) { p.arrived = true; onArrive(p); return; }
+  const c = hopCurve(from, to);
+  const len = c ? curveLength(c) : 0;
+  p.f = len < 4 ? 1 : p.f + ((SPEED[reqMode] ?? 260) * dt) / len;
   if (p.f < 1) return;
   p.seg++; p.f = 0;
   if (p.dropAt !== null && p.seg >= p.dropAt) onFail(p);
-  else if (!p.pts[p.seg + 1]) { p.arrived = true; onArrive(p); }
+  else if (p.ids[p.seg + 1] === undefined) { p.arrived = true; onArrive(p); }
 }
 function onFail(p) {
-  if (reqMode === 'people' && p.kind === 'req') Object.assign(p, { pts: p.pts.slice(0, p.seg + 1).reverse(), seg: 0, f: 0, dropAt: null, kind: 'angry' });
-  else if (reqMode === 'roundtrip' && p.kind === 'req') { p.dead = true; spawn({ pts: p.pts.slice(0, p.seg + 1).reverse(), dropAt: null }, 'error'); }
+  if (reqMode === 'people' && p.kind === 'req') Object.assign(p, { ids: p.ids.slice(0, p.seg + 1).reverse(), seg: 0, f: 0, dropAt: null, kind: 'angry' });
+  else if (reqMode === 'roundtrip' && p.kind === 'req') { p.dead = true; spawn({ ids: p.ids.slice(0, p.seg + 1).reverse(), dropAt: null }, 'error'); }
   else p.dead = true;
 }
 function onArrive(p) {
-  if (reqMode === 'roundtrip' && p.kind === 'req') spawn({ pts: [...p.pts].reverse(), dropAt: null }, 'reply');
+  if (reqMode === 'roundtrip' && p.kind === 'req') spawn({ ids: [...p.ids].reverse(), dropAt: null }, 'reply');
   if (reqMode === 'people' && p.kind === 'req') p.kind = 'happy';
 }
-const posOf = (p) => { const a = p.pts[p.seg], b = p.pts[p.seg + 1] ?? a; return { x: a.x + (b.x - a.x) * p.f, y: a.y + (b.y - a.y) * p.f }; };
+function posOf(p) {
+  const from = p.ids[p.seg], to = p.ids[p.seg + 1];
+  const c = to !== undefined ? hopCurve(from, to) : null;
+  if (c) return bez(c, Math.min(1, p.f));
+  const prev = p.ids[p.seg - 1];
+  return (prev !== undefined && hopCurve(prev, from)?.[3]) || anchor(from, 'in') || anchor(from, 'out');
+}
 function drawPerson(x, y, color) {
   ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y - 6, 2.6, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.moveTo(x - 3.4, y + 2); ctx.quadraticCurveTo(x, y - 6, x + 3.4, y + 2); ctx.closePath(); ctx.fill();
 }
 function drawParticle(p) {
-  if (!p.pts.length) return;
-  const { x, y } = posOf(p);
+  const pos = posOf(p); if (!pos) return;
+  const { x, y } = pos;
   ctx.globalAlpha = Math.max(0, p.life);
   if (reqMode === 'people') {
     const color = p.kind === 'angry' ? '#f87171' : p.kind === 'happy' ? '#4ade80' : '#7ff5e5';
@@ -447,54 +505,64 @@ function drawParticle(p) {
     if (p.kind === 'angry') { ctx.font = '800 11px ui-monospace'; ctx.fillText('!', x - 2, y - 11); }
     if (p.kind === 'happy') { ctx.font = '800 10px ui-monospace'; ctx.fillStyle = '#fde047'; ctx.fillText('+$', x + 5, y - 8 - (1 - p.life) * 14); }
   } else if (reqMode === 'roundtrip') {
-    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#7ff5e5';
-    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 6;
-    ctx.fillRect(x - 3, y - 3 + (p.kind === 'req' ? -5 : 5), 6, 6); ctx.shadowBlur = 0;
+    const color = p.kind === 'reply' ? '#4ade80' : p.kind === 'error' ? '#f87171' : '#d9fffa';
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.fillRect(x - 3, y - 3 + (p.kind === 'req' ? -6 : 6), 6, 6); ctx.shadowBlur = 0;
     if (p.kind === 'error' && p.seg === 0 && p.f < .3) { ctx.font = '800 10px ui-monospace'; ctx.fillText('503', x + 5, y - 2); }
   } else {
-    const color = p.dead ? '#f87171' : p.arrived ? '#4ade80' : '#b7fff4';
+    const color = p.dead ? '#f87171' : p.arrived ? '#4ade80' : '#d9fffa';
     ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8;
     ctx.beginPath(); ctx.arc(x, y + (p.dead ? (1 - p.life) * 18 : 0), p.dead ? 4 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
     if (p.dead && p.life > .6) { ctx.font = '700 11px ui-monospace'; ctx.fillText('✕', x + 5, y - 4); }
   }
   ctx.globalAlpha = 1;
 }
+const strokeCurve = (c) => { ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); ctx.bezierCurveTo(c[1].x, c[1].y, c[2].x, c[2].y, c[3].x, c[3].y); ctx.stroke(); };
 function drawLinks(now, lines) {
   ctx.lineCap = 'round';
   for (const ln of lines) {
     const selected = ln.indexes.includes(S.selectedLink);
-    const flowing = reqMode === 'flow' && ln.flow > 0;
-    const w = flowing ? 2 + ln.flow / 45 : selected ? 3 : 2;
-    ctx.globalAlpha = .25; ctx.strokeStyle = selected ? '#ffffff' : '#3ee0c8'; ctx.lineWidth = w + 6;
-    ctx.beginPath(); ctx.moveTo(ln.a.x, ln.a.y); ctx.lineTo(ln.b.x, ln.b.y); ctx.stroke();
-    ctx.globalAlpha = selected ? 1 : .75; ctx.lineWidth = w;
-    ctx.setLineDash(ln.live ? (flowing ? [10, 8] : []) : [4, 6]);
-    if (flowing) ctx.lineDashOffset = -(now / 1000) * 60 * S.speed;
-    ctx.strokeStyle = selected ? '#ffffff' : ln.live ? '#3ee0c8' : '#fbbf24';
-    ctx.beginPath(); ctx.moveTo(ln.a.x, ln.a.y); ctx.lineTo(ln.b.x, ln.b.y); ctx.stroke(); ctx.setLineDash([]);
-    // Arrow head in the middle, so the direction is clear.
-    const mx = (ln.a.x + ln.b.x) / 2, my = (ln.a.y + ln.b.y) / 2, ang = Math.atan2(ln.b.y - ln.a.y, ln.b.x - ln.a.x);
-    ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(mx + 7 * Math.cos(ang), my + 7 * Math.sin(ang));
-    ctx.lineTo(mx + 7 * Math.cos(ang + 2.5), my + 7 * Math.sin(ang + 2.5)); ctx.lineTo(mx + 7 * Math.cos(ang - 2.5), my + 7 * Math.sin(ang - 2.5)); ctx.fill();
-    if (flowing) { ctx.globalAlpha = 1; ctx.font = '800 11px ui-monospace'; ctx.fillStyle = '#dce8e5'; ctx.fillText(`${Math.round(ln.flow)}/s`, mx + 8, my - 8); }
-    ctx.globalAlpha = 1;
-  }
-  if (reqMode === 'flow' && S.flow?.rps) {
-    for (const [id, v] of S.flow.drop) if (v > 1) {
-      const pt = pointOf(id); if (!pt) continue;
-      ctx.font = '800 12px ui-monospace'; ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 8;
-      ctx.fillText(`✕ −${Math.round(v)}/s`, pt.x - 24, pt.y + 46); ctx.shadowBlur = 0;
+    const flowing = ln.flow > 0;
+    const w = 2 + Math.min(14, ln.flow / 45);
+    const color = selected ? '#ffffff' : !ln.live ? '#fbbf24' : '#3ee0c8';
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = flowing ? .22 : .12; ctx.lineWidth = w + 7; strokeCurve(ln.c);
+    ctx.globalAlpha = selected ? 1 : flowing ? .9 : .55; ctx.lineWidth = w;
+    ctx.setLineDash(!ln.live ? [4, 6] : [10, 8]);
+    ctx.lineDashOffset = flowing ? -(now / 1000) * 60 * Math.max(1, S.speed) : 0;
+    strokeCurve(ln.c); ctx.setLineDash([]);
+    // Arrow head and traffic at the middle of the curve.
+    const m = bez(ln.c, .5), m2 = bez(ln.c, .53), ang = Math.atan2(m2.y - m.y, m2.x - m.x);
+    ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.beginPath();
+    ctx.moveTo(m.x + 7 * Math.cos(ang), m.y + 7 * Math.sin(ang));
+    ctx.lineTo(m.x + 7 * Math.cos(ang + 2.5), m.y + 7 * Math.sin(ang + 2.5)); ctx.lineTo(m.x + 7 * Math.cos(ang - 2.5), m.y + 7 * Math.sin(ang - 2.5)); ctx.fill();
+    if (flowing) {
+      const text = `${Math.round(ln.flow)}/s`; ctx.font = '800 11px ui-monospace';
+      const tw = ctx.measureText(text).width;
+      ctx.fillStyle = 'rgba(6,11,12,.85)'; ctx.fillRect(m.x - tw / 2 - 4, m.y - w / 2 - 20, tw + 8, 15);
+      ctx.fillStyle = '#dce8e5'; ctx.fillText(text, m.x - tw / 2, m.y - w / 2 - 9);
     }
   }
-  if (drag?.linking && drag.to) {
+  if (S.flow?.rps) {
+    for (const [id, v] of S.flow.drop) if (v > 1) {
+      const r = nodeRect(id); if (!r) continue;
+      const text = `✕ −${Math.round(v)}/s`; ctx.font = '800 12px ui-monospace';
+      const tw = ctx.measureText(text).width, x = r.left + r.width / 2 - tw / 2, y = r.top - 6;
+      ctx.fillStyle = 'rgba(6,11,12,.9)'; ctx.fillRect(x - 4, y - 12, tw + 8, 16);
+      ctx.fillStyle = '#f87171'; ctx.fillText(text, x, y);
+    }
+  }
+  if (drag?.linking && drag.to && drag.fromPt) {
     ctx.setLineDash([6, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.globalAlpha = .9;
-    ctx.beginPath(); ctx.moveTo(drag.fromPt.x, drag.fromPt.y); ctx.lineTo(drag.to.x, drag.to.y); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const a = drag.fromPt, b = drag.to, reach = Math.max(40, Math.abs(b.x - a.x) * .5);
+    strokeCurve([a, { x: a.x + reach, y: a.y }, { x: b.x - reach, y: b.y }, b]); ctx.setLineDash([]); ctx.globalAlpha = 1;
   }
 }
 const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
 let lastAnim = performance.now();
 function animate(now) {
   const dt = Math.min(.05, (now - lastAnim) / 1000); lastAnim = now;
+  curveCache = new Map(); obstacleCache = null; // the map may have moved or changed since the last frame
   const field = q('.field');
   if (field) {
     const r = field.getBoundingClientRect(), dpr = devicePixelRatio || 1;
@@ -508,7 +576,7 @@ function animate(now) {
     if (reqMode !== 'flow') {
       if (running && S.last?.rps) {
         spawnDebt += (S.last.rps / PER[reqMode]) * dt * S.speed;
-        while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; const route = routeFor(); if (route?.pts.length) spawn(route); }
+        while (spawnDebt >= 1 && particles.length < 260) { spawnDebt--; const route = routeFor(); if (route) spawn(route); }
       }
       for (const p of particles) { if (running) for (let k = 0; k < Math.min(S.speed, 4); k++) advance(p, dt); drawParticle(p); }
       for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
@@ -548,7 +616,8 @@ function zoneInner(zone) {
         <span class="sub">${live.length}/${all.length} en servicio</span>${live.length ? `<span class="load ${lvl(rho)}"><span style="width:${Math.round(rho * 100)}%"></span></span>` : ''}</button>`;
     }).join('');
   }
-  const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer');
+  const ORDER = ['loadBalancer', 'cache', 'database']; // the cache sits before the silos, so the line between them runs forward
+  const apps = units.filter(u => u.type === 'appServer'), others = units.filter(u => u.type !== 'appServer').sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
   return others.map(u => unitHtml(u)).join('') + (apps.length ? `<div class="container"><span class="name">App server · ${apps.length} instancia${apps.length > 1 ? 's' : ''}</span>${apps.map(u => unitHtml(u, 52)).join('')}</div>` : '');
 }
 function systemHtml() {
@@ -560,7 +629,7 @@ function systemHtml() {
       <span class="muted" style="font-size:12px">${S.units.length} edificios · mantenimiento $${upkeepPerS().toFixed(1)}/s · cambia a la capa 3 para ver cada uno</span></div>`;
   }
   return `<div class="system"><span class="label">Tu sistema <span class="kind">[Sistema de software]</span></span>
-    <div class="zones">${ZONES.filter(([z]) => S.units.some(u => TYPES[u.type].zone === z)).map(([z, name]) => `<div class="zone"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
+    <div class="zones">${ZONES.filter(([z]) => S.units.some(u => TYPES[u.type].zone === z)).map(([z, name]) => `<div class="zone zone-${z}"><span class="zname">${name} <small>[Contenedor]</small></span>${zoneInner(z)}</div>`).join('')}</div></div>`;
 }
 function inspectorHtml() {
   const link = S.links[S.selectedLink];
@@ -677,12 +746,9 @@ function zoomAt(factor, cx, cy) {
 }
 /** The line closest to a screen point, if it is near enough to be clicked. */
 function linkAt(x, y) {
-  let best = null, bestD = 8;
+  let best = null, bestD = 9;
   for (const ln of drawnLinks()) {
-    const dx = ln.b.x - ln.a.x, dy = ln.b.y - ln.a.y, len2 = dx * dx + dy * dy || 1;
-    const t = Math.max(0, Math.min(1, ((x - ln.a.x) * dx + (y - ln.a.y) * dy) / len2));
-    const d = Math.hypot(x - (ln.a.x + t * dx), y - (ln.a.y + t * dy));
-    if (d < bestD) { bestD = d; best = ln.indexes[0]; }
+    for (const pt of sample(ln.c, 40)) { const d = Math.hypot(x - pt.x, y - pt.y); if (d < bestD) { bestD = d; best = ln.indexes[0]; } }
   }
   return best;
 }
@@ -694,7 +760,7 @@ document.addEventListener('pointerdown', e => {
   const node = e.target.closest('[data-id]');
   if (node && !onPanel) {
     const id = node.dataset.id === 'users' ? 'users' : Number(node.dataset.id);
-    drag = { kind: 'node', id, x: e.clientX, y: e.clientY, fromPt: pointOf(id) };
+    drag = { kind: 'node', id, x: e.clientX, y: e.clientY, fromPt: anchor(id, 'out') };
     return;
   }
   const pick = e.target.closest('[data-pick]');
