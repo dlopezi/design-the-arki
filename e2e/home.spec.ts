@@ -30,7 +30,7 @@ test('the campaign map shows a briefing for the selected mission, with its build
   const briefing = page.getByRole('complementary', { name: 'Mission briefing' });
   // The next mission is selected first; level 2 brings the load balancer, drawn as the relay tower.
   await expect(briefing.getByRole('heading', { name: 'First spike' })).toBeVisible();
-  await expect(briefing).toContainText('New building: Relay tower');
+  await expect(briefing).toContainText('New component: Load balancer');
   await expect(briefing.getByRole('list', { name: 'Modes' }).getByRole('link')).toHaveCount(4);
 
   await levelNode(page, 'Flash sale').getByRole('button').click();

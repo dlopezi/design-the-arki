@@ -14,7 +14,7 @@ import { Building, buildingName, componentArt } from '../componentArt';
 
 const componentColor = (type: string) => componentArt[type]?.color ?? '#5b6577';
 import { FeedbackButton } from '../feedbackDialog';
-import { Stars } from '../reportCard';
+import { Stars } from '../stars';
 import { baseHref, levelsHref } from '../routes';
 import { startFlowCanvas, type C4Layer, type Point } from './flowCanvas';
 
@@ -281,7 +281,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
     const idle = active && game.phase === 'wave' && servingIndex > (flow?.usable[b.id] ?? 0);
     const load = active && !idle ? flow?.load[b.id] ?? 0 : 0;
     const warn = noEntry(b) ? t.rt.inspector.noEntry : deadEnd(b) ? t.rt.inspector.deadEnd : '';
-    const label = scaled ? `${catalog[b.type]!.presentation?.instancePrefix ?? b.type}-${k + 1}` : buildingName(b.type);
+    const label = scaled ? instanceNames.get(b.id)?.[k] ?? b.type : buildingName(b.type);
     const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : '';
     const selected = selectedBuilding?.id === b.id;
     return (
@@ -318,6 +318,16 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
         </div>
       : piece(b, 0, 64)));
   }
+  // Instance names (app-1, app-2…) are numbered across every component with the same prefix, as players read them.
+  const instanceNames = useMemo(() => {
+    const counters = new Map<string, number>(), names = new Map<string, string[]>();
+    for (const b of game.buildings) {
+      if (!catalog[b.type]!.scalesOut) continue;
+      const prefix = catalog[b.type]!.presentation?.instancePrefix ?? b.type;
+      names.set(b.id, b.instances.map(() => { const n = (counters.get(prefix) ?? 0) + 1; counters.set(prefix, n); return `${prefix}-${n}`; }));
+    }
+    return names;
+  }, [game.buildings]);
   const counts = useMemo(() => Object.keys(catalog).map(type => [type, game.buildings.filter(b => b.type === type).reduce((s, b) => s + b.instances.length, 0)] as const).filter(([, n]) => n), [game.buildings]);
 
   // ───────── Inspector ─────────
@@ -432,6 +442,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
 
         <section className="play-panel play-mission" aria-label={t.rt.mission}>
           <span className="label">{t.rt.mission}</span>
+          <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
           {mode === 'guided' && <p role="note" className="play-lesson">{level.guidedHint}</p>}
           <p className="muted">{level.brief}</p>
           <p className="muted">{t.rt.waveInfo(level.play.wave.rps, level.play.wave.lengthS)}</p>

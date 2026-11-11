@@ -9,10 +9,10 @@ test('a new visitor learns what the game is and starts the tutorial', async ({ p
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Play level 1' }).click();
   await expect(page).toHaveURL(/#briefing$/);
   await expect(page.getByRole('heading', { name: 'Before your first mission' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Factory' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'App server' })).toBeVisible();
   await expect(page.getByText('Runs your application code')).toBeVisible();
-  await page.getByRole('button', { name: /Relay tower/ }).click();
-  await expect(page.getByRole('heading', { name: 'Relay tower' })).toBeVisible();
+  await page.getByRole('button', { name: /Load balancer/ }).click();
+  await expect(page.getByRole('heading', { name: 'Load balancer' })).toBeVisible();
   await page.getByRole('link', { name: 'Start level 1' }).click();
   await expect(page).toHaveURL(/#01-hello-world\/guided$/);
   await expect(page.getByRole('region', { name: 'Tutorial' })).toContainText('Step 1 of 4');
@@ -78,8 +78,8 @@ test('the title screen menu opens the building archive and the player\'s base', 
   await menu.getByRole('link', { name: /Building archive/ }).click();
   await expect(page.getByRole('heading', { name: 'Building archive' })).toBeVisible();
   // The load balancer arrives in level 2, which is open; the cache, in a later level, is still locked.
-  await expect(page.getByRole('button', { name: /Relay tower/ })).not.toContainText('Locked');
-  await expect(page.getByRole('button', { name: /Generator/ })).toContainText('Locked');
+  await expect(page.getByRole('button', { name: /Load balancer/ })).not.toContainText('Locked');
+  await expect(page.getByRole('button', { name: /Cache/ })).toContainText('Locked');
 
   await page.goto('/');
   await menu.getByRole('link', { name: /Your base/ }).click();

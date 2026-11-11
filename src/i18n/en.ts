@@ -28,7 +28,7 @@ export const en = {
     briefing: 'Mission briefing',
     missionState: (n: number, state: string) => `Mission ${n} · ${state}`,
     states: { done: 'passed', current: 'next', open: 'open', locked: 'locked' } as Record<'done' | 'current' | 'open' | 'locked', string>,
-    newBuilding: 'New building:',
+    newBuilding: 'New component:',
     buildings: 'Buildings in this mission',
     lockedHint: 'Pass the mission before it to unlock this one.',
     lockedMission: (title: string) => `${title} (locked): show briefing`,
@@ -68,7 +68,7 @@ export const en = {
     change: 'Change mode',
     badge: (name: string) => `Hardest mode passed: ${name}`,
     guided: { name: 'Guided', description: 'The design is almost complete and a hint tells you what to look at.' },
-    normal: { name: 'Normal', description: 'Some components are placed for you. Hints appear after a failed run.' },
+    normal: { name: 'Normal', description: 'Some components are placed for you. Hints appear after a lost wave.' },
     hard: { name: 'Hard', description: 'You inherit a broken design. Find what is wrong and fix it.' },
     god: { name: 'God', description: 'An empty canvas and no hints, like a real interview.' },
   },
@@ -241,26 +241,22 @@ export const en = {
     seeArchive: 'Building archive',
     buildings: {
       loadBalancer: {
-        name: 'Relay tower',
         role: 'Spreads incoming requests across several app server instances, so no single instance gets all the load.',
         when: 'As soon as you run more than one app server instance. Users can only reach many instances through it.',
       },
       appServer: {
-        name: 'Factory',
         role: 'Runs your application code. Each instance has a few workers, and each worker handles one request at a time.',
         when: 'Always: every system needs one. When traffic grows, add instances (scale out) or use bigger ones (scale up).',
       },
       cache: {
-        name: 'Generator',
         role: 'Keeps recent answers in memory and returns them fast, without asking the database. The TTL sets how long it keeps an answer.',
         when: 'When many requests read the same data and the database is the bottleneck.',
       },
       database: {
-        name: 'Silos',
         role: 'Stores the data that requests read and write. Its tier sets how many queries it serves at once.',
         when: 'Always: it is where the data lives. When it is full, give it a bigger tier or take reads off it with a cache.',
       },
-    } as Record<string, { name: string; role: string; when: string }>,
+    } as Record<string, { role: string; when: string }>,
     pick: 'Choose a building in the list to read its card.',
   },
   base: {
@@ -297,6 +293,7 @@ export const en = {
     visits: (n: string) => `${n} visits answered`,
     buildSite: { title: 'Construction zone', line1: 'Your base will rise here.', line2: (keys: string) => `Build your first building with the card below or the keys ${keys}.` },
     mission: 'Mission',
+    waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
     incidentInfo: (type: string, s: number) => `${s} s into the wave, one ${type} instance goes down.`,
     map: 'Map', zoomIn: 'Zoom in', zoomOut: 'Zoom out', center: 'Center',

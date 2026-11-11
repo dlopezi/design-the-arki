@@ -31,7 +31,7 @@ export const es: Strings = {
     briefing: 'Informe de la misión',
     missionState: (n: number, state: string) => `Misión ${n} · ${state}`,
     states: { done: 'superada', current: 'siguiente', open: 'abierta', locked: 'bloqueada' } as Record<'done' | 'current' | 'open' | 'locked', string>,
-    newBuilding: 'Nuevo edificio:',
+    newBuilding: 'Nuevo componente:',
     buildings: 'Edificios de la misión',
     lockedHint: 'Supera la misión anterior para desbloquear esta.',
     lockedMission: (title: string) => `${title} (bloqueada): ver informe`,
@@ -71,7 +71,7 @@ export const es: Strings = {
     change: 'Cambiar modo',
     badge: (name: string) => `Modo más difícil superado: ${name}`,
     guided: { name: 'Guiado', description: 'El diseño está casi completo y una pista te dice dónde mirar.' },
-    normal: { name: 'Normal', description: 'Algunos componentes ya están colocados. Las pistas aparecen tras una ejecución fallida.' },
+    normal: { name: 'Normal', description: 'Algunos componentes ya están colocados. Las pistas aparecen si pierdes una oleada.' },
     hard: { name: 'Difícil', description: 'Heredas un diseño roto. Encuentra el fallo y arréglalo.' },
     god: { name: 'Dios', description: 'Lienzo vacío y sin pistas, como en una entrevista real.' },
   },
@@ -244,26 +244,22 @@ export const es: Strings = {
     seeArchive: 'Archivo de edificios',
     buildings: {
       loadBalancer: {
-        name: 'Torre de enlace',
         role: 'Reparte las peticiones entre varias instancias del servidor de aplicaciones, para que ninguna reciba toda la carga.',
         when: 'En cuanto tengas más de una instancia del servidor. Los usuarios solo llegan a varias instancias a través de ella.',
       },
       appServer: {
-        name: 'Fábrica',
         role: 'Ejecuta el código de tu aplicación. Cada instancia tiene pocos workers, y cada worker atiende una petición a la vez.',
         when: 'Siempre: todo sistema necesita uno. Si crece el tráfico, añade instancias (escalar en horizontal) o usa instancias más grandes (escalar en vertical).',
       },
       cache: {
-        name: 'Generador',
         role: 'Guarda respuestas recientes en memoria y las devuelve rápido, sin preguntar a la base de datos. El TTL dice cuánto tiempo guarda cada respuesta.',
         when: 'Cuando muchas peticiones leen los mismos datos y la base de datos es el cuello de botella.',
       },
       database: {
-        name: 'Silos',
         role: 'Guarda los datos que las peticiones leen y escriben. Su nivel (tier) dice cuántas consultas atiende a la vez.',
         when: 'Siempre: es donde viven los datos. Si se llena, dale un tier mayor o quítale lecturas con una caché.',
       },
-    } as Record<string, { name: string; role: string; when: string }>,
+    } as Record<string, { role: string; when: string }>,
     pick: 'Elige un edificio de la lista para leer su ficha.',
   },
   base: {
@@ -300,6 +296,7 @@ export const es: Strings = {
     visits: (n: string) => `${n} visitas atendidas`,
     buildSite: { title: 'Zona de construcción', line1: 'Aquí se levantará tu base.', line2: (keys: string) => `Construye tu primer edificio con la tarjeta de abajo o las teclas ${keys}.` },
     mission: 'Misión',
+    waveShort: (rps: number, s: number) => `Una oleada: ${rps} req/s durante ${s} s`,
     waveInfo: (rps: number, s: number) => `Una oleada de ${rps} req/s durante ${s} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero que te quede.`,
     incidentInfo: (type: string, s: number) => `A los ${s} s de la oleada se cae una instancia de ${type}.`,
     map: 'Mapa', zoomIn: 'Acercar', zoomOut: 'Alejar', center: 'Centrar',

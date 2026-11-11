@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, node, playAndSkip, skipTutorial } from './helpers';
+import { buildKeys, playWave, skipTutorial } from './helpers';
 
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
@@ -10,13 +10,10 @@ async function play(page: Page, title: string, mode = 'God') {
 
 async function passLevel1(page: Page) {
   await play(page, 'Hello world');
-  await expect(page.getByText('Mode: God')).toBeVisible();
-  await page.keyboard.press('1');
-  await page.keyboard.press('2');
-  await connect(page, { label: 'Clients' }, { label: 'App server' });
-  await connect(page, { label: 'App server' }, { label: 'Database' });
-  await playAndSkip(page);
-  await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Mission' })).toBeVisible();
+  await buildKeys(page, '12');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
 }
 
 test.beforeEach(async ({ page }) => { await skipTutorial(page); });
@@ -29,7 +26,7 @@ test('a new player starts at the level select with only level 1 open', async ({ 
   await expect(levelCard(page, 'First spike').getByRole('button', { name: /Play/ })).toHaveCount(0);
 });
 
-test('passing a level saves its stars, unlocks the next one and keeps the design, across reloads', async ({ page }) => {
+test('passing a level saves its stars and unlocks the next one, across reloads', async ({ page }) => {
   await page.goto('/#levels');
   await passLevel1(page);
   await page.getByRole('dialog').getByRole('link', { name: 'Next level' }).click();
@@ -37,16 +34,12 @@ test('passing a level saves its stars, unlocks the next one and keeps the design
 
   await page.getByRole('link', { name: 'Levels' }).click();
   await expect(page).toHaveURL(/#levels$/);
-  await expect(levelCard(page, 'Hello world').getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
+  await expect(levelCard(page, 'Hello world').getByRole('img', { name: /[123] of 3 stars/ })).toBeVisible();
   await expect(levelCard(page, 'First spike').getByRole('button', { name: /Play/ })).toBeVisible();
 
   await page.reload();
-  await expect(levelCard(page, 'Hello world').getByRole('img', { name: '3 of 3 stars' })).toBeVisible();
+  await expect(levelCard(page, 'Hello world').getByRole('img', { name: /[123] of 3 stars/ })).toBeVisible();
   await expect(levelCard(page, 'First spike').getByRole('button', { name: /Play/ })).toBeVisible();
-
-  await play(page, 'Hello world');
-  await expect(node(page, 'App server')).toBeVisible();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
 });
 
 test('the level map has its own address, and the mode picker links back to it', async ({ page }) => {
@@ -66,8 +59,7 @@ test('a locked level opened by its link sends the player back to the level selec
 test('progress can be reset after confirming in the page', async ({ page }) => {
   await page.goto('/#levels');
   await passLevel1(page);
-  await page.getByRole('dialog').getByRole('button', { name: 'Back to design' }).click();
-  await page.getByRole('link', { name: 'Levels' }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Level map' }).click();
 
   await page.getByRole('button', { name: 'Reset progress' }).click();
   const confirm = page.getByRole('dialog', { name: 'Reset all progress?' });

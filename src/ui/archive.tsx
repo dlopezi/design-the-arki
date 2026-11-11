@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
 import { artStyle, Building, buildingName } from './componentArt';
+import { catalog } from '../catalog/catalog';
 import { levelsHref } from './routes';
 
 type Props = {
@@ -50,7 +51,7 @@ export function Archive({ levels, progress, briefing }: Props) {
                 <Building type={e.type} size={44} down={!isOpen(e.unlocked)} />
                 <span className="name">
                   {buildingName(e.type)}
-                  <small>{t.componentTypes[e.type] ?? e.type}{isOpen(e.unlocked) ? '' : ` · ${a.locked}`}</small>
+                  <small>{catalog[e.type]?.presentation?.technology}{isOpen(e.unlocked) ? '' : ` · ${a.locked}`}</small>
                 </span>
               </button>
             </li>
@@ -61,7 +62,7 @@ export function Archive({ levels, progress, briefing }: Props) {
           <div className="archive-art"><Building type={entry.type} size={180} down={!open} /></div>
           <div>
             <h2 id="archive-name">{buildingName(entry.type)}</h2>
-            <span className="kind">{a.component}: <strong>{t.componentTypes[entry.type] ?? entry.type}</strong></span>
+            <span className="kind">{catalog[entry.type]?.presentation?.technology} · {t.zones[catalog[entry.type]?.presentation?.zone ?? 'application']}</span>
           </div>
           {open ? (
             <dl>

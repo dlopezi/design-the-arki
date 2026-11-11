@@ -3,7 +3,7 @@ import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import { MODES } from '../levels/modes';
 import { isUnlocked, type Progress } from '../progress/progress';
-import { Stars } from './reportCard';
+import { Stars } from './stars';
 import { FeedbackButton } from './feedbackDialog';
 import { archiveHref, baseHref } from './routes';
 import { Building, buildingName } from './componentArt';
@@ -66,12 +66,12 @@ function Briefing({ level, number, state, newTypes, progress }: { level: LevelDe
       <ul className="campaign-objectives">
         <li>{t.objectiveP95(level.requirements.p95Ms)}</li>
         <li>{t.objectiveErrors(level.requirements.maxErrorRate)}</li>
-        <li>{t.objectiveCost(level.budget)}</li>
+        <li>{t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}</li>
       </ul>
       {newTypes.map(type => (
         <div key={type} className="campaign-new">
           <Building type={type} size={44} down={state === 'locked'} />
-          <span><strong>{l.newBuilding}</strong> {buildingName(type)} ({t.componentTypes[type] ?? type})</span>
+          <span><strong>{l.newBuilding}</strong> {buildingName(type)}</span>
         </div>
       ))}
       <span className="console-label">{l.buildings}</span>

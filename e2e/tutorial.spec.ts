@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { connect, node, select } from './helpers';
+import { dragConnect, playWave, unit } from './helpers';
 
 test('a new player learns the controls in a guided tutorial on level 1, which unlocks every mode', async ({ page }) => {
   await page.goto('/#01-hello-world');
@@ -11,20 +11,21 @@ test('a new player learns the controls in a guided tutorial on level 1, which un
   const tutorial = page.getByRole('region', { name: 'Tutorial' });
   await expect(tutorial).toContainText('Step 1 of 4');
   await expect(tutorial).toContainText('Select the app server');
-  await expect(node(page, 'App server').locator('.tutorial-target')).toHaveCount(1);
+  await expect(unit(page, 'app-1')).toHaveClass(/tutorial-target/);
+  // The map already says what is wrong: the app server has no way out, the database no way in.
+  await expect(unit(page, 'app-1')).toContainText('no way out');
+  await expect(unit(page, 'Database')).toContainText('no way in');
 
-  await select(page, 'App server');
+  await unit(page, 'app-1').click();
   await expect(tutorial).toContainText('Step 2 of 4');
-  await expect(node(page, 'Database').locator('.tutorial-target')).toHaveCount(1);
-
-  await connect(page, { label: 'App server' }, { label: 'Database' });
+  await dragConnect(page, 'app-1', 'Database');
   await expect(tutorial).toContainText('Step 3 of 4');
-  await expect(page.getByRole('button', { name: 'Play' })).toHaveClass(/tutorial-target/);
+  await expect(page.getByRole('button', { name: /Bring them now/ })).toHaveClass(/tutorial-target/);
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: /Bring them now/ }).click();
   await expect(tutorial).toContainText('Step 4 of 4');
-  await page.getByRole('button', { name: 'Skip to results' }).click();
-  await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
   await expect(tutorial).toContainText('Tutorial complete');
 
   await page.goto('/#01-hello-world');
