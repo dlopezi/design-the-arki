@@ -74,8 +74,14 @@ jobs:
         env:
           URLS: https://${{ vars.GCP_PROJECT_ID }}.web.app ${{ vars.PRODUCTION_URL }}
         run: |
+          # A new release can take a few seconds to reach Firebase's CDN: try for up to a minute.
+          check() {
+            curl -sfI "$1/" | grep -i "content-security-policy" &&
+            curl -sf "$1/" | grep -q "<title>Design the Arki"
+          }
           for url in $URLS; do
             echo "Checking $url"
-            curl -sfI "$url/" | grep -i "content-security-policy"
-            curl -sf "$url/" | grep -q "<title>Design the Arki"
+            for i in $(seq 1 12); do check "$url" && continue 2; sleep 5; done
+            echo "::error::$url did not answer with the game and its security headers"
+            exit 1
           done

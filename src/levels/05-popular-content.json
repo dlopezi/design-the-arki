@@ -208,5 +208,16 @@
         "db"
       ]
     ]
+  },
+  "play": {
+    "startMoney": 300,
+    "wave": {
+      "rps": 600,
+      "lengthS": 40
+    },
+    "starMoney": [
+      220,
+      320
+    ]
   }
 }

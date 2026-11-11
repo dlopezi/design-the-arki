@@ -39,6 +39,8 @@ export type StationPrimitive = {
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
   sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
   defaultSize?: string;
+  /** Seconds to build one instance in real-time play; the engine ignores this. */
+  buildS?: number;
   /** How the game draws it; the engine ignores this. */
   presentation?: Presentation;
   /**

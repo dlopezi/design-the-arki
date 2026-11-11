@@ -2,7 +2,7 @@
   "id": "04-flash-sale",
   "chapter": "Core",
   "title": "Flash sale",
-  "brief": "A 10-second flash sale starts at 30 s and traffic jumps from 200 to 500 people per second. Most of them load the same product pages. A bigger database would cope, but is there a cheaper way?",
+  "brief": "A flash sale: 500 people per second for 30 seconds, and most of them load the same product pages. A bigger database would cope, but is there a cheaper way?",
   "durationS": 60,
   "traffic": [
     {
@@ -44,7 +44,7 @@
       "maxInstances": 4
     }
   },
-  "guidedHint": "The small database cannot take the spike alone. Put the cache between the app servers and the database.",
+  "guidedHint": "The small database cannot take the sale alone. Put the cache between the app servers and the database, and raise its TTL.",
   "startingDesigns": {
     "guided": {
       "components": [
@@ -154,7 +154,7 @@
         "id": "api",
         "type": "appServer",
         "params": {
-          "instances": 3
+          "instances": 4
         }
       },
       {
@@ -186,6 +186,17 @@
         "cache",
         "db"
       ]
+    ]
+  },
+  "play": {
+    "startMoney": 300,
+    "wave": {
+      "rps": 500,
+      "lengthS": 30
+    },
+    "starMoney": [
+      140,
+      230
     ]
   }
 }

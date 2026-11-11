@@ -1,0 +1,291 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway: three ideas for the level map (A campaign, B tech tree, C mission board) and the C4 layers switch.
+     Not part of the build. Open with the dev server at /prototypes/level-map.prototype.html, switch with the bottom bar or ?v=a|b|c|c4. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo: mapa de niveles</title>
+<style>
+:root {
+  --bg: #04080a; --panel: #0c1517; --panel-2: #122023; --line: #1f3438; --line-strong: #2f4b51;
+  --fg: #dce8e5; --muted: #8ca5a1; --accent: #3ee0c8; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --star: #fde047;
+  --guided: #5b8cff; --normal: #ffc83d; --hard: #ff8a3d; --god: #b26bff;
+  --steel: linear-gradient(180deg, #172629 0%, #0c1517 55%, #091012 100%);
+  --bevel: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.55);
+  --chamfer: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg) 65%) fixed var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; padding-bottom: 90px; }
+button { font: inherit; cursor: pointer; color: inherit; }
+a { color: inherit; }
+.panel { background: var(--steel); border: 1px solid var(--line-strong); clip-path: var(--chamfer); box-shadow: var(--bevel); }
+.label { font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 8px rgba(62,224,200,.35); }
+.muted { color: var(--muted); }
+.stars { color: var(--star); letter-spacing: 2px; } .stars .off { color: var(--line-strong); }
+.badge { font: 800 10px var(--mono); padding: 1px 6px; border-radius: 2px; color: #06121f; }
+.badge.guided { background: var(--guided); } .badge.normal { background: var(--normal); color: #4a3200; }
+.badge.hard { background: var(--hard); } .badge.god { background: var(--god); color: #fff; }
+.btn { padding: 8px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #1a2b2f, #0e181a); box-shadow: var(--bevel); border-radius: 2px; font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: linear-gradient(180deg, #6ef0a6, #22a35a 60%, #16723f); color: #03140a; border-color: #86efac; }
+.page { width: min(1180px, 100%); margin: 0 auto; padding: 14px 16px; display: grid; gap: 14px; }
+.topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.topbar .home { font: 700 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+.topbar h1 { margin: 0; font: 900 22px var(--mono); letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 14px rgba(62,224,200,.35); }
+.topbar .spacer { flex: 1; }
+.pill { padding: 5px 12px; background: #070d0e; border: 1px solid var(--line); font: 800 13px var(--mono); }
+.question { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(62,224,200,.06); font-size: 14px; }
+.question b { color: var(--accent); }
+
+/* A: campaign map */
+.a-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+.a-map { position: relative; padding: 14px; }
+.a-map svg { display: block; width: 100%; height: auto; }
+.a-terrain { fill: #0a1416; }
+.a-gridline { stroke: rgba(62,224,200,.06); }
+.a-route { fill: none; stroke: rgba(62,224,200,.25); stroke-width: 4; stroke-dasharray: 2 8; stroke-linecap: round; }
+.a-route.done { stroke: var(--ok); stroke-dasharray: none; opacity: .7; }
+.a-node { cursor: pointer; }
+.a-node .ring { fill: #0b1416; stroke: var(--line-strong); stroke-width: 2; }
+.a-node.done .ring { stroke: var(--ok); }
+.a-node.current .ring { stroke: var(--accent); stroke-width: 3; filter: drop-shadow(0 0 8px var(--accent)); }
+.a-node.locked { opacity: .45; }
+.a-node.selected .ring { stroke: #fff; stroke-width: 3; }
+.a-node text { fill: var(--fg); font: 800 11px var(--mono); text-anchor: middle; letter-spacing: .04em; }
+.a-node .num { font-size: 15px; }
+.a-sector { fill: none; stroke: rgba(62,224,200,.35); stroke-dasharray: 6 4; }
+.a-sector-label { fill: var(--accent); font: 800 12px var(--mono); letter-spacing: .14em; }
+.a-detail { padding: 18px; display: grid; gap: 10px; }
+.a-detail h2 { margin: 0; font: 900 20px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.a-detail ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.a-new { display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.3); font-size: 13.5px; }
+.a-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.a-modes .btn { text-align: left; display: grid; gap: 2px; text-transform: none; letter-spacing: 0; font-family: system-ui, sans-serif; font-weight: 400; font-size: 12px; }
+.a-modes .btn b { font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.a-modes .btn.locked { opacity: .45; cursor: default; }
+
+/* B: tech tree */
+.b-tree { padding: 18px; overflow-x: auto; }
+.b-table { display: grid; grid-template-columns: 190px repeat(8, minmax(70px, 1fr)); gap: 0; min-width: 820px; }
+.b-head { padding: 6px 0 10px; text-align: center; font: 800 11px var(--mono); color: var(--muted); }
+.b-head.current { color: var(--accent); }
+.b-row-label { display: flex; align-items: center; gap: 8px; padding: 6px 0; font: 800 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; border-top: 1px solid var(--line); }
+.b-row-label small { display: block; font: 400 11.5px system-ui, sans-serif; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.b-cell { position: relative; display: grid; place-items: center; border-top: 1px solid var(--line); min-height: 64px; }
+.b-cell::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--rowline, transparent); }
+.b-dot { position: relative; z-index: 1; width: 34px; height: 34px; display: grid; place-items: center; font: 800 12px var(--mono); border: 2px solid var(--line-strong); background: #0b1416; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.b-dot.teach { width: 44px; height: 44px; background: var(--c); color: #04120f; border: none; }
+.b-dot.use { background: #0b1416; color: var(--fg); }
+.b-dot.done.use { background: color-mix(in srgb, var(--c) 30%, #0b1416); }
+.b-dot.locked { opacity: .35; }
+.b-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.b-side { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.b-side .panel { padding: 12px 14px; display: grid; gap: 6px; }
+.b-side h3 { margin: 0; font: 800 13px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+
+/* C: mission board */
+.c-tabs { display: flex; gap: 6px; }
+.c-tabs .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.c-board { padding: 6px 0; }
+.c-row { display: grid; grid-template-columns: 50px minmax(160px, 1.4fr) minmax(140px, 1.2fr) 120px 90px 110px 120px; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.c-row.head { border-top: none; font: 800 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.c-row.next { background: rgba(62,224,200,.07); box-shadow: inset 3px 0 0 var(--accent); }
+.c-row.locked { color: var(--muted); }
+.c-row .num { font: 900 16px var(--mono); color: var(--accent); }
+.c-row.locked .num { color: var(--line-strong); }
+.c-row .name { font: 800 13px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.c-row .icons { display: flex; gap: 0; }
+
+/* C4 */
+.c4-switch { display: inline-flex; border: 1px solid var(--line-strong); }
+.c4-switch button { padding: 8px 14px; border: none; background: #0b1416; font: 800 12px var(--mono); letter-spacing: .06em; }
+.c4-switch button + button { border-left: 1px solid var(--line-strong); }
+.c4-switch button[aria-pressed="true"] { background: rgba(62,224,200,.16); color: var(--accent); }
+.c4-stage { padding: 30px 20px; min-height: 380px; display: flex; align-items: center; justify-content: center; gap: 0;
+  background-image: linear-gradient(rgba(62,224,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(62,224,200,.06) 1px, transparent 1px); background-size: 48px 48px; overflow-x: auto; }
+.person { flex: none; display: grid; justify-items: center; gap: 2px; padding: 12px 16px; background: linear-gradient(180deg, #13262a, #0a1416); border: 1px solid rgba(62,224,200,.5); border-radius: 50% 50% 4px 4px / 40% 40% 4px 4px; font: 800 12px var(--mono); }
+.person i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #b7fff4, #2aa596); box-shadow: 0 0 14px rgba(62,224,200,.55); }
+.arrow { flex: none; width: 60px; height: 2px; background: rgba(62,224,200,.5); position: relative; }
+.arrow::after { content: ''; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left-color: rgba(62,224,200,.8); }
+.system { flex: none; border: 1px solid rgba(62,224,200,.45); background: rgba(62,224,200,.03); padding: 12px 16px 16px; display: grid; gap: 10px; }
+.system > .label { display: block; }
+.zones { display: flex; align-items: center; gap: 0; }
+.zone { border: 1px dashed rgba(140,165,161,.4); background: rgba(0,0,0,.28); padding: 8px 10px 10px; display: grid; gap: 6px; min-width: 150px; }
+.zone .zname { font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.comp { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 2px; background: linear-gradient(180deg, #132326, #0a1315); border: 1px solid var(--line-strong); font: 800 11px var(--mono); text-transform: uppercase; }
+.comp small { display: block; font: 400 11px system-ui, sans-serif; text-transform: none; color: var(--muted); }
+.inst { margin-left: 18px; padding: 2px 8px 2px 2px; font-size: 10.5px; }
+.c4-note { font-size: 13.5px; color: var(--muted); max-width: 70ch; }
+
+/* switcher */
+.switcher { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 10; display: flex; gap: 4px; padding: 6px; background: var(--steel); border: 1px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.8), 0 0 20px rgba(62,224,200,.25); }
+.switcher button { padding: 8px 14px; border: 1px solid transparent; background: none; font: 800 12px var(--mono); letter-spacing: .06em; color: var(--muted); }
+.switcher button[aria-pressed="true"] { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
+.proto-tag { position: fixed; top: 8px; right: 8px; z-index: 10; font: 800 10px var(--mono); letter-spacing: .14em; padding: 3px 8px; background: var(--warn); color: #241a00; }
+@media (max-width: 860px) { .a-grid { grid-template-columns: minmax(0, 1fr); } .c-row { grid-template-columns: 40px 1fr 90px; } .c-row > :nth-child(n+4):not(:last-child) { display: none; } }
+</style>
+</head>
+<body>
+<span class="proto-tag">PROTOTIPO</span>
+<div id="app"></div>
+<nav class="switcher" aria-label="Propuestas"></nav>
+<script>
+// ---------- Data: chapter 1, a player who passed levels 1-4 ----------
+const LEVELS = [
+  { n: 1, title: 'Hola, mundo', concept: 'Servidor + base de datos', uses: ['appServer', 'database'], teaches: ['appServer', 'database'], stars: 1, mode: 'guided', x: 90, y: 300 },
+  { n: 2, title: 'Primer pico', concept: 'Escalar en horizontal', uses: ['loadBalancer', 'appServer', 'database'], teaches: ['loadBalancer'], stars: 1, mode: 'guided', x: 220, y: 200 },
+  { n: 3, title: '¿Más grande o más?', concept: 'Escalar en vertical', uses: ['loadBalancer', 'appServer', 'database'], teaches: [], stars: 1, mode: 'normal', x: 370, y: 250 },
+  { n: 4, title: 'Venta flash', concept: 'Caché delante de la BD', uses: ['loadBalancer', 'appServer', 'cache', 'database'], teaches: ['cache'], stars: 2, mode: 'guided', x: 500, y: 140 },
+  { n: 5, title: 'Contenido popular', concept: 'TTL de la caché', uses: ['loadBalancer', 'appServer', 'cache', 'database'], teaches: [], stars: 0, x: 650, y: 210 },
+  { n: 6, title: 'Se cae un servidor', concept: 'Redundancia N+1', uses: ['loadBalancer', 'appServer', 'database'], teaches: [], stars: 0, x: 600, y: 360 },
+  { n: 7, title: 'Presupuesto ajustado', concept: 'Coste: caché o tier', uses: ['loadBalancer', 'appServer', 'cache', 'database'], teaches: [], stars: 0, x: 440, y: 420 },
+  { n: 8, title: 'Black Friday', concept: 'Todo junto', uses: ['loadBalancer', 'appServer', 'cache', 'database'], teaches: [], stars: 0, x: 280, y: 440 },
+];
+const CURRENT = 5;
+const state = (l) => l.stars > 0 ? 'done' : l.n === CURRENT ? 'current' : 'locked';
+const BUILD = {
+  appServer: { name: 'Fábrica', comp: 'App server', color: '#34b97a' },
+  database: { name: 'Silos', comp: 'Base de datos', color: '#9b6bff' },
+  loadBalancer: { name: 'Torre de enlace', comp: 'Load balancer', color: '#4f8ef7' },
+  cache: { name: 'Generador', comp: 'Caché', color: '#f59e0b' },
+};
+const MODES = [['guided', 'Guiado', 'Casi hecho, con pistas'], ['normal', 'Normal', 'Diseño a medias'], ['hard', 'Difícil', 'Arregla un diseño roto'], ['god', 'Dios', 'Lienzo vacío']];
+
+// ---------- Buildings (same drawing as src/ui/componentArt.tsx, as SVG strings) ----------
+function shade(hex, f) { const t = f > 0 ? 255 : 0, k = Math.abs(f); return '#' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).map(v => Math.round(v + (t - v) * k).toString(16).padStart(2, '0')).join(''); }
+const P = (pts) => pts.map(p => p.join(',')).join(' ');
+function box(cx, cy, w, h, p) { const d = w / 2; return `<g stroke="${p.dark}" stroke-width=".6"><polygon points="${P([[cx - w, cy], [cx, cy + d], [cx, cy + d - h], [cx - w, cy - h]])}" fill="${p.dark}"/><polygon points="${P([[cx, cy + d], [cx + w, cy], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.base}"/><polygon points="${P([[cx - w, cy - h], [cx, cy - d - h], [cx + w, cy - h], [cx, cy + d - h]])}" fill="${p.top}"/></g>`; }
+function cyl(cx, cy, r, h, p) { const ry = r / 2, top = cy - h; return `<g stroke="${p.dark}" stroke-width=".6"><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx + r},${cy} L${cx + r},${top} Z" fill="${p.base}"/><path d="M${cx - r},${top} L${cx - r},${cy} A${r} ${ry} 0 0 0 ${cx},${cy + ry} L${cx},${top + ry} A${r} ${ry} 0 0 1 ${cx - r},${top} Z" fill="${p.dark}" stroke="none"/><ellipse cx="${cx}" cy="${top}" rx="${r}" ry="${ry}" fill="${p.top}"/></g>`; }
+const DRAW = {
+  loadBalancer: p => box(32, 48, 14, 6, p) + box(32, 41, 2.5, 26, p) + `<path d="M32 20 L18 27 M32 20 L46 27" stroke="${p.light}" stroke-width="1.4"/><circle cx="32" cy="12" r="6" fill="${p.glow}" opacity=".3"/><circle cx="32" cy="12" r="2.6" fill="${p.glow}"/>`,
+  appServer: p => box(29, 47, 17, 15, p) + box(23, 31, 3.5, 10, p) + box(33, 29, 3, 7, p) + box(47, 50, 7, 8, p) + `<polygon points="33,45 37,43 37,39 33,41" fill="#fde68a"/><polygon points="39,42 43,40 43,36 39,38" fill="#fde68a"/>`,
+  cache: p => box(32, 50, 16, 7, p) + `<ellipse cx="32" cy="43" rx="9" ry="4.5" fill="${p.glow}" opacity=".55"/><polygon points="32,6 41,22 32,38 23,22" fill="${p.light}"/><polygon points="32,6 41,22 32,38" fill="${p.base}"/><polygon points="32,11 36,22 32,30 28,22" fill="${p.glow}" opacity=".85"/>`,
+  database: p => cyl(41, 45, 8, 20, p) + cyl(26, 52, 11, 27, p),
+};
+function building(type, size, grey = false) {
+  const c = grey ? '#5b6577' : BUILD[type].color;
+  const p = { base: c, light: shade(c, .25), dark: shade(c, -.45), top: shade(c, .45), glow: shade(c, .6) };
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,50 32,36 60,50 32,64" fill="#111a1e" stroke="${c}" stroke-opacity=".55"/>${DRAW[type](p)}</svg>`;
+}
+const stars = (n) => '<span class="stars">' + '★'.repeat(n) + '<span class="off">' + '★'.repeat(3 - n) + '</span></span>';
+const topbar = (title) => `<header class="topbar"><a class="home" href="#">← Inicio</a><h1>${title}</h1><span class="spacer"></span>
+  <a class="btn" href="#">Tu base</a><a class="btn" href="#">Archivo</a><span class="pill"><span class="stars">★</span> 5 / 24</span></header>`;
+
+// ---------- A: campaign map ----------
+let selectedA = CURRENT;
+function viewA() {
+  const l = LEVELS[selectedA - 1], s = state(l);
+  const route = LEVELS.slice(0, -1).map((a, i) => { const b = LEVELS[i + 1]; return `<line class="a-route ${state(b) !== 'locked' ? 'done' : ''}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`; }).join('');
+  const nodes = LEVELS.map(v => `<g class="a-node ${state(v)} ${v.n === selectedA ? 'selected' : ''}" data-n="${v.n}" transform="translate(${v.x},${v.y})">
+      <circle class="ring" r="24"/>${v.teaches[0] ? `<g transform="translate(-20,-26)">${building(v.teaches[0], 40, state(v) === 'locked')}</g>` : `<text class="num" y="5">${state(v) === 'locked' ? '🔒' : v.n}</text>`}
+      <text y="42">${v.n}. ${v.title.toUpperCase()}</text><text y="56" class="stars-t" fill="#fde047">${v.stars ? '★'.repeat(v.stars) : ''}</text></g>`).join('');
+  const grid = Array.from({ length: 16 }, (_, i) => `<line class="a-gridline" x1="${i * 50}" y1="0" x2="${i * 50}" y2="520"/><line class="a-gridline" x1="0" y1="${i * 40}" x2="760" y2="${i * 40}"/>`).join('');
+  return `<div class="page">${topbar('Campaña')}
+    <p class="question"><b>A · Mapa de campaña.</b> Las misiones son puntos en un terreno, por sectores (capítulos). Haz clic en una misión: el panel de la derecha muestra su informe y los modos.</p>
+    <div class="a-grid">
+      <div class="a-map panel"><svg viewBox="0 0 760 520">
+        <rect class="a-terrain" width="760" height="520"/>${grid}
+        <rect class="a-sector" x="30" y="70" width="700" height="420"/><text class="a-sector-label" x="44" y="94">SECTOR 1 · FUNDAMENTOS</text>
+        <text class="a-sector-label" x="44" y="512" opacity=".5">SECTOR 2 · ASÍNCRONO 🔒 PRÓXIMAMENTE</text>
+        ${route}${nodes}</svg></div>
+      <aside class="a-detail panel">
+        <span class="label">Misión ${l.n} · ${s === 'done' ? 'superada' : s === 'current' ? 'siguiente' : 'bloqueada'}</span>
+        <h2>${l.title}</h2>
+        <span class="muted">Concepto: <b style="color:var(--fg)">${l.concept}</b></span>
+        <div>${stars(l.stars)} ${l.mode ? `<span class="badge ${l.mode}">${MODES.find(m => m[0] === l.mode)[1]}</span>` : ''}</div>
+        <span class="label">Objetivos</span>
+        <ul><li>Latencia p95 ≤ 200 ms</li><li>Errores ≤ 1%</li><li>Coste ≤ $300/mes</li></ul>
+        ${l.teaches.length ? `<div class="a-new">${building(l.teaches[0], 44)}<span><b>Nuevo edificio:</b> ${BUILD[l.teaches[0]].name} (${BUILD[l.teaches[0]].comp})</span></div>` : ''}
+        <span class="label">Edificios de la misión</span>
+        <div>${l.uses.map(t => building(t, 40, s === 'locked')).join('')}</div>
+        <span class="label">Elige modo</span>
+        <div class="a-modes">${MODES.map(([k, name, note]) => `<button class="btn ${s === 'locked' ? 'locked' : ''}" ${k === 'guided' && s !== 'locked' ? 'style="border-color:var(--ok)"' : ''}><b>${name}</b>${note}</button>`).join('')}</div>
+      </aside>
+    </div></div>`;
+}
+
+// ---------- B: tech tree ----------
+function viewB() {
+  const types = ['appServer', 'database', 'loadBalancer', 'cache'];
+  const head = `<div class="b-head"></div>` + LEVELS.map(l => `<div class="b-head ${l.n === CURRENT ? 'current' : ''}">${l.n}<br>${state(l) === 'done' ? stars(l.stars) : state(l) === 'current' ? '▶ SIGUIENTE' : '🔒'}</div>`).join('');
+  const rows = types.map(t => {
+    const first = LEVELS.find(l => l.uses.includes(t)).n;
+    return `<div class="b-row-label">${building(t, 40)}<span>${BUILD[t].name}<small>${BUILD[t].comp}</small></span></div>` +
+      LEVELS.map(l => {
+        const teach = l.teaches.includes(t), use = l.uses.includes(t);
+        return `<div class="b-cell" style="--rowline:${l.n >= first ? BUILD[t].color + '55' : 'transparent'}">${use ? `<span class="b-dot ${teach ? 'teach' : 'use'} ${state(l)}" style="--c:${BUILD[t].color}" title="${l.title}">${l.n}</span>` : ''}</div>`;
+      }).join('');
+  }).join('');
+  return `<div class="page">${topbar('Árbol de tecnología')}
+    <p class="question"><b>B · Árbol de tecnología.</b> Cada fila es un edificio; cada columna, un nivel. El rombo grande marca el nivel que enseña ese edificio; los pequeños, dónde lo vuelves a usar. Haz clic en un nivel para jugarlo.</p>
+    <div class="b-tree panel"><div class="b-table">${head}${rows}</div>
+      <div class="b-legend"><span>◆ grande = aprendes el edificio</span><span>◇ pequeño = lo usas otra vez</span><span>Línea de color = ya lo tienes desbloqueado</span></div></div>
+    <div class="b-side">${LEVELS.slice(3, 6).map(l => `<div class="panel"><span class="label">Nivel ${l.n}</span><h3>${l.title}</h3><span class="muted">${l.concept}</span>${state(l) === 'current' ? '<button class="btn primary">Jugar ▶</button>' : state(l) === 'done' ? stars(l.stars) : '<span class="muted">🔒 Supera el nivel anterior</span>'}</div>`).join('')}</div>
+  </div>`;
+}
+
+// ---------- C: mission board ----------
+function viewC() {
+  const row = (l) => { const s = state(l); return `<div class="c-row ${s === 'current' ? 'next' : s}">
+    <span class="num">${l.n}</span><span class="name">${l.title}${s === 'locked' ? ' 🔒' : ''}</span><span>${l.concept}</span>
+    <span class="icons">${l.uses.map(t => building(t, 28, s === 'locked')).join('')}</span>
+    <span>${s === 'locked' ? '' : stars(l.stars)}</span><span>${l.mode ? `<span class="badge ${l.mode}">${MODES.find(m => m[0] === l.mode)[1]}</span>` : '—'}</span>
+    <span>${s === 'current' ? '<button class="btn primary">Jugar ▶</button>' : s === 'done' ? '<button class="btn">Repetir</button>' : ''}</span></div>`; };
+  return `<div class="page">${topbar('Misiones')}
+    <p class="question"><b>C · Tablero de misiones.</b> Una lista compacta: todo en una pantalla, fácil con teclado (↑ ↓ y Enter). Pestañas por capítulo; la siguiente misión resaltada.</p>
+    <div class="c-tabs"><button class="btn" aria-pressed="true">Cap. 1 · Fundamentos · 4/8</button><button class="btn">Cap. 2 · Asíncrono 🔒</button></div>
+    <div class="c-board panel"><div class="c-row head"><span>#</span><span>Misión</span><span>Concepto</span><span>Edificios</span><span>Estrellas</span><span>Modo</span><span></span></div>
+      ${LEVELS.map(row).join('')}</div></div>`;
+}
+
+// ---------- C4 layers ----------
+let layer = 3;
+function viewC4() {
+  const comp = (t, title, sub) => `<div class="comp">${building(t, 34)}<span>${title}<small>${sub}</small></span></div>`;
+  const zone = (name, inner) => `<div class="zone"><span class="zname">${name} <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">[Contenedor]</span></span>${inner}</div>`;
+  let system;
+  if (layer === 1) system = `<div class="system"><span class="label">Tu sistema [Sistema de software]</span>
+      <div style="display:flex;gap:4px;align-items:center">${['loadBalancer', 'appServer', 'cache', 'database'].map(t => building(t, 44)).join('')}</div>
+      <span class="muted" style="font-size:12.5px">7 edificios · $260/mes · p95 341 ms</span></div>`;
+  else if (layer === 2) system = `<div class="system"><span class="label">Tu sistema [Sistema de software]</span><div class="zones">
+      ${zone('Borde', comp('loadBalancer', 'Load balancer', '1 torre'))}<span class="arrow" style="width:30px"></span>
+      ${zone('Aplicación', comp('appServer', 'App server × 4', 'Node.js · carga 74%'))}<span class="arrow" style="width:30px"></span>
+      ${zone('Datos', comp('cache', 'Caché', 'Redis · 25% aciertos') + comp('database', 'Base de datos', 'PostgreSQL · 100%'))}</div></div>`;
+  else system = `<div class="system"><span class="label">Tu sistema [Sistema de software]</span><div class="zones">
+      ${zone('Borde', comp('loadBalancer', 'Load balancer', 'L7 · round-robin'))}<span class="arrow" style="width:30px"></span>
+      ${zone('Aplicación', comp('appServer', 'App server', '4 instancias · Mediana') + [1, 2, 3, 4].map(i => `<div class="comp inst">${building('appServer', 24)}app-${i} <small>&nbsp;4 workers</small></div>`).join(''))}<span class="arrow" style="width:30px"></span>
+      ${zone('Datos', comp('cache', 'Caché', 'TTL 10 s') + comp('database', 'Base de datos', 'Pequeña · 8 conexiones'))}</div></div>`;
+  const notes = {
+    1: '<b>Capa 1 · Contexto:</b> solo los usuarios y tu sistema como una caja, con sus edificios como iconos y los números clave. Sirve para ver la idea general.',
+    2: '<b>Capa 2 · Contenedores:</b> las zonas (borde, aplicación, datos) con sus componentes; las instancias se resumen como "× 4". Sirve para ver el flujo sin detalle.',
+    3: '<b>Capa 3 · Componentes:</b> la vista actual, con cada instancia (app-1…app-4). Es la única capa donde construyes y conectas; si añades un edificio desde la 1 o la 2, el juego pasa a la 3.',
+  };
+  return `<div class="page">${topbar('Contenido popular')}
+    <p class="question"><b>Vista C4 por capas.</b> Un selector encima del diagrama del juego. Prueba los tres botones.</p>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="label">Vista C4</span>
+      <span class="c4-switch">${[[1, '1 Contexto'], [2, '2 Contenedores'], [3, '3 Componentes']].map(([k, n]) => `<button data-layer="${k}" aria-pressed="${layer === k}">${n}</button>`).join('')}</span></div>
+    <div class="c4-stage panel"><div class="person"><i></i>Clientes<span class="muted" style="font-weight:400;font-size:11px">[Persona]</span></div><span class="arrow"></span>${system}</div>
+    <p class="c4-note">${notes[layer]}</p></div>`;
+}
+
+// ---------- Switcher ----------
+const VIEWS = { a: ['A · Campaña', viewA], b: ['B · Árbol', viewB], c: ['C · Tablero', viewC], c4: ['Vista C4', viewC4] };
+let current = new URLSearchParams(location.search).get('v') || 'a';
+if (!VIEWS[current]) current = 'a';
+function render() {
+  document.getElementById('app').innerHTML = VIEWS[current][1]();
+  document.querySelector('.switcher').innerHTML = Object.entries(VIEWS).map(([k, [n]]) => `<button data-v="${k}" aria-pressed="${k === current}">${n}</button>`).join('');
+}
+document.addEventListener('click', e => {
+  const v = e.target.closest('[data-v]'); if (v) { current = v.dataset.v; history.replaceState(null, '', '?v=' + current); render(); window.scrollTo(0, 0); return; }
+  const n = e.target.closest('.a-node'); if (n) { selectedA = Number(n.dataset.n); render(); return; }
+  const l = e.target.closest('[data-layer]'); if (l) { layer = Number(l.dataset.layer); render(); }
+});
+render();
+</script>
+</body>
+</html>
