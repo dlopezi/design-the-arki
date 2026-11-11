@@ -15,7 +15,7 @@ An ordered group of levels about one topic that introduces new component types. 
 _Avoid_: World, section
 
 **Mode**:
-The difficulty the player picks for a level (Guided, Normal, Hard, God); it sets the starting design and how much help is shown.
+The difficulty the player picks once for every mission (Guided, Normal, Hard, God), on the difficulty screen; it sets the starting design and how much help is shown. Guided only until the tutorial is done.
 _Avoid_: Difficulty level (clashes with Level), setting
 
 **Starting Design**:
@@ -62,13 +62,13 @@ _Avoid_: Edge, wire, link
 A component as it stands on the map, always called by its real name (app server, database…). Each of its instances is drawn as its own small isometric building in the type's colour.
 _Avoid_: Unit, structure, made-up names (factory, silos…)
 
-**Building Archive**:
-The page that explains what each building (component) does, when to build it and which level brings it; shown as a **Briefing** before level 1.
-_Avoid_: Codex, encyclopedia, help
+**Field Manual**:
+The help pages, in three tabs: How to play, Buildings (what each building does in the game and in real life, and which level brings it) and Concepts (p95, error rate, scaling…). Its Buildings tab is shown as a **Briefing** before level 1.
+_Avoid_: Codex, encyclopedia, Building Archive (old name)
 
-**Base**:
-The player's growing infrastructure: one district per passed level, built from the design that passed it.
-_Avoid_: City, world, colony
+**Mission Briefing**:
+The card that opens a mission over the game screen: story, objectives, new buildings and the star rule. The build clock waits until the player presses Start building.
+_Avoid_: Intro, splash
 
 **C4 Layer**:
 How deep the design's diagram is drawn, after the C4 model: 1 Context (users and the system as one box), 2 Containers (zones and components, instances folded), 3 Components (every instance).

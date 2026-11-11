@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { dragConnect, playWave, unit } from './helpers';
+import { dragConnect, playWave, startMission, unit } from './helpers';
 
 test('a new player learns the controls in a guided tutorial on level 1, which unlocks every mode', async ({ page }) => {
+  // Before the tutorial only Guided exists, so the mission opens in it without asking.
   await page.goto('/#01-hello-world');
-  const modes = page.getByRole('list', { name: 'Modes' });
-  await expect(modes.getByRole('link')).toHaveText([/Guided/]);
-  await expect(modes.getByRole('listitem').filter({ hasText: 'God' })).toContainText('Finish the tutorial first');
-  await modes.getByRole('link', { name: /Guided/ }).click();
+  await expect(page).toHaveURL(/#01-hello-world\/guided$/);
+  await startMission(page);
 
   const tutorial = page.getByRole('region', { name: 'Tutorial' });
   await expect(tutorial).toContainText('Step 1 of 4');
@@ -36,11 +35,15 @@ test('a new player learns the controls in a guided tutorial on level 1, which un
 
 test('modes other than guided cannot be opened by link before the tutorial', async ({ page }) => {
   await page.goto('/#01-hello-world/god');
-  await expect(page.getByRole('list', { name: 'Modes' })).toBeVisible();
+  await startMission(page);
+  await expect(page.getByText('Mode: Guided')).toBeVisible();
+  await page.goto('/#mode');
+  await expect(page.getByRole('list', { name: 'Modes' }).getByRole('listitem').filter({ hasText: 'God' })).toContainText('Finish the tutorial first');
 });
 
 test('the tutorial can be skipped, which also unlocks every mode', async ({ page }) => {
   await page.goto('/#01-hello-world/guided');
+  await startMission(page);
   await page.getByRole('region', { name: 'Tutorial' }).getByRole('button', { name: 'Skip tutorial' }).click();
   await expect(page.getByRole('region', { name: 'Tutorial' })).toHaveCount(0);
   await page.goto('/#01-hello-world');

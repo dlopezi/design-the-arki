@@ -13,7 +13,13 @@ export type LevelProgress = {
   /** The latest design that passed the level: what the player's Base shows for it. */
   passedDesign?: Design;
 };
-export type Progress = { version: 1; levels: Record<string, LevelProgress>; tutorialDone?: boolean };
+export type Progress = {
+  version: 1;
+  levels: Record<string, LevelProgress>;
+  tutorialDone?: boolean;
+  /** The difficulty the player chose once for every mission; unset until they choose. */
+  mode?: Mode;
+};
 
 const KEY = 'design-the-arki:progress';
 const empty = (): Progress => ({ version: 1, levels: {} });
@@ -65,6 +71,15 @@ export function withPass(progress: Progress, id: string, stars: number, mode: Mo
 export function withDesign(progress: Progress, id: string, mode: Mode, design: Design): Progress {
   const current = progress.levels[id] ?? { bestStars: 0 };
   return { ...progress, levels: { ...progress.levels, [id]: { ...current, designs: { ...current.designs, [mode]: design } } } };
+}
+
+export function withMode(progress: Progress, mode: Mode): Progress {
+  return progress.mode === mode ? progress : { ...progress, mode };
+}
+
+/** The mode a mission opens in: Guided until the tutorial is done, then the chosen one (null: ask first). */
+export function playMode(progress: Progress): Mode | null {
+  return progress.tutorialDone ? progress.mode ?? null : 'guided';
 }
 
 export function withTutorialDone(progress: Progress): Progress {
