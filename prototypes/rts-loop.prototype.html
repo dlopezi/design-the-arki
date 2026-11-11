@@ -59,7 +59,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .panel-tr .label { margin-right: 8px; }
 .panel-tr button { padding: 3px 9px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 11.5px var(--mono); }
 .panel-tr button.on { background: rgba(62,224,200,.16); border-color: var(--accent); color: var(--fg); }
-.c4 { top: 12px; } .reqmode { top: 52px; } .viewctl { top: 92px; }
+.c4 { top: 12px; } .reqmode { top: 52px; } .linestyle { top: 92px; } .viewctl { top: 132px; }
 .hint { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 5; padding: 4px 12px; background: rgba(6,11,12,.85); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; pointer-events: none; }
 .hint b { color: var(--fg); }
 .crowd { display: grid; justify-items: center; gap: 4px; min-width: 110px; padding: 6px; border: 1px solid transparent; }
@@ -518,37 +518,85 @@ function drawParticle(p) {
   ctx.globalAlpha = 1;
 }
 const strokeCurve = (c) => { ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); ctx.bezierCurveTo(c[1].x, c[1].y, c[2].x, c[2].y, c[3].x, c[3].y); ctx.stroke(); };
+// Four ways to draw the lines, from calm to busy. In the calm ones the colour says how the line is doing
+// (teal fine, yellow busy, red losing requests) and the req/s appear only on the line under the pointer or selected.
+const LINE_STYLES = [['soft', 'Suave'], ['thin', 'Fina'], ['weight', 'Grosor'], ['busy', 'Animada']];
+let lineStyle = 'soft', hoverLink = null;
+function lineHealth(ln) {
+  const to = S.links[ln.indexes[0]]?.to;
+  if (!ln.live) return 'off';
+  if ((S.flow?.drop.get(to) ?? 0) > 1) return 'bad';
+  if ((S.flow?.rho.get(to) ?? 0) >= .7) return 'warn';
+  return 'ok';
+}
+const HEALTH_COLOR = { ok: '#3ee0c8', warn: '#fbbf24', bad: '#f87171', off: '#fbbf24' };
+function arrowAt(c, color, size) {
+  const m = bez(c, .5), m2 = bez(c, .53), ang = Math.atan2(m2.y - m.y, m2.x - m.x);
+  ctx.fillStyle = color; ctx.beginPath();
+  ctx.moveTo(m.x + size * Math.cos(ang), m.y + size * Math.sin(ang));
+  ctx.lineTo(m.x + size * Math.cos(ang + 2.5), m.y + size * Math.sin(ang + 2.5)); ctx.lineTo(m.x + size * Math.cos(ang - 2.5), m.y + size * Math.sin(ang - 2.5)); ctx.fill();
+}
+function labelAt(c, text, lift) {
+  const m = bez(c, .5); ctx.font = '800 11px ui-monospace';
+  const tw = ctx.measureText(text).width;
+  ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(6,11,12,.9)'; ctx.fillRect(m.x - tw / 2 - 4, m.y - lift - 14, tw + 8, 15);
+  ctx.fillStyle = '#dce8e5'; ctx.fillText(text, m.x - tw / 2, m.y - lift - 3);
+}
 function drawLinks(now, lines) {
   ctx.lineCap = 'round';
-  for (const ln of lines) {
-    const selected = ln.indexes.includes(S.selectedLink);
-    const flowing = ln.flow > 0;
-    const w = 2 + Math.min(14, ln.flow / 45);
-    const color = selected ? '#ffffff' : !ln.live ? '#fbbf24' : '#3ee0c8';
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = selected ? 1 : flowing ? .9 : .55; ctx.lineWidth = w;
-    ctx.setLineDash(!ln.live ? [4, 6] : [10, 8]);
-    ctx.lineDashOffset = flowing ? -(now / 1000) * 60 * Math.max(1, S.speed) : 0;
-    strokeCurve(ln.c); ctx.setLineDash([]);
-    // Arrow head and traffic at the middle of the curve.
-    const m = bez(ln.c, .5), m2 = bez(ln.c, .53), ang = Math.atan2(m2.y - m.y, m2.x - m.x);
-    ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.beginPath();
-    ctx.moveTo(m.x + 7 * Math.cos(ang), m.y + 7 * Math.sin(ang));
-    ctx.lineTo(m.x + 7 * Math.cos(ang + 2.5), m.y + 7 * Math.sin(ang + 2.5)); ctx.lineTo(m.x + 7 * Math.cos(ang - 2.5), m.y + 7 * Math.sin(ang - 2.5)); ctx.fill();
-    if (flowing) {
-      const text = `${Math.round(ln.flow)}/s`; ctx.font = '800 11px ui-monospace';
-      const tw = ctx.measureText(text).width;
-      ctx.fillStyle = 'rgba(6,11,12,.85)'; ctx.fillRect(m.x - tw / 2 - 4, m.y - w / 2 - 20, tw + 8, 15);
-      ctx.fillStyle = '#dce8e5'; ctx.fillText(text, m.x - tw / 2, m.y - w / 2 - 9);
+  lines.forEach((ln, n) => {
+    const selected = ln.indexes.includes(S.selectedLink), hovered = ln.indexes.includes(hoverLink);
+    const flowing = ln.flow > 0, health = lineHealth(ln);
+    const color = selected ? '#ffffff' : HEALTH_COLOR[health];
+    const showLabel = flowing && (lineStyle === 'busy' || selected || hovered);
+    ctx.strokeStyle = color; ctx.setLineDash(health === 'off' ? [4, 6] : []);
+    let w = 2;
+    if (lineStyle === 'busy') {
+      // As before: thicker with traffic, moving dashes, numbers always shown.
+      w = 2 + Math.min(14, ln.flow / 45);
+      ctx.globalAlpha = selected ? 1 : flowing ? .9 : .55; ctx.lineWidth = w;
+      if (health !== 'off') ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = flowing ? -(now / 1000) * 60 * Math.max(1, S.speed) : 0;
+      strokeCurve(ln.c);
+    } else if (lineStyle === 'thin') {
+      // A thin, quiet line; only the colour changes.
+      w = 1.5; ctx.globalAlpha = selected || hovered ? .95 : .5; ctx.lineWidth = selected || hovered ? 2.5 : w; strokeCurve(ln.c);
+    } else if (lineStyle === 'weight') {
+      // Thickness shows traffic, nothing moves.
+      w = 1.5 + Math.min(9, ln.flow / 60); ctx.globalAlpha = selected || hovered ? .8 : .38; ctx.lineWidth = w; strokeCurve(ln.c);
+    } else {
+      // Soft: a calm line with one gentle pulse running along it while traffic flows.
+      w = 2; ctx.globalAlpha = selected || hovered ? .9 : .4; ctx.lineWidth = w; strokeCurve(ln.c);
+      if (flowing && health !== 'off') {
+        const speed = .45 * Math.max(1, Math.min(S.speed, 2));
+        const k = ((now / 1000) * speed + n * .37) % 1, pts = [];
+        for (let t = Math.max(0, k - .14); t <= k; t += .01) pts.push(bez(ln.c, t));
+        if (pts.length > 1) {
+          ctx.globalAlpha = .85; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+          pts.forEach(pt => ctx.lineTo(pt.x, pt.y)); ctx.stroke();
+        }
+      }
     }
-  }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = lineStyle === 'busy' || selected || hovered ? 1 : .7;
+    arrowAt(ln.c, color, lineStyle === 'busy' ? 7 : 5);
+    if (showLabel) labelAt(ln.c, `${Math.round(ln.flow)}/s`, w / 2 + 6);
+    ctx.globalAlpha = 1;
+  });
   if (S.flow?.rps) {
     for (const [id, v] of S.flow.drop) if (v > 1) {
       const r = nodeRect(id); if (!r) continue;
-      const text = `✕ −${Math.round(v)}/s`; ctx.font = '800 12px ui-monospace';
-      const tw = ctx.measureText(text).width, x = r.left + r.width / 2 - tw / 2, y = r.top - 6;
-      ctx.fillStyle = 'rgba(6,11,12,.9)'; ctx.fillRect(x - 4, y - 12, tw + 8, 16);
-      ctx.fillStyle = '#f87171'; ctx.fillText(text, x, y);
+      if (lineStyle === 'busy') {
+        const text = `✕ −${Math.round(v)}/s`; ctx.font = '800 12px ui-monospace';
+        const tw = ctx.measureText(text).width, x = r.left + r.width / 2 - tw / 2, y = r.top - 6;
+        ctx.fillStyle = 'rgba(6,11,12,.9)'; ctx.fillRect(x - 4, y - 12, tw + 8, 16);
+        ctx.fillStyle = '#f87171'; ctx.fillText(text, x, y);
+      } else {
+        // Calm styles: a small red badge on the building that loses requests.
+        const x = r.right - 6, y = r.top + 6;
+        ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#160406'; ctx.font = '900 9px ui-monospace'; ctx.fillText('!', x - 2.5, y + 3.5);
+      }
     }
   }
   if (drag?.linking && drag.to && drag.fromPt) {
@@ -694,6 +742,7 @@ function render() {
     </section>
     <div class="panel-tr c4"><span class="label">Vista C4</span>${[[1, 'Contexto'], [2, 'Contenedores'], [3, 'Componentes']].map(([k, n]) => `<button class="${layer === k ? 'on' : ''}" data-layer="${k}">${k} ${n}</button>`).join('')}</div>
     <div class="panel-tr reqmode"><span class="label">Peticiones</span>${REQ_MODES.map(([k, n]) => `<button class="${reqMode === k ? 'on' : ''}" data-req="${k}">${n}</button>`).join('')}</div>
+    <div class="panel-tr linestyle"><span class="label">Líneas</span>${LINE_STYLES.map(([k, n]) => `<button class="${lineStyle === k ? 'on' : ''}" data-line="${k}">${n}</button>`).join('')}</div>
     <div class="panel-tr viewctl"><span class="label">Mapa</span><button data-act="zoomout">−</button><button data-act="zoomin">+</button><button data-act="center">Centrar</button>
       <button class="${S.auto ? 'on' : ''}" data-act="auto">Auto-conectar ${S.auto ? 'sí' : 'no'}</button><button data-act="rewire">⟲ Reconectar</button></div>
     ${banner}
@@ -767,6 +816,7 @@ document.addEventListener('pointerdown', e => {
     // pointerdown, not click: the screen redraws 10 times a second, which can swallow a click.
     if (el.dataset.build) buildUnit(el.dataset.build);
     else if (el.dataset.level) { reset(LEVELS[Number(el.dataset.level)]); render(); }
+    else if (el.dataset.line) { lineStyle = el.dataset.line; render(); }
     else if (el.dataset.req) { reqMode = el.dataset.req; particles.length = 0; render(); }
     else if (el.dataset.layer) { layer = Number(el.dataset.layer); particles.length = 0; render(); }
     else if (el.dataset.remove) removeUnit(Number(el.dataset.remove));
@@ -792,7 +842,7 @@ document.addEventListener('pointerdown', e => {
   q('.field')?.classList.add('panning');
 });
 document.addEventListener('pointermove', e => {
-  if (!drag) return;
+  if (!drag) { hoverLink = e.target.closest('.field') && !e.target.closest('.mission, .panel-tr') ? linkAt(e.clientX, e.clientY) : null; return; }
   if (drag.kind === 'pan') { view.x = drag.vx + e.clientX - drag.x; view.y = drag.vy + e.clientY - drag.y; applyView(); return; }
   if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
     if (layer !== 3) { log('Cambia a la capa 3 (Componentes) para conectar edificios.', 'warn'); drag = null; render(); return; }
