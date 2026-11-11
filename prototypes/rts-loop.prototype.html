@@ -521,7 +521,7 @@ const strokeCurve = (c) => { ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); ctx.be
 // Four ways to draw the lines, from calm to busy. In the calm ones the colour says how the line is doing
 // (teal fine, yellow busy, red losing requests) and the req/s appear only on the line under the pointer or selected.
 const LINE_STYLES = [['soft', 'Suave'], ['thin', 'Fina'], ['weight', 'Grosor'], ['busy', 'Animada']];
-let lineStyle = 'soft', hoverLink = null;
+let lineStyle = 'thin', hoverLink = null;
 function lineHealth(ln) {
   const to = S.links[ln.indexes[0]]?.to;
   if (!ln.live) return 'off';
