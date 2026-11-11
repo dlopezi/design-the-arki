@@ -14,52 +14,61 @@ Decisions settled in the initial design grilling session (2026-11-04).
 
 ## Gameplay
 
-- **Core loop**: read the level's requirements, place and configure **Components**, connect them, run the **Simulation**, pass or fail.
-- **Scoring**: pass = meet the SLA (latency, availability, throughput). Extra **Stars** for lower monthly cost.
-- **Component configuration**: a few key parameters per component (instance count, size/tier, cache TTL, …), each with a visible cost.
-- **Failure events**: scripted per level (traffic spikes, node or zone outages), introduced in advanced levels.
-- **Feedback on failure**: metrics charts, the **Bottleneck** highlighted on the diagram, and a short **Hint** naming the concept.
+Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototypes/rts-loop.prototype.html`; ADR-0005):
+
+- **Build phase** (30 s): the player builds components with money; each one takes seconds to build and connects itself the usual way (load balancer in front of the app servers, cache in front of the database). The player can change any connection by dragging from one building to another, or select a line and press Delete. "Bring them now!" starts the wave early and pays a bonus.
+- **One wave per level**: users arrive from the Internet at a fixed rate for a set time; each level teaches one idea, so one wave is enough. The player keeps building during the wave.
+- **Money** grows by itself (+$2/s) and with each answered visit ($1 per 100), and each building costs maintenance (its monthly cost ÷ 100 per second). **Reputation** falls while errors (−6/s) or latency (−4/s) break the level's requirements, and rises slowly otherwise; at 0 the base is lost.
+- **Scoring**: lasting the wave passes the level; the money left decides the extra stars.
+- **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
-- **Visual style**: clean, modern architecture-diagram look, dark mode, requests animated along connections.
 
 ## Game screen
 
-Chosen from the UI prototype (variant D in `prototypes/game-ui`, 2026-11-04): the mission-style HUD combined with the studio tool's detail panels.
+Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
 
-- **Canvas first**: full-bleed diagram with floating HUD: objectives as checkboxes (top-left), cost meter with star thresholds (top-right), simulation clock with live rps / p95 / errors while it runs, and a bottom hotbar of components plus a big Play button.
-- **Component icons** (chosen 2026-11-07 from a three-style prototype: colour cards, line icons and characters with faces; kept on branch `prototype/component-icons`, commit b33e47d): each component type has its own glyph and colour, so players tell components apart at a glance. The hotbar shows colour cards (glyph on the type's colour, name, cost on a band); on the diagram each component and instance has a badge in the same colour, grey when the instance is down. Every new component type needs a glyph and a colour (`src/ui/componentArt.tsx`).
-- **C4-style grouping**: players appear as a C4 *person* outside the system boundary; inside it, components sit in container boundaries (edge, application, data) labelled with name, type and technology.
-- **Real resources**: every **Instance** is drawn as its own node (`api-1`, `api-2`, …) with its own load, and a failed instance turns grey and stops receiving traffic. No "×N" badges.
-- **Inspector** (right, collapsible with `I`): deployment settings (instances, instance size), an *Advanced* section (queue size, service time, timeout), capacity and cost breakdown, and per-instance stats after a run.
-- **Results drawer** (bottom, collapsible with `R`): verdict, stars, hint, rps / p95 / error charts, and load per resource.
-- **Report card** after each run, with "View details" opening the inspector on the bottleneck.
-- **Phone and tablet** (planned 2026-11-05, `.scratch/mobile/spec.md`): below 700 px a compact layout with a top bar, the diagram, a bottom sheet with tabs (Mission / Inspector / Results) and the component bar with Play; connections can also be made from the inspector ("Sends requests to"). Between 700 and 1100 px one side panel with Mission / Inspector tabs on the left, the cost top right, and the results drawer (two rows on tall screens) at the bottom (chosen 2026-11-05 over narrower panels, which left the diagram about 250 px wide).
+- **Resource bar** on top: back to the levels, level name, money (with its rate per second), the phase timer, reputation, Feedback.
+- **Map** in the middle: the Internet globe on the left and your base on the right, drawn in **C4 layers** (1 Context, 2 Containers, 3 Components; layer 3 by default). It starts as an empty construction zone; zones appear with their first building. Drag the ground to pan, use the wheel to zoom.
+- **Connections** are thin curved lines from a building's right side to the next one's left side, bending around other buildings; their colour shows health (teal fine, yellow busy, red losing requests, grey not used) and the req/s appear on hover or selection. **Requests** travel along them and come back (round trip): green when answered, red with "503" from the building that failed.
+- A selected building lights its own base in neon, in its type's colour. Buildings warn "no way in" or "no way out" when a connection is missing.
+- **Console** at the bottom: live results (req/s, p95, errors, income and maintenance), the inspector (state, instances, where it sends requests, load, capacity, size or tier, cache TTL, add or remove instances), and the build card with "Bring them now!", pause and speed (1×, 2×, 4×).
+- The **mission** panel shows the mode, the guided hint, the brief, the wave, the incident and the objectives.
 
+## Home screen (level map)
 
+A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tech tree, mission board; `prototypes/level-map.prototype.html`), replacing the winding road of round buttons:
 
-Target 20+ levels covering four component groups:
-
-1. **Core**: client, load balancer, app server, database, cache.
-2. **Async**: message queue, workers, pub/sub.
-3. **Data scale**: read replicas, sharding, object storage.
-4. **Edge/network**: CDN, API gateway, rate limiter, DNS / multi-region.
-
-## Home screen
-
-Chosen from a three-variant prototype (path, skyline, mobile hub; kept in commit b671a49): a winding road of big round level buttons, in the spirit of mobile learning and puzzle games but with its own look and no mascot. Passed levels show a tick and are coloured by the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple), with a mode label and a legend; the next level glows with a "Play!" bubble; locked levels are grey with a lock. A top bar shows the stars collected and each chapter has a banner with the next level and a progress bar.
+- Each chapter is a **sector** of terrain with its missions joined by a route; passed parts of the route are green. A mission that brings a new building shows that building as its marker; the ring colour shows the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple) and the next mission glows with a "Play!" bubble.
+- Clicking a mission selects it and opens its **briefing** on the right: state, brief, objectives (with a link to what p95 means), how to earn stars, the badge, the new building, the buildings in the mission, and one **Play mission** button. Clicking the selected mission again, its "Play!" bubble or Enter also plays it; arrow keys move between missions. Locked missions show their briefing without the button. A mission opened since the last visit pops in with a "New mission open!" bubble and its route draws itself.
+- **One mode for every mission** (changed 2026-11-11, replacing four mode buttons per mission): the player picks the difficulty once on the difficulty screen (`#mode`), the first time they play after the tutorial; it is changed from the top bar, Options or the game's mission panel. Before the tutorial is done every mission opens in Guided.
+- The top bar has "← Home", the current mode, the Field Manual, the stars collected, Send feedback and ⚙ Options. "Your base" was removed on 2026-11-11. On a phone the map becomes a list, with the briefing below it.
 
 ## Title screen
 
-The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** (Play level 1 / Continue: level N, Level map, How to play) and the playable demo as a **Training** panel, over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). "How to play" opens the three steps (Build, Run, Earn stars) in a dialog. On a computer everything fits without scrolling; on a phone the menu is on the first screen and Training is below it.
+The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Field manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
 
 ## Look and feel
 
-Same family as System Defense ("Defend the Arki"), because both games live on thearki.com (chosen 2026-11-09): its colour palette (navy panels, cyan accent, green / red / yellow for good / bad / numbers), monospace for titles, labels and numbers with system sans-serif for body text, and its title screen (glitching monospace logo, falling 0s and 1s, horizon with a perspective data floor, scanlines, "Press … to start", records and version in the footer). Tokens live in `:root` in `src/ui/styles.css`.
+Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense look chosen the same day: the player builds and runs a base. Original art and names, inspired by the genre, not by any one game.
+
+- **Palette**: dark steel panels with a bevel and cut corners, a teal accent, green for selection and good, red / yellow for bad / warning, gold for money. Monospace, uppercase labels for titles and numbers; system sans-serif for body text. Tokens live in `:root` in `src/ui/styles.css`.
+- **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`), always called by its real name (load balancer, app server, cache, database). A failed instance is grey with smoke. Every new component type needs a colour and a building.
+- **The game screen** is described under *Game screen*: a resource bar, the map of the base in C4 layers on a grid floor (the system boundary is the base wall, zones are plots of land, load bars are segmented like health bars), and the console.
+
+## Field Manual, briefing and options
+
+Set up like the Guide and How to play screens of System Defense ("Defend the Arki"), 2026-11-11:
+
+- The **Field Manual** (`#manual`, `#manual/<tab>`; the old `#archive` opens its Buildings tab) has three tabs. **How to play**: the goal, four steps (Build, Connect, Bring the users, Read the results) each with a small looping picture, the modes, the star rule and the keys. **Buildings**: each component as a building, with what it does, when to build it, its cost, the level that first uses it, and *In real life* (real tools, how the game is like it and not like it, a link to read more). Buildings of levels the player cannot reach yet are locked. **Concepts**: p95, throughput, error rate, bottleneck, scaling, redundancy, cache hit rate and TTL, cost, C4.
+- It opens from the title screen, the campaign top bar, and over the game (📖 Manual), where it stops the clock.
+- A new player's "Play level 1" opens the Buildings tab as a **briefing** (`#briefing`) with "Start level 1".
+- **Mission briefing in the game**: every mission opens with a card (story, objectives, new buildings, star rule) and the build clock waits until **Start building**. 📋 Mission opens it again and stops the clock.
+- **Options** (`#options`): language, sound on/off (short menu sounds made with Web Audio), difficulty, and Reset progress (moved here from the campaign top bar).
 
 ## Release
 
 - **Early access** with the 8 levels of chapter 1 (Core), then grow to 20+ in updates; chapter 2 (Async) is the first update.
-- **Modes**: the player picks Guided, Normal, Hard (fix a broken design) or God (empty canvas) per level; stars depend only on cost, and a badge shows the hardest mode passed.
+- **Modes**: the player picks Guided, Normal, Hard (fix a broken design) or God (empty canvas) once for every mission; stars depend only on cost, and a badge shows the hardest mode passed.
 - Static hosting on Firebase Hosting (Google Cloud), set up like System Defense ("Defend the Arki"): CI deploys every push to `main` after the tests pass (`docs/deployment.md`). Own domain later.
 - Privacy-first, cookieless analytics (Plausible or Umami: levels started/completed, drop-off) plus a feedback form link.
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, openLevel, playAndSkip } from './helpers';
+import { buildKeys, openLevel, playWave } from './helpers';
 
 type Recorded = [string, Record<string, unknown> | undefined];
 
@@ -17,17 +17,14 @@ test('playing a level reports started, run and passed, with level, mode and star
   await recordAnalytics(page);
   await openLevel(page, '01-hello-world');
   await expect(page.getByRole('heading', { name: 'Hello world', level: 1 })).toBeVisible();
-  await page.keyboard.press('1');
-  await page.keyboard.press('2');
-  await connect(page, { label: 'Clients' }, { label: 'App server' });
-  await connect(page, { label: 'App server' }, { label: 'Database' });
-  await playAndSkip(page);
-  await expect(page.getByRole('dialog', { name: 'Level passed' })).toBeVisible();
+  await buildKeys(page, '12');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
 
   await expect.poll(() => events(page)).toEqual([
     ['Level started', { level: '01-hello-world', mode: 'god' }],
     ['Run', { level: '01-hello-world', mode: 'god', passed: 'yes' }],
-    ['Level passed', { level: '01-hello-world', mode: 'god', stars: 3 }],
+    ['Level passed', { level: '01-hello-world', mode: 'god', stars: expect.any(Number) }],
   ]);
 });
 

@@ -2,7 +2,7 @@
   "id": "08-black-friday",
   "chapter": "Core",
   "title": "Black Friday",
-  "brief": "Everything at once: traffic doubles to 500 people per second for 15 seconds, an app server instance crashes in the middle of the peak, and the budget is tight. This is the chapter's final exam.",
+  "brief": "Everything at once: 500 people per second for 40 seconds, an app server instance crashes 15 seconds into the wave, and money is tight. This is the chapter's final exam.",
   "durationS": 60,
   "traffic": [
     {
@@ -186,8 +186,7 @@
         "id": "api",
         "type": "appServer",
         "params": {
-          "instances": 7,
-          "size": "small"
+          "instances": 5
         }
       },
       {
@@ -219,6 +218,21 @@
         "cache",
         "db"
       ]
+    ]
+  },
+  "play": {
+    "startMoney": 330,
+    "wave": {
+      "rps": 500,
+      "lengthS": 40
+    },
+    "incident": {
+      "atS": 15,
+      "componentType": "appServer"
+    },
+    "starMoney": [
+      150,
+      250
     ]
   }
 }

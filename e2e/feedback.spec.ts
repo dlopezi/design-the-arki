@@ -39,7 +39,7 @@ test('the player switches the game to Spanish and the choice is kept', async ({ 
   await page.reload();
   await expect(page.getByRole('navigation', { name: 'Menú principal' }).getByRole('link', { name: /Jugar nivel 1/ })).toBeVisible();
   await page.goto('/#01-hello-world/guided');
-  await expect(page.getByRole('heading', { name: 'Hola, mundo' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hola, mundo', level: 1 })).toBeVisible();
 });
 
 test('the title footer links to the release, the code and shows the ©', async ({ page }) => {

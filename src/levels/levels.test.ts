@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { simulate } from '../engine/simulate';
+import { designCost } from '../engine/simulate';
+import { callNow, createGame, run, starsOf, waveEnd } from '../realtime/game';
 import { allLevels, parseLevel } from './levels';
 import { levelTextEs } from './text.es';
 
@@ -36,12 +37,13 @@ describe('level files', () => {
   });
 
   for (const level of allLevels()) {
-    it(`${level.id}: its reference design passes the level with every star, on several seeds`, () => {
-      for (const seed of [1, 2, 3]) {
-        const result = simulate(level, level.referenceDesign, seed);
-        expect(result.checks.filter(c => !c.ok)).toEqual([]);
-        expect(result.stars).toBe(1 + level.starCostThresholds.length);
-      }
+    it(`${level.id}: its reference design, bought at the start, lasts the wave: 2 stars, and all 3 when the users are called early`, () => {
+      const bought = () => { const s = createGame(level, level.referenceDesign); return { ...s, money: s.money - designCost(level.referenceDesign) }; };
+      const plain = run(bought(), waveEnd(level) + 1, level);
+      expect(plain.phase).toBe('won');
+      expect(starsOf(plain, level)).toBe(2);
+      const early = run(callNow(run(bought(), 10, level)), level.play.wave.lengthS + 1, level);
+      expect(starsOf(early, level)).toBe(3);
     });
 
     it(`${level.id}: its reference design only uses the level's allowed components`, () => {
@@ -50,11 +52,8 @@ describe('level files', () => {
     });
 
     for (const mode of ['guided', 'normal', 'hard'] as const) {
-      it(`${level.id}: its ${mode} starting design does not already pass the level`, () => {
-        const start = level.startingDesigns[mode];
-        let passed = false;
-        try { passed = simulate(level, start, 1).passed; } catch { passed = false; } // an unrunnable design does not pass either
-        expect(passed).toBe(false);
+      it(`${level.id}: its ${mode} starting design, left as it is, does not last the wave`, () => {
+        expect(run(createGame(level, level.startingDesigns[mode]), waveEnd(level) + 1, level).phase).toBe('lost');
       });
     }
 

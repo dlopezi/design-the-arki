@@ -2,7 +2,7 @@
   "id": "07-tight-budget",
   "chapter": "Core",
   "title": "Tight budget",
-  "brief": "The flash sale is back, and this time finance capped the bill at $230 a month. A bigger database would cope, but it would blow the budget. Find the cheapest design that still holds.",
+  "brief": "The flash sale is back, and this time money is short. A bigger database would cope, but you cannot afford it. Find the cheapest base that still holds.",
   "durationS": 60,
   "traffic": [
     {
@@ -161,7 +161,7 @@
         "id": "api",
         "type": "appServer",
         "params": {
-          "instances": 3
+          "instances": 4
         }
       },
       {
@@ -193,6 +193,17 @@
         "cache",
         "db"
       ]
+    ]
+  },
+  "play": {
+    "startMoney": 300,
+    "wave": {
+      "rps": 500,
+      "lengthS": 30
+    },
+    "starMoney": [
+      140,
+      230
     ]
   }
 }
