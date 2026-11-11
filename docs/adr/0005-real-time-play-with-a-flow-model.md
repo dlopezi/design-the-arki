@@ -10,4 +10,6 @@ We chose this capacity model over re-running the discrete-event engine (ADR-0001
 
 - The discrete-event engine (`src/engine/simulate.ts`) and the level fields it reads (`traffic`, `durationS`, `budget`, `starCostThresholds`, `failureEvents`) are no longer used by the game. They stay for now; removing them, or bringing the engine back for a "replay in detail" view, is a later decision.
 - Each level's `play` block sets the starting money, the wave, an optional incident and the money for each extra star. Level tests play every reference design in real time: it must last the wave with 2 stars, and earn all 3 when the users are called early; every starting design, left unchanged, must lose.
+- Running out of money also loses the level (maintenance can no longer be paid), in the build phase too.
+- Load is capped at 97% in the latency formula and the p95 at 2,000 ms, so a full component is very slow rather than infinitely slow.
 - The latency is an estimate, not a measured percentile: the numbers teach the shape of queueing (a component near full gets slow) rather than exact values.

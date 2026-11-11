@@ -183,7 +183,10 @@ export function build(s: GameState, type: string, level: GameLevel, catalog: Cat
 export function demolish(s: GameState, id: string, catalog: Catalog = defaultCatalog): GameState {
   const b = s.buildings.find(x => x.id === id); if (!b) return s;
   const back = Math.round(instancePrice(b, catalog) * REFUND);
-  const left = b.instances.slice(0, -1);
+  // The instance that goes is the least useful one: a fallen one, then one still being built, then the last.
+  const order = [b.instances.findIndex(i => i.down), b.instances.findIndex(i => i.buildLeftS > 0), b.instances.length - 1];
+  const gone = order.find(k => k >= 0)!;
+  const left = b.instances.filter((_, k) => k !== gone);
   return {
     ...s, money: s.money + back,
     buildings: left.length ? s.buildings.map(x => (x === b ? { ...x, instances: left } : x)) : s.buildings.filter(x => x !== b),
@@ -191,17 +194,19 @@ export function demolish(s: GameState, id: string, catalog: Catalog = defaultCat
     events: log(s, { kind: 'removed', type: b.type, id, amount: back }),
   };
 }
-/** Changes the size (app servers) or tier (databases): pay the new price, get part of the old one back, rebuild. */
+/** What changing to another size costs: the new price for every instance, minus part of the old one. */
+export const resizeCost = (b: Building, size: string, catalog: Catalog = defaultCatalog) =>
+  (instancePrice({ ...b, params: { ...b.params, size } }, catalog) - Math.round(instancePrice(b, catalog) * REFUND)) * b.instances.length;
+/** Changes the size (app servers) or tier (databases): pay, then every instance is rebuilt, fallen ones included. */
 export function resize(s: GameState, id: string, size: string, catalog: Catalog = defaultCatalog): GameState {
   const b = s.buildings.find(x => x.id === id);
   if (!b || (b.params.size ?? catalog[b.type]!.defaultSize) === size || !catalog[b.type]!.sizes?.[size]) return s;
-  const n = b.instances.length;
-  const cost = instancePrice({ ...b, params: { ...b.params, size } }, catalog) * n - Math.round(instancePrice(b, catalog) * REFUND) * n;
+  const cost = resizeCost(b, size, catalog);
   if (s.money < cost) return s;
   const time = buildTime(b.type, catalog);
   return {
     ...s, money: s.money - cost,
-    buildings: s.buildings.map(x => (x === b ? { ...x, params: { ...x.params, size }, instances: x.instances.map(i => ({ ...i, buildLeftS: time, buildTotalS: time })) } : x)),
+    buildings: s.buildings.map(x => (x === b ? { ...x, params: { ...x.params, size }, instances: x.instances.map(() => ({ buildLeftS: time, buildTotalS: time, down: false })) } : x)),
     events: log(s, { kind: 'resized', type: b.type, id }),
   };
 }

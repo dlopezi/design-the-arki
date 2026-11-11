@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, capacityOf, hitRateOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
-  demolish, disconnect, resize, rewire, run, setAutoLink, setTtl, starsOf, toDesign, upkeepPerS, waveEnd, type GameEvent, type GameState,
+  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { buildingCount } from '../../base/base';
@@ -29,7 +29,7 @@ type Props = {
   onTutorialDone: () => void;
 };
 type Selection = { kind: 'building'; id: string } | { kind: 'link'; link: Link } | null;
-type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number } | { kind: 'node'; id: string; x: number; y: number; from: Point | null; moved: boolean } | null;
+type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?: boolean } | { kind: 'node'; id: string; x: number; y: number; from: Point | null; moved: boolean } | null;
 
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
@@ -158,14 +158,11 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
 
   const note = (text: string) => setNotes(n => [...n, { t: live.current.game.t, text }].slice(-6));
   const doBuild = useCallback((type: string) => {
-    setGame(g => {
-      const next = build(g, type, level);
-      if (next !== g) {
-        const id = next.buildings.find(b => b.type === type)?.id;
-        if (id) setSelection({ kind: 'building', id });
-      }
-      return next;
-    });
+    // The state update stays pure (React may run it twice); what gets selected is worked out from the state on screen.
+    const current = live.current.game;
+    if (buildProblem(current, type, level)) return;
+    setGame(g => build(g, type, level));
+    setSelection({ kind: 'building', id: current.buildings.find(b => b.type === type)?.id ?? `${type}-${current.nextId}` });
     setLayer(l => (l === 1 ? 3 : l)); // layer 1 shows no buildings: show the new one
   }, [level]);
   const restart = () => { setGame(fresh()); setSelection(null); setNotes([]); setPaused(false); canvasApi.current?.clearRequests(); };
@@ -213,7 +210,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
         setHoverLink(prev => (prev?.from === link?.from && prev?.to === link?.to ? prev : link));
         return;
       }
-      if (d.kind === 'pan') { view.current = { ...view.current, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }; applyView(); return; }
+      if (d.kind === 'pan') { d.moved ||= Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4; view.current = { ...view.current, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }; applyView(); return; }
       if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) {
         if (live.current.layer !== 3) { note(t.rt.layer3ToConnect); drag.current = null; return; }
         d.moved = true;
@@ -224,6 +221,8 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
       const d = drag.current; drag.current = null;
       field.current?.classList.remove('panning');
       setDragLine(null);
+      // A click on empty ground (no drag) clears the selection, so Delete never removes a line chosen earlier.
+      if (d?.kind === 'pan' && !d.moved) { setSelection(null); return; }
       if (!d || d.kind !== 'node') return;
       if (!d.moved) { if (d.id !== CLIENT) setSelection({ kind: 'building', id: d.id }); return; }
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-node-id]')?.getAttribute('data-node-id');
@@ -371,7 +370,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
         <fieldset className="play-sizes" aria-label={spec.scalesOut ? i.size : i.tier}>
           <legend className="muted">{spec.scalesOut ? i.size : i.tier}</legend>
           {sizes.map(s => {
-            const cost = instancePrice({ type: b.type, params: { ...b.params, size: s } }) * b.instances.length - Math.round(price * REFUND) * b.instances.length;
+            const cost = resizeCost(b, s);
             return <button key={s} className={`btn ${s === size ? 'on' : ''}`} disabled={s === size || game.money < cost || over} onClick={() => setGame(g => resize(g, b.id, s))}>
               {t.inspector.sizes[s] ?? s}{s !== size ? ` · ${i.resizeCost(cost)}` : ''}</button>;
           })}

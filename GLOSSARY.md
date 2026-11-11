@@ -59,7 +59,7 @@ A directed link along which requests flow from one component to another.
 _Avoid_: Edge, wire, link
 
 **Building**:
-A component as it stands on the map, drawn as a small isometric building in its type's colour and always called by its real name (app server, database…); every instance is one building.
+A component as it stands on the map, always called by its real name (app server, database…). Each of its instances is drawn as its own small isometric building in the type's colour.
 _Avoid_: Unit, structure, made-up names (factory, silos…)
 
 **Building Archive**:

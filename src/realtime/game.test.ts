@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, build, callNow, connect, createGame, disconnect, run, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, build, callNow, connect, createGame, demolish, disconnect, resize, run, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -111,5 +111,14 @@ describe('real-time play', () => {
     const design = toDesign(s);
     expect(design.components.find(c => c.type === 'appServer')!.params).toMatchObject({ instances: 2 });
     expect(ids(createGame(level, design))).toEqual(ids(s));
+  });
+
+  it('removing an instance takes away a fallen one first; resizing rebuilds every instance, fallen ones included', () => {
+    let s = createGame(level, { components: [{ id: 'api', type: 'appServer', params: { instances: 3 } }], connections: [] });
+    s = { ...s, buildings: s.buildings.map(b => ({ ...b, instances: b.instances.map((i, k) => (k === 1 ? { ...i, down: true } : i)) })) };
+    expect(demolish(s, 'api').buildings[0]!.instances.some(i => i.down)).toBe(false);
+    const resized = resize(s, 'api', 'large');
+    expect(resized.buildings[0]!.instances.every(i => !i.down && i.buildLeftS === 5)).toBe(true);
+    expect(resized.money).toBe(300 - (80 - 20) * 3);
   });
 });
