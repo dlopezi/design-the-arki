@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { catalog } from '../catalog/catalog';
 import type { Design, Level } from '../engine/types';
+import type { Play } from '../realtime/game';
 import { lang, type Lang } from '../i18n';
 import { chaptersEs, levelTextEs } from './text.es';
 
@@ -30,6 +31,13 @@ const levelSchema = z.object({
     /** Upper bounds for numeric params, e.g. { ttlS: 60 }. */
     limits: z.record(z.string(), z.number().positive()).optional(),
   })).default({}),
+  /** Real-time play (ADR-0005): starting money, the one wave of users, an optional incident and the money for each extra star. */
+  play: z.object({
+    startMoney: z.number().positive(),
+    wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive() }),
+    incident: z.object({ atS: z.number().min(0), componentType }).optional(),
+    starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
+  }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
   /** Shown from the start in guided mode: the one idea this level teaches. */
@@ -63,6 +71,7 @@ export type LevelDefinition = Level & {
   componentOptions: Record<string, ComponentOptions>; referenceDesign: Design;
   startingDesigns: { guided: Design; normal: Design; hard: Design }; guidedHint: string;
   tutorial?: TutorialStep[];
+  play: Play;
 };
 
 /** Validates raw level data; throws with every problem listed (path and message). */

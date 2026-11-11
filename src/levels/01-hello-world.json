@@ -153,5 +153,16 @@
         "event": "pass"
       }
     }
-  ]
+  ],
+  "play": {
+    "startMoney": 150,
+    "wave": {
+      "rps": 50,
+      "lengthS": 30
+    },
+    "starMoney": [
+      130,
+      190
+    ]
+  }
 }

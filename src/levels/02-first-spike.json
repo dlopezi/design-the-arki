@@ -110,7 +110,7 @@
         "id": "api",
         "type": "appServer",
         "params": {
-          "instances": 2
+          "instances": 3
         }
       },
       {
@@ -131,6 +131,17 @@
         "api",
         "db"
       ]
+    ]
+  },
+  "play": {
+    "startMoney": 220,
+    "wave": {
+      "rps": 300,
+      "lengthS": 40
+    },
+    "starMoney": [
+      140,
+      225
     ]
   }
 }
