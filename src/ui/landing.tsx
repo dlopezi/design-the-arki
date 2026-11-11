@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lang, LANGS, setLang, t } from '../i18n';
 import { FeedbackDialog } from './feedbackDialog';
 import { mainAction } from '../landing/mainAction';
 import { playerSummary } from '../landing/summary';
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
-import { archiveHref, baseHref, levelsHref } from './routes';
-import { baseOf } from '../base/base';
+import { levelsHref, manualHref, optionsHref } from './routes';
+import { blip } from './sound';
 
 // The title screen's backdrop, as on System Defense: falling 0s and 1s over a sky that meets a moving data floor.
 const rnd = (i: number, k: number) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -29,29 +29,6 @@ function TitleBackground() {
   );
 }
 
-function HowToPlay({ onClose }: { onClose: () => void }) {
-  const l = t.landing;
-  const titleId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div className="title-backdrop" onClick={onClose}>
-      <div className="title-dialog title-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}>
-        <h2 id={titleId}>{l.howToPlay}</h2>
-        <div className="title-steps">
-          {l.steps.map(s => <div key={s.title}><h3>{s.title}</h3><p>{s.text}</p></div>)}
-        </div>
-        <button ref={closeRef} className="title-close" onClick={onClose}>{l.close}</button>
-      </div>
-    </div>
-  );
-}
-
 const REPO_URL = 'https://github.com/dlopezi/design-the-arki';
 
 type MenuItem = { label: string; note: string } & ({ href: string } | { onClick: () => void });
@@ -62,25 +39,21 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
   const action = mainAction(levels, progress);
   const summary = useMemo(() => playerSummary(levels, progress), [levels, progress]);
   const [selected, setSelected] = useState(0);
-  const [howTo, setHowTo] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const itemRefs = useRef<(HTMLElement | null)[]>([]);
-  const buildings = useMemo(() => baseOf(levels, progress).buildings, [levels, progress]);
-  const closeHowTo = useCallback(() => { setHowTo(false); itemRefs.current[2]?.focus(); }, []);
-  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[5]?.focus(); }, []);
+  const closeFeedback = useCallback(() => { setFeedback(false); itemRefs.current[4]?.focus(); }, []);
 
   const menu: MenuItem[] = [
     { href: action.href, label: action.label, note: !summary.next ? l.allPassed : action.returning ? summary.next.title : l.firstNote(summary.next.title) },
     { href: levelsHref, label: l.levelMap, note: l.levelMapNote },
-    { onClick: () => setHowTo(true), label: l.howToPlay, note: l.howToPlayNote },
-    { href: archiveHref, label: t.archive.title, note: t.archive.menuNote },
-    { href: baseHref, label: t.base.title, note: t.base.menuNote(buildings) },
+    { href: manualHref(), label: t.manual.title, note: t.manual.menuNote },
+    { href: optionsHref, label: t.options.title, note: t.options.menuNote },
     { onClick: () => setFeedback(true), label: t.feedbackForm.title, note: t.feedbackForm.menuNote },
   ];
 
   // Game-style menu: ↑ / ↓ move the selection, Enter starts the selected item when nothing else has focus.
   useEffect(() => {
-    if (howTo || feedback) return;
+    if (feedback) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       const items = itemRefs.current;
@@ -93,6 +66,7 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
         const from = focused < 0 ? selected : focused;
         const next = (from + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
         setSelected(next);
+        blip('hover');
         items[next]?.focus();
       } else if (e.key === 'Enter' && free) {
         e.preventDefault();
@@ -101,7 +75,7 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [howTo, feedback, selected]);
+  }, [feedback, selected]);
 
   const { chapter } = summary;
   // "Design the Arki" → white "Design the ", glowing "Arki" (like "Defend the" + "Arki").
@@ -147,7 +121,7 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
                   const common = {
                     className: `menu-item${i === 0 ? ' primary' : ''}`,
                     'data-selected': i === selected,
-                    onMouseEnter: () => setSelected(i),
+                    onMouseEnter: () => { if (i !== selected) blip('hover'); setSelected(i); },
                     onFocus: () => setSelected(i),
                   };
                   return (
@@ -183,7 +157,6 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
           </span>
         </footer>
       </div>
-      {howTo && <HowToPlay onClose={closeHowTo} />}
       {feedback && <FeedbackDialog info={{ level: 'none' }} onClose={closeFeedback} />}
     </div>
   );

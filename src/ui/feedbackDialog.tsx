@@ -59,7 +59,7 @@ export function FeedbackDialog({ info, onClose }: { info: FeedbackGameInfo; onCl
         {sent ? (
           <>
             <p className="feedback-status ok" role="status">{statusText('sent')}</p>
-            <button ref={closeRef} className="title-close" onClick={onClose}>{t.landing.close}</button>
+            <button ref={closeRef} className="title-close" onClick={onClose}>{t.manual.close}</button>
           </>
         ) : (
           <form className="feedback-form" noValidate onSubmit={submit}>

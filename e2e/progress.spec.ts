@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { buildKeys, playWave, skipTutorial } from './helpers';
+import { buildKeys, playWave, skipTutorial, startMission } from './helpers';
 
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
 async function play(page: Page, title: string, mode = 'God') {
   await levelCard(page, title).getByRole('button', { name: /Play/ }).click();
   await page.getByRole('list', { name: 'Modes' }).getByRole('link', { name: new RegExp(mode) }).click();
+  await startMission(page);
 }
 
 async function passLevel1(page: Page) {
@@ -31,6 +32,7 @@ test('passing a level saves its stars and unlocks the next one, across reloads',
   await passLevel1(page);
   await page.getByRole('dialog').getByRole('link', { name: 'Next level' }).click();
   await expect(page.getByRole('heading', { name: 'First spike', level: 1 })).toBeVisible();
+  await startMission(page);
 
   await page.getByRole('link', { name: 'Levels' }).click();
   await expect(page).toHaveURL(/#levels$/);
@@ -56,18 +58,24 @@ test('a locked level opened by its link sends the player back to the level selec
   await expect(page.getByRole('status')).toContainText('First spike is locked');
 });
 
-test('progress can be reset after confirming in the page', async ({ page }) => {
+test('progress can be reset in Options after confirming', async ({ page }) => {
   await page.goto('/#levels');
   await passLevel1(page);
   await page.getByRole('dialog').getByRole('link', { name: 'Level map' }).click();
+  await expect(page.getByRole('button', { name: 'Reset progress' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Options' }).click();
 
   await page.getByRole('button', { name: 'Reset progress' }).click();
   const confirm = page.getByRole('dialog', { name: 'Reset all progress?' });
   await confirm.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('link', { name: /Campaign/ }).click();
   await expect(levelCard(page, 'First spike').getByRole('button', { name: /Play/ })).toBeVisible();
 
+  await page.getByRole('link', { name: 'Options' }).click();
   await page.getByRole('button', { name: 'Reset progress' }).click();
   await confirm.getByRole('button', { name: 'Reset' }).click();
+  await expect(page.getByRole('status')).toContainText('Progress cleared');
+  await page.getByRole('link', { name: /Campaign/ }).click();
   await expect(levelCard(page, 'First spike')).toContainText('Locked');
   await expect(levelCard(page, 'Hello world').getByRole('img', { name: '0 of 3 stars' })).toBeVisible();
 });

@@ -642,7 +642,7 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .new-components a { color: var(--accent); }
 
 /* Building archive and briefing */
-.archive, .base-page { min-height: 100%; width: min(1040px, 100%); margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 18px; align-content: start; }
+.manual, .options-page { min-height: 100%; width: min(1040px, 100%); margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 18px; align-content: start; }
 .page-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .page-bar a { color: var(--muted); font: 700 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
 .page-bar a:hover { color: var(--fg); }
@@ -681,21 +681,6 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 }
 
 /* Your base: an isometric map of districts, one per passed level. */
-.base-stats { display: flex; flex-wrap: wrap; gap: 8px; }
-.base-stats span { padding: 6px 12px; background: #070d0e; border: 1px solid var(--line); font: 800 13px var(--mono); letter-spacing: .06em; }
-.base-stats b { color: var(--ok); }
-.base-map { position: relative; padding: 18px; overflow-x: auto; }
-.base-map svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
-.base-ground { fill: #0a1416; stroke: rgba(62, 224, 200, .25); }
-.base-district-floor { fill: rgba(62, 224, 200, .05); stroke: rgba(62, 224, 200, .45); stroke-dasharray: 4 3; }
-.base-district-label { paint-order: stroke; stroke: #070d0e; stroke-width: 5px; stroke-linejoin: round; fill: var(--accent); font: 800 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
-.base-road { stroke: rgba(62, 224, 200, .25); stroke-width: 3; fill: none; stroke-dasharray: 2 6; }
-.base-empty { padding: 28px; text-align: center; color: var(--muted); display: grid; gap: 14px; justify-items: center; }
-.base-districts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.base-districts li { padding: 10px 12px; display: grid; gap: 6px; }
-.base-districts h3 { margin: 0; font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
-.base-districts ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--muted); }
-.base-districts ul li { padding: 0; display: inline-flex; align-items: center; gap: 4px; }
 
 /* Level map and title screen: the same steel and teal. */
 .home-topbar { background: var(--bg); }
@@ -833,15 +818,6 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .campaign a { text-decoration: none; color: inherit; }
 .campaign :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Help: how Your base grows, and the report's link to it. */
-.base-how { padding: 12px 16px; display: grid; gap: 8px; }
-.base-how ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.base-how li { display: flex; align-items: center; gap: 10px; }
-.base-how li + li::before { content: '→'; color: var(--accent); margin-right: 4px; }
-.base-how b { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--accent); color: var(--accent); font: 900 14px var(--mono); }
-.base-how strong { display: block; font-size: 14px; } .base-how small { color: var(--muted); font-size: 12.5px; }
-@media (max-width: 640px) { .base-how ol { grid-template-columns: minmax(0, 1fr); } .base-how li + li::before { display: none; } }
-.base-note { border-left-color: var(--ok); }
-.base-note a { color: var(--accent); }
 .archive-pick { color: var(--accent) !important; font-size: 13.5px; }
 
 /* Title screen without the training panel: the menu sits alone in the middle. */
@@ -857,9 +833,8 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .campaign-head { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 14px; }
 .campaign-head .home-eyebrow { margin: 0; }
 .campaign-head .home-progress { grid-column: 1 / -1; height: 8px; }
-.campaign-head .home-legend { grid-column: 3; grid-row: 1; justify-content: flex-end; }
 /* Map size: as wide as the column, but never taller than the space left on screen. */
-.campaign-map { width: min(100%, calc((100dvh - 210px) * 760 / 520)); margin: 0 auto; }
+.campaign-map { width: min(100%, calc((100dvh - 230px) * 760 / 500)); margin: 0 auto; }
 .campaign-briefing { position: static; max-height: 100%; overflow-y: auto; gap: 6px; padding: 14px 16px; }
 /* Without the training panel the menu uses two columns, so the title screen fits on short laptop screens. */
 .title-panels { grid-template-columns: minmax(0, 680px); }
@@ -867,7 +842,6 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .title-menu li:first-child { grid-column: 1 / -1; }
 @media (max-width: 600px) { .title-menu ul { grid-template-columns: minmax(0, 1fr); } }
 @media (max-height: 760px) { .title-logo { font-size: clamp(40px, 7vw, 76px); } .title-main { gap: 16px; } }
-.title-menu li:last-child { grid-column: 1 / -1; }
 
 /* ───────────── Real-time game screen (ADR-0005): resource bar, a map in C4 layers, the console ───────────── */
 .play-screen { height: 100dvh; display: grid; grid-template-rows: 52px minmax(0, 1fr) 236px; background: var(--bg); overflow: hidden; }
@@ -990,3 +964,165 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
   .play-help { display: none; }
   .play-tutorial { width: min(420px, calc(100% - 300px)); }
 }
+
+/* ───────────── Campaign: one global mode, click the map to play, star rule ───────────── */
+.campaign-sectors { height: 100%; }
+.campaign-sector { height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; align-content: stretch; }
+.campaign-map { align-self: center; }
+.campaign-stars-count { font: 800 12px var(--mono); color: var(--star); }
+.campaign-help { margin: 0; text-align: center; color: var(--muted); font-size: 12.5px; }
+.home-links .home-mode { border-color: var(--accent); color: var(--accent); }
+.home-gear { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #172629, #0c1517); box-shadow: var(--bevel); font-size: 17px; color: var(--fg); }
+.home-gear:hover { border-color: var(--accent); }
+.campaign-node .home-bubble { pointer-events: auto; cursor: pointer; text-decoration: none; }
+.campaign-node .fresh-bubble { background: var(--star); color: #2a2100; pointer-events: none; }
+.campaign-node .fresh-bubble::after { border-top-color: var(--star); }
+.campaign-node.fresh .campaign-marker { animation: campaign-pop .7s cubic-bezier(.2, 1.6, .4, 1) both, home-glow-teal 1.6s ease-in-out .7s infinite; }
+.campaign-terrain .route.fresh { stroke: var(--accent); stroke-dasharray: 1; stroke-dashoffset: 1; animation: campaign-draw 1s ease-out .2s forwards; }
+@keyframes campaign-pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes campaign-draw { to { stroke-dashoffset: 0; } }
+.campaign-node.locked { cursor: help; }
+.campaign-objectives { list-style: none; padding: 0; display: grid; gap: 3px; }
+.campaign-objectives li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.campaign-objectives li > span { width: 18px; text-align: center; }
+.campaign .campaign-why { font-size: 12px; color: var(--accent); text-decoration: underline dotted; }
+.campaign-stars { display: grid; gap: 4px; }
+.campaign-stars ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+.campaign-stars li b { display: inline-block; min-width: 44px; color: #3b4a4d; letter-spacing: 1px; }
+.campaign-stars li.got { color: var(--fg); } .campaign-stars li.got b { color: var(--star); }
+.campaign-stars .badge.mode { justify-self: start; }
+.campaign-go { display: grid; gap: 8px; margin-top: 6px; }
+.campaign-play { text-align: center; padding: 12px 18px; font: 900 15px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.campaign-go .muted { font-size: 12.5px; text-align: center; }
+.campaign-go .muted a { color: var(--accent); text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .campaign-node.fresh .campaign-marker, .campaign-terrain .route.fresh { animation: none; stroke-dashoffset: 0; } }
+
+/* ───────────── Difficulty screen ───────────── */
+.mode-picker h1 { font: 900 clamp(24px, 4vw, 34px) var(--mono); letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 18px rgba(62, 224, 200, .35); }
+.mode-picker { --guided: #5b8cff; --normal: #ffc83d; --hard: #ff8a3d; --god: #b26bff; }
+.mode-cards { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.mode-cards a, .mode-cards .locked-mode { --c: var(--accent); position: relative; display: grid; gap: 8px; align-content: start; height: 100%; padding: 16px; border-radius: 0; clip-path: var(--chamfer);
+  background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); color: var(--fg); text-decoration: none; transition: transform .12s; }
+.mode-cards .mode-guided { --c: var(--guided); } .mode-cards .mode-normal { --c: var(--normal); } .mode-cards .mode-hard { --c: var(--hard); } .mode-cards .mode-god { --c: var(--god); }
+.mode-cards a:hover, .mode-cards a:focus-visible { border-color: var(--c); transform: translateY(-3px); box-shadow: var(--bevel), 0 0 20px -6px var(--c); }
+.mode-cards a.current { border-color: var(--c); background: linear-gradient(180deg, color-mix(in srgb, var(--c) 18%, #0c1517), #091012); }
+.mode-cards strong { font: 900 18px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--c); }
+.mode-cards em { position: absolute; top: 12px; right: 14px; font: 800 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; font-style: normal; color: var(--c); }
+.mode-cards .locked-mode { opacity: .5; }
+.mode-pips { display: flex; gap: 4px; } .mode-pips i { width: 14px; height: 6px; background: #22353a; } .mode-pips i.on { background: var(--c); }
+.mode-later { font-size: 13px; }
+
+/* ───────────── Field manual ───────────── */
+.manual-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line-strong); }
+.manual-tabs button { padding: 8px 16px; background: none; border: 1px solid transparent; border-bottom: none; color: var(--muted); font: 800 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.manual-tabs button[aria-selected="true"] { color: var(--accent); border-color: var(--line-strong); background: var(--steel); box-shadow: 0 2px 0 var(--bg); }
+.manual-tabs button:hover { color: var(--fg); }
+[role="tabpanel"] { display: grid; gap: 14px; }
+.manual-howto { display: grid; gap: 14px; }
+.manual-goal { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(62, 224, 200, .07); }
+.manual-goal b { color: var(--accent); }
+.manual-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.manual-steps li { padding: 14px; display: grid; gap: 8px; align-content: start; }
+.manual-steps strong { font: 900 15px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.manual-steps p { margin: 0; color: var(--muted); font-size: 14px; }
+.step-n { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--accent); color: var(--accent); font: 900 14px var(--mono); }
+.manual-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.manual-box { padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.manual-box p { margin: 0; font-size: 14px; }
+.manual-modes { margin: 0; display: grid; gap: 8px; }
+.manual-modes div { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: baseline; }
+.manual-modes dt { text-align: center; } .manual-modes dd { margin: 0; font-size: 13.5px; color: var(--muted); }
+.manual-box .badge.mode { --guided: #5b8cff; --normal: #ffc83d; --hard: #ff8a3d; --god: #b26bff; }
+.manual-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; color: var(--muted); }
+kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px solid var(--line-strong); border-bottom-width: 2px; background: #0a1315; color: var(--fg); font: 700 12px var(--mono); text-align: center; }
+.manual-concepts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.manual-concepts li { padding: 14px 16px; display: grid; gap: 6px; align-content: start; scroll-margin-top: 20px; }
+.manual-concepts li:target { border-color: var(--accent); }
+.manual-concepts h3 { margin: 0; font: 900 14px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.manual-concepts p { margin: 0; font-size: 14px; } .manual-concepts .in-game { color: var(--muted); font-size: 13px; }
+.archive-real { grid-column: 1 / -1; display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.archive-real dl { margin: 0; display: grid; gap: 8px; }
+.archive-real dt { font: 800 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.archive-real dd { margin: 2px 0 0; font-size: 14px; }
+.archive-real a { color: var(--accent); font-size: 13.5px; }
+.manual-dialog { position: relative; width: min(1040px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 22px; display: grid; gap: 14px; align-content: start; background: var(--bg); border: 1px solid var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, .6); }
+.manual-backdrop { position: fixed; z-index: 30; }
+.manual-close { position: absolute; top: 14px; right: 14px; }
+/* Scenes: small looping pictures for each step. */
+.scene { position: relative; height: 84px; display: flex; align-items: center; justify-content: center; gap: 12px; background: radial-gradient(circle at 50% 70%, #10262a, #070d0e 75%); border: 1px solid var(--line); overflow: hidden; }
+.scene-card { display: grid; justify-items: center; padding: 4px 6px; border: 1px solid var(--line-strong); background: #0d1a1c; font: 800 10px var(--mono); color: var(--star); animation: scene-press 3s ease-in-out infinite; }
+.scene-arrow { color: var(--accent); font-weight: 900; }
+.scene-rise { display: grid; justify-items: center; gap: 4px; animation: scene-rise 3s ease-out infinite; transform-origin: bottom; }
+.scene-bar { display: block; width: 44px; height: 4px; background: #1d2e31; } .scene-bar i { display: block; height: 100%; background: var(--ok); animation: scene-fill 3s linear infinite; }
+.scene-line { position: relative; width: 70px; height: 2px; background: rgba(62, 224, 200, .2); }
+.scene-line i { position: absolute; inset: 0; background: var(--accent); transform-origin: left; animation: scene-draw 2.4s ease-in-out infinite; }
+.scene-globe { font-size: 30px; }
+.scene-flow { position: relative; width: 80px; height: 10px; }
+.scene-flow i { position: absolute; top: 2px; left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 6px var(--warn); animation: scene-go 1.4s linear infinite; }
+.scene-results svg { width: 120px; height: 40px; } .scene-results polyline { fill: none; stroke: var(--warn); stroke-width: 2; stroke-dasharray: 160; animation: scene-chart 3s ease-out infinite; }
+.scene-results .limit { stroke: var(--bad); stroke-dasharray: 3 3; }
+.scene-stars { display: flex; gap: 2px; font-size: 20px; color: var(--star); } .scene-stars i { font-style: normal; animation: scene-star 3s ease-out infinite; }
+.scene-stars i:nth-child(2) { animation-delay: .2s; } .scene-stars i:nth-child(3) { animation-delay: .4s; }
+@keyframes scene-press { 0%, 20% { transform: scale(1); } 25% { transform: scale(.9); } 30%, 100% { transform: scale(1); } }
+@keyframes scene-rise { 0%, 25% { transform: scaleY(.1); opacity: .2; } 60%, 100% { transform: scaleY(1); opacity: 1; } }
+@keyframes scene-fill { 0%, 25% { width: 0; } 60%, 100% { width: 100%; } }
+@keyframes scene-draw { 0% { transform: scaleX(0); } 50%, 100% { transform: scaleX(1); } }
+@keyframes scene-go { from { left: 0; } to { left: calc(100% - 6px); } }
+@keyframes scene-chart { from { stroke-dashoffset: 160; } 60%, to { stroke-dashoffset: 0; } }
+@keyframes scene-star { 0%, 50% { opacity: .15; transform: scale(.6); } 65%, 100% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .scene *, .scene { animation: none !important; } }
+
+/* ───────────── Options ───────────── */
+.options-page { width: min(760px, 100%); }
+.options { padding: 6px 18px; display: grid; }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.opt:last-of-type { border-bottom: none; }
+.opt > div:first-child { display: grid; gap: 2px; } .opt strong { font: 800 13px var(--mono); letter-spacing: .1em; text-transform: uppercase; } .opt span { color: var(--muted); font-size: 13.5px; }
+.seg { display: flex; flex: none; }
+.seg button, .options-page .btn { padding: 6px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, #1a2b2f, #0e181a); color: var(--muted); font: 800 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
+.seg button + button { border-left: none; }
+.seg button[aria-pressed="true"] { color: #04120f; background: var(--accent); border-color: var(--accent); }
+.options-page .btn { color: var(--fg); flex: none; } .options-page .btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+.options .note { margin: 0 0 12px; border-left-color: var(--ok); }
+
+/* ───────────── Game: briefing before the clock starts ───────────── */
+.play-bar-tools { display: flex; align-items: center; gap: 8px; }
+.play-briefing-backdrop { z-index: 25; backdrop-filter: blur(3px); }
+.play-briefing { width: min(520px, 100%); text-align: left; gap: 10px; padding: 24px 26px; }
+.play-briefing h2 { color: var(--accent); }
+.play-briefing p { margin: 0; }
+.play-brief-goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.play-brief-goals li { display: flex; gap: 8px; } .play-brief-goals span { width: 18px; text-align: center; }
+.play-brief-new { display: flex; flex-wrap: wrap; gap: 8px; }
+.play-brief-new span { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .3); font-size: 13.5px; }
+.play-brief-new b { color: var(--ok); }
+.play-brief-stars { font-size: 13px; }
+.play-briefing .note { border-left-color: var(--accent); }
+.play-briefing .actions { justify-content: flex-end; }
+.play-start { padding: 12px 22px; font: 900 15px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+@media (max-width: 760px) { .play-bar-tools .btn { padding: 4px 8px; font-size: 11px; } }
+/* The grid always takes the last, flexible row, with or without a notice above it. */
+.campaign > .campaign-grid { grid-row: 3; }
+.campaign-head .home-progress { grid-column: auto; height: 8px; }
+.campaign-head .home-progress { background: #13262a; border: 1px solid var(--line); }
+.campaign-head .home-progress span { background: linear-gradient(90deg, var(--accent), var(--ok)); }
+.campaign-sectors { align-content: stretch; }
+.campaign-briefing { align-content: start; }
+/* Narrow screens: the page scrolls, with the whole mission list above the briefing. */
+@media (max-width: 900px) {
+  .campaign { height: auto; min-height: 100dvh; overflow: visible; grid-template-rows: none; }
+  .campaign > .campaign-grid { grid-row: auto; height: auto; }
+  .campaign-sectors, .campaign-sector { height: auto; }
+  .campaign-briefing { max-height: none; overflow: visible; }
+  .campaign-help { display: none; }
+}
+/* Tablet portrait: the briefing sits under the map, so its Play button stays pinned to the bottom of the screen. */
+@media (max-width: 900px) {
+  .campaign-go { position: sticky; bottom: 0; z-index: 2; margin: 6px -16px -14px; padding: 10px 16px 12px; background: linear-gradient(180deg, rgba(9, 16, 18, .85), #091012 40%); border-top: 1px solid var(--line); }
+}
+.play-bar h1 { min-width: 0; }
+@media (max-width: 1100px) { .play-bar-tools .btn-word { display: none; } .play-bar-tools .btn { padding: 4px 8px; } }
+.play-screen { grid-template-columns: minmax(0, 1fr); }
+.play-bar h1 { flex: 1 1 0; }
+.manual-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .manual-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -9,21 +9,28 @@ import {
   demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
-import { buildingCount } from '../../base/base';
 import { Building, buildingName, componentArt } from '../componentArt';
 
 const componentColor = (type: string) => componentArt[type]?.color ?? '#5b6577';
 import { FeedbackButton } from '../feedbackDialog';
 import { Stars } from '../stars';
-import { baseHref, levelsHref } from '../routes';
+import { levelsHref, modeHref } from '../routes';
+import { Manual } from '../manual';
+import type { Progress } from '../../progress/progress';
 import { startFlowCanvas, type C4Layer, type Point } from './flowCanvas';
 
 type Props = {
   level: LevelDefinition;
+  /** The mission's number on the campaign map. */
+  number: number;
   mode: Mode;
   /** Component types this level brings for the first time. */
   newTypes: string[];
-  nextLevelId: string | null;
+  /** Where "Next level" goes, or null after the last one. */
+  nextHref: string | null;
+  /** For the Field Manual opened over the game. */
+  levels: LevelDefinition[];
+  progress: Progress;
   onPassed: (stars: number, design: ReturnType<typeof toDesign>) => void;
   tutorial: TutorialStep[] | null;
   onTutorialDone: () => void;
@@ -74,10 +81,15 @@ function Spark({ values, max, color, limit }: { values: number[]; max: number; c
 }
 
 /** The real-time game screen: a map of your base in C4 layers, the console below, and one wave of users (ADR-0005). */
-export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutorial: tutorialAtStart, onTutorialDone }: Props) {
+/** What covers the map and stops the clock: the briefing before the build phase, the mission again, or the manual. */
+type Overlay = 'start' | 'mission' | 'manual' | null;
+
+export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, progress, onPassed, tutorial: tutorialAtStart, onTutorialDone }: Props) {
   const fresh = useCallback(() => createGame(level, startingDesign(level, mode)), [level, mode]);
   const [game, setGame] = useState<GameState>(fresh);
   const [paused, setPaused] = useState(false);
+  // The clock waits until the player has read the mission and presses Start.
+  const [overlay, setOverlay] = useState<Overlay>('start');
   const [speed, setSpeed] = useState(1);
   const [layer, setLayer] = useState<C4Layer>(3);
   const [selection, setSelection] = useState<Selection>(null);
@@ -91,10 +103,15 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
   const view = useRef({ x: 0, y: 0, z: 1 });
   const drag = useRef<Drag>(null);
   const canvasApi = useRef<ReturnType<typeof startFlowCanvas> | null>(null);
-  const live = useRef({ game, layer, selection, hoverLink, dragLine, paused, speed });
-  live.current = { game, layer, selection, hoverLink, dragLine, paused, speed };
+  const stopped = paused || overlay !== null;
+  const live = useRef({ game, layer, selection, hoverLink, dragLine, paused: stopped, speed });
+  live.current = { game, layer, selection, hoverLink, dragLine, paused: stopped, speed };
   const passed = useRef(false);
   const endId = useId();
+  const briefId = useId();
+  const startRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (overlay === 'start' || overlay === 'mission') startRef.current?.focus(); }, [overlay]);
+  const closeManual = useCallback(() => setOverlay(null), []);
   const over = game.phase === 'won' || game.phase === 'lost';
 
   // ───────── Time: 10 updates a second, faster with the speed buttons ─────────
@@ -171,7 +188,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]') || document.querySelector('.play-screen [role="dialog"]')) return;
       const index = Number(e.key) - 1;
       if (Number.isInteger(index) && level.allowedComponents[index]) { doBuild(level.allowedComponents[index]!); e.preventDefault(); }
       else if (e.code === 'Space' && !target.closest('button')) { setPaused(p => !p); e.preventDefault(); }
@@ -264,7 +281,10 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
-    return type ? t.hints[type] ?? t.genericHint(buildingName(type)) : null;
+    if (!type) return null;
+    // A size the level does not let the player change must not be the advice.
+    const fixed = (level.componentOptions[type]?.sizes?.length ?? 2) < 2;
+    return (fixed && t.fixedHints[type]) || (t.hints[type] ?? t.genericHint(buildingName(type)));
   }, [game.phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const log = [...game.events.slice(-6).map(e => ({ t: e.t, text: eventText(game, e, level.play.wave.rps), tone: eventTone(e) })),
     ...notes.map(n => ({ ...n, tone: 'warn' }))].sort((a, b) => b.t - a.t).slice(0, 6);
@@ -365,6 +385,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
         {!spec.presentation?.hideCapacity && <><dt>{i.capacity}</dt><dd>{i.perSecond(Math.round(capacityOf(b) * Math.max(1, serving)))}</dd></>}
         {spec.shortcut && <><dt>{i.hitRate}</dt><dd>{Math.round(hitRateOf(b) * 100)}%</dd></>}
         <dt>{i.upkeep}</dt><dd>{i.money((price * b.instances.length) / UPKEEP_DIVISOR)}</dd>
+        {spec.sizes && sizes.length === 1 && <><dt>{spec.scalesOut ? i.size : i.tier}</dt><dd>{(size && t.inspector.sizes[size]) ?? size} · {i.fixed}</dd></>}
       </dl>
       {sizes.length > 1 && (
         <fieldset className="play-sizes" aria-label={spec.scalesOut ? i.size : i.tier}>
@@ -406,7 +427,15 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>
-        <FeedbackButton info={() => ({ level: level.id, mode, result: over ? (game.phase === 'won' ? `passed ${stars}★` : 'failed') : undefined })} />
+        <span className="play-bar-tools">
+          {([['mission', t.rt.briefing.open], ['manual', t.rt.briefing.manual]] as const).map(([which, label]) => {
+            // "📋 Mission": the icon always shows, the word only when there is room (it stays the button's name).
+            const [icon, ...words] = label.split(' ');
+            return <button key={which} className="btn icon-btn" aria-label={words.join(' ')} title={words.join(' ')} disabled={which === 'mission' && over}
+              onClick={() => setOverlay(which)}><span aria-hidden="true">{icon}</span><span className="btn-word" aria-hidden="true"> {words.join(' ')}</span></button>;
+          })}
+          <FeedbackButton info={() => ({ level: level.id, mode, result: over ? (game.phase === 'won' ? `passed ${stars}★` : 'failed') : undefined })} />
+        </span>
       </header>
 
       <main className="play-field" ref={field} onPointerDown={onPointerDown}>
@@ -441,7 +470,7 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
 
         <section className="play-panel play-mission" aria-label={t.rt.mission}>
           <span className="label">{t.rt.mission}</span>
-          <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={`#${level.id}`}>{t.modes.change}</a></p>
+          <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={modeHref(level.id)}>{t.modes.change}</a></p>
           {mode === 'guided' && <p role="note" className="play-lesson">{level.guidedHint}</p>}
           <p className="muted">{level.brief}</p>
           <p className="muted">{t.rt.waveInfo(level.play.wave.rps, level.play.wave.lengthS)}</p>
@@ -518,13 +547,40 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
           </div>
           <div className="play-controls">
             {building && <button className={`btn go ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>}
-            <button className={`btn ${paused ? 'on' : ''}`} onClick={() => setPaused(p => !p)}>{paused ? t.rt.build.resume : t.rt.build.pause}</button>
+            <button className={`btn ${paused ? 'on' : ''}`} disabled={overlay !== null} onClick={() => setPaused(p => !p)}>{paused ? t.rt.build.resume : t.rt.build.pause}</button>
             {[1, 2, 4].map(x => <button key={x} className={`btn ${speed === x ? 'on' : ''}`} aria-pressed={speed === x} onClick={() => setSpeed(x)}>{x}×</button>)}
             <button className="btn" aria-label={t.rt.build.restart} title={t.rt.build.restart} onClick={restart}>↺</button>
           </div>
         </section>
       </footer>
 
+      {(overlay === 'start' || overlay === 'mission') && !over && (
+        <div className="backdrop play-briefing-backdrop">
+          <div className="report play-briefing" role="dialog" aria-modal="true" aria-labelledby={briefId}>
+            <span className="console-label">{t.rt.briefing.eyebrow(number, t.modes[mode].name)}</span>
+            <h2 id={briefId}>{level.title}</h2>
+            <p>{level.brief}</p>
+            {mode === 'guided' && <p className="play-lesson">{level.guidedHint}</p>}
+            <ul className="play-brief-goals" aria-label={t.objectives}>
+              <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)}</li>
+              <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
+              <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}</li>
+              {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
+            </ul>
+            {newTypes.length > 0 && (
+              <div className="play-brief-new">
+                {newTypes.map(type => <span key={type}><Building type={type} size={40} /><b>{t.newLabel}</b> {buildingName(type)}</span>)}
+              </div>
+            )}
+            <p className="muted play-brief-stars">★ {t.levelSelect.starPass} · ★★ {t.levelSelect.starMoney(level.play.starMoney[0] ?? 0)} · ★★★ {t.levelSelect.starMoney(level.play.starMoney[1] ?? 0)}</p>
+            <p className="note">⏱ {overlay === 'start' ? t.rt.briefing.clock(BUILD_PHASE_S) : t.rt.briefing.paused}</p>
+            <div className="actions">
+              <button ref={startRef} className="primary-link play-start" onClick={() => setOverlay(null)}>{overlay === 'start' ? t.rt.briefing.start : t.rt.briefing.resume}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {overlay === 'manual' && <Manual levels={levels} progress={progress} onClose={closeManual} />}
       {over && (
         <div className="backdrop">
           <div className="report" role="dialog" aria-modal="true" aria-labelledby={endId}>
@@ -533,11 +589,10 @@ export function PlayScreen({ level, mode, newTypes, nextLevelId, onPassed, tutor
             <p className="muted">{t.rt.end.summary(Math.floor(game.money), Math.round(game.visits).toLocaleString(), Math.round(game.reputation))}</p>
             <p className="muted">{t.rt.end.starsAt(level.play.starMoney[0] ?? 0, level.play.starMoney[1] ?? 0)}</p>
             {hint && <p className="note"><strong>{t.hintLabel}</strong> {hint}</p>}
-            {game.phase === 'won' && <p className="note base-note">🏗 {t.base.reportLine(buildingCount(toDesign(game)))} · <a href={baseHref}>{t.base.view} →</a></p>}
             <div className="actions">
               <button className="secondary" onClick={restart}>{t.rt.end.again}</button>
               <a className="secondary" href={levelsHref}>{t.rt.end.map}</a>
-              {game.phase === 'won' && nextLevelId && <a className="primary-link" href={`#${nextLevelId}/${mode}`}>{t.rt.end.next}</a>}
+              {game.phase === 'won' && nextHref && <a className="primary-link" href={nextHref}>{t.rt.end.next}</a>}
             </div>
           </div>
         </div>

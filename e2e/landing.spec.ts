@@ -27,7 +27,8 @@ test('a returning player continues at the next open level', async ({ page }) => 
   await expect(page.getByRole('img', { name: 'Chapter 1 · Core: 2 of 8 levels passed' })).toBeVisible();
   await page.getByRole('link', { name: 'Continue: level 3' }).click();
   await expect(page).toHaveURL(/#03-bigger-or-more$/);
-  await expect(page.getByRole('heading', { name: 'Bigger or more?' })).toBeVisible();
+  // No difficulty chosen yet: the game asks for it before the mission.
+  await expect(page.getByText('Next mission: Bigger or more?')).toBeVisible();
 });
 
 test('the title screen menu links to the level map', async ({ page }) => {
@@ -45,18 +46,10 @@ test('the menu works from the keyboard like a game menu', async ({ page }) => {
   const menu = page.getByRole('navigation', { name: 'Main menu' });
   await expect(menu.getByRole('link', { name: 'Play level 1' })).toHaveAttribute('data-selected', 'true');
 
-  // ↓ ↓ selects "How to play"; Enter opens the steps, Escape closes them and keeps the selection.
+  // ↓ ↓ selects the Field manual; ↑ goes back to "Level map"; Enter opens it.
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('button', { name: 'How to play' })).toBeFocused();
-  await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'How to play' });
-  await expect(dialog).toContainText('1 · Build');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(menu.getByRole('button', { name: 'How to play' })).toBeFocused();
-
-  // ↑ goes back to "Level map"; Enter opens it.
+  await expect(menu.getByRole('link', { name: /Field manual/ })).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#levels$/);
@@ -69,21 +62,28 @@ test('Enter on a fresh title screen starts the selected first item', async ({ pa
   await expect(page).toHaveURL(/#briefing$/);
 });
 
-test('the title screen menu opens the building archive and the player\'s base', async ({ page }) => {
+test('the title screen menu opens the field manual, with how to play, the buildings and the concepts', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 1 } } }));
   });
   await page.goto('/');
   const menu = page.getByRole('navigation', { name: 'Main menu' });
-  await menu.getByRole('link', { name: /Building archive/ }).click();
-  await expect(page.getByRole('heading', { name: 'Building archive' })).toBeVisible();
+  await expect(menu.getByRole('link', { name: /Your base/ })).toHaveCount(0);
+  await menu.getByRole('link', { name: /Field manual/ }).click();
+  await expect(page.getByRole('heading', { name: 'Field manual', level: 1 })).toBeVisible();
+  await expect(page.getByRole('tabpanel')).toContainText('Bring the users');
+
+  await page.getByRole('tab', { name: 'Buildings' }).click();
+  await expect(page).toHaveURL(/#manual\/buildings$/);
   // The load balancer arrives in level 2, which is open; the cache, in a later level, is still locked.
   await expect(page.getByRole('button', { name: /Load balancer/ })).not.toContainText('Locked');
   await expect(page.getByRole('button', { name: /Cache/ })).toContainText('Locked');
+  await expect(page.getByText('In real life')).toBeVisible();
 
-  await page.goto('/');
-  await menu.getByRole('link', { name: /Your base/ }).click();
-  await expect(page.getByRole('heading', { name: 'Your base' })).toBeVisible();
-  await expect(page.getByRole('status')).toContainText('1 district');
-  await expect(page.getByRole('heading', { name: 'Level 1 · Hello world' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Concepts' }).click();
+  await expect(page.getByRole('heading', { name: 'p95 latency' })).toBeVisible();
+
+  // The old archive address opens the Buildings tab.
+  await page.goto('/#archive');
+  await expect(page.getByRole('tab', { name: 'Buildings' })).toHaveAttribute('aria-selected', 'true');
 });

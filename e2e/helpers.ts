@@ -42,6 +42,13 @@ export async function openLevel(page: Page, id: string, mode: 'guided' | 'normal
   }, levelIds);
   await page.goto(`/#${id}/${mode}`);
   await expect(page.locator('.play-screen')).toBeVisible();
+  await startMission(page);
+}
+
+/** Closes the briefing that opens every mission; the clock starts only then. */
+export async function startMission(page: Page) {
+  await page.getByRole('button', { name: /Start building/ }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
 }
 
 /** Marks the tutorial as done for a fresh player, so every mode is available. */

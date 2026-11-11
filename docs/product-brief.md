@@ -39,12 +39,13 @@ Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen fr
 A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tech tree, mission board; `prototypes/level-map.prototype.html`), replacing the winding road of round buttons:
 
 - Each chapter is a **sector** of terrain with its missions joined by a route; passed parts of the route are green. A mission that brings a new building shows that building as its marker; the ring colour shows the hardest mode passed (Guided blue, Normal gold, Hard orange, God purple) and the next mission glows with a "Play!" bubble.
-- Clicking a mission opens its **briefing** on the right: state, brief, stars and badge, objectives, the new building, the buildings in the mission, and the four mode buttons that start it (only Guided before the tutorial is done). Locked missions show their briefing without the modes.
-- The top bar has "← Home" (title screen), links to Your base and the Building Archive, and the stars collected. On a phone the map becomes a list, with the briefing below it.
+- Clicking a mission selects it and opens its **briefing** on the right: state, brief, objectives (with a link to what p95 means), how to earn stars, the badge, the new building, the buildings in the mission, and one **Play mission** button. Clicking the selected mission again, its "Play!" bubble or Enter also plays it; arrow keys move between missions. Locked missions show their briefing without the button. A mission opened since the last visit pops in with a "New mission open!" bubble and its route draws itself.
+- **One mode for every mission** (changed 2026-11-11, replacing four mode buttons per mission): the player picks the difficulty once on the difficulty screen (`#mode`), the first time they play after the tutorial; it is changed from the top bar, Options or the game's mission panel. Before the tutorial is done every mission opens in Guided.
+- The top bar has "← Home", the current mode, the Field Manual, the stars collected, Send feedback and ⚙ Options. "Your base" was removed on 2026-11-11. On a phone the map becomes a list, with the briefing below it.
 
 ## Title screen
 
-The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, How to play, Building archive, Your base, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). "How to play" opens the three steps (Build, Run, Earn stars) in a dialog. On a computer everything fits without scrolling.
+The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Field manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
 
 ## Look and feel
 
@@ -54,20 +55,20 @@ Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense loo
 - **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`), always called by its real name (load balancer, app server, cache, database). A failed instance is grey with smoke. Every new component type needs a colour and a building.
 - **The game screen** is described under *Game screen*: a resource bar, the map of the base in C4 layers on a grid floor (the system boundary is the base wall, zones are plots of land, load bars are segmented like health bars), and the console.
 
-## Building Archive and briefing
+## Field Manual, briefing and options
 
-- The **Building Archive** (`#archive`) explains each component as a building: what it does, when to build it, its cost and the level that first uses it. Buildings of levels the player cannot reach yet are locked.
-- A new player's "Play level 1" opens the archive as a **briefing** (`#briefing`) with "Start level 1", so they know every building before the first level.
-- The mission panel shows new buildings with their art and a link to the archive.
+Set up like the Guide and How to play screens of System Defense ("Defend the Arki"), 2026-11-11:
 
-## Your base
-
-The page explains itself with a "How it works" strip (pass a level → its design becomes a district → your base grows), and the report after a pass says how many buildings the design adds, with a link to the base. `#base` shows the infrastructure the player has built so far: one **district** per passed level on an isometric map, with one building per instance of the design that passed it (the level's reference design for progress saved before this feature). It opens from the title screen menu and the level map.
+- The **Field Manual** (`#manual`, `#manual/<tab>`; the old `#archive` opens its Buildings tab) has three tabs. **How to play**: the goal, four steps (Build, Connect, Bring the users, Read the results) each with a small looping picture, the modes, the star rule and the keys. **Buildings**: each component as a building, with what it does, when to build it, its cost, the level that first uses it, and *In real life* (real tools, how the game is like it and not like it, a link to read more). Buildings of levels the player cannot reach yet are locked. **Concepts**: p95, throughput, error rate, bottleneck, scaling, redundancy, cache hit rate and TTL, cost, C4.
+- It opens from the title screen, the campaign top bar, and over the game (📖 Manual), where it stops the clock.
+- A new player's "Play level 1" opens the Buildings tab as a **briefing** (`#briefing`) with "Start level 1".
+- **Mission briefing in the game**: every mission opens with a card (story, objectives, new buildings, star rule) and the build clock waits until **Start building**. 📋 Mission opens it again and stops the clock.
+- **Options** (`#options`): language, sound on/off (short menu sounds made with Web Audio), difficulty, and Reset progress (moved here from the campaign top bar).
 
 ## Release
 
 - **Early access** with the 8 levels of chapter 1 (Core), then grow to 20+ in updates; chapter 2 (Async) is the first update.
-- **Modes**: the player picks Guided, Normal, Hard (fix a broken design) or God (empty canvas) per level; stars depend only on cost, and a badge shows the hardest mode passed.
+- **Modes**: the player picks Guided, Normal, Hard (fix a broken design) or God (empty canvas) once for every mission; stars depend only on cost, and a badge shows the hardest mode passed.
 - Static hosting on Firebase Hosting (Google Cloud), set up like System Defense ("Defend the Arki"): CI deploys every push to `main` after the tests pass (`docs/deployment.md`). Own domain later.
 - Privacy-first, cookieless analytics (Plausible or Umami: levels started/completed, drop-off) plus a feedback form link.
 
