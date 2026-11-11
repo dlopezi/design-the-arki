@@ -4,7 +4,7 @@ A browser puzzle game about software architecture, for developers preparing for 
 
 Each level gives you requirements (throughput, p95 latency, availability) and a budget. You place and connect components (load balancers, app servers, caches, databases), run a simulation of real traffic, and pass if your design meets the SLA. A cheaper design earns more stars. When a design fails, the game highlights the bottleneck and gives a hint.
 
-**Play:** https://design.thearki.com (desktop, tablet or phone; English and Spanish)
+**Play:** https://design.thearki.com (desktop or tablet; English and Spanish)
 
 **Status:** early access. Chapter 1 (Core) has 8 levels: Hello world, First spike, Bigger or more?, Flash sale, Popular content, A server goes down, Tight budget and Black Friday. Each level can be played in Guided, Normal, Hard or God mode.
 
