@@ -17,21 +17,18 @@ export const levelTextEs: Record<string, LevelText> = {
   '01-hello-world': {
     title: 'Hola, mundo',
     brief: 'Abre una tienda online pequeña. Unas 50 personas por segundo verán el catálogo. Atiéndelas con un app server y una base de datos.',
-    guidedHint: 'Conecta el app server a la base de datos para que pueda responder peticiones. Luego pulsa Jugar.',
+    guidedHint: 'Conecta el app server a la base de datos para que pueda responder peticiones. Luego haz que lleguen los usuarios.',
     tutorial: [
       { text: 'Selecciona el app server para ver su configuración en el inspector.' },
-      {
-        text: 'Las peticiones llegan al app server, pero no siguen. Arrastra desde su punto derecho hasta la base de datos para conectarlos.',
-        textCompact: 'Las peticiones llegan al app server, pero no siguen. En el inspector, elige Base de datos en "Manda peticiones a" para conectarlos.',
-      },
-      { text: 'Pulsa Jugar para mandar 60 segundos de tráfico por tu diseño.' },
-      { text: 'La ejecución se repite en pocos segundos: mira el reloj y la carga de cada componente, y luego lee el informe.' },
+      { text: 'Las peticiones llegan al app server, pero no siguen. Arrastra desde el app server hasta la base de datos para conectarlos.' },
+      { text: 'Pulsa «¡Que vengan ya!» para empezar la oleada, o espera a que acabe la cuenta atrás.' },
+      { text: 'Mira cómo viajan las peticiones y vuelven. Aguanta hasta que termine la oleada.' },
     ],
   },
   '02-first-spike': {
     title: 'Primer pico',
     brief: 'Una newsletter habló de la tienda y el tráfico subió a 300 personas por segundo. Un app server atiende unas 200. Pon un load balancer delante y usa más instancias.',
-    guidedHint: 'Una instancia de app server atiende unas 200 req/s. Selecciónala y añade una segunda instancia.',
+    guidedHint: 'Una instancia de app server atiende unas 200 req/s. Selecciona el app server y añade instancias hasta que cada una quede por debajo del 70 % de carga.',
   },
   '03-bigger-or-more': {
     title: '¿Más grande o más?',
@@ -40,27 +37,27 @@ export const levelTextEs: Record<string, LevelText> = {
   },
   '04-flash-sale': {
     title: 'Venta flash',
-    brief: 'Una venta flash de 10 segundos empieza a los 30 s y el tráfico salta de 200 a 500 personas por segundo. Casi todas cargan las mismas páginas de producto. Una base de datos más grande aguantaría, pero ¿hay una forma más barata?',
-    guidedHint: 'La base de datos pequeña no aguanta el pico sola. Pon la cache entre los app servers y la base de datos.',
+    brief: 'Una venta flash: 500 personas por segundo durante 30 segundos, y casi todas cargan las mismas páginas de producto. Una base de datos más grande aguantaría, pero ¿hay una forma más barata?',
+    guidedHint: 'La base de datos pequeña no aguanta la venta sola. Pon la caché entre los app servers y la base de datos, y sube su TTL.',
   },
   '05-popular-content': {
     title: 'Contenido popular',
-    brief: 'Un post viral manda 600 personas por segundo durante 40 segundos. Tu base de datos está fija en el tier pequeño y los datos de producto pueden tener como mucho 60 segundos de retraso. ¿Cuánto tiempo debe guardar la cache las respuestas?',
-    guidedHint: 'Con un TTL de 10 s, la mayoría de peticiones aún llega a la base de datos. Selecciona la cache y sube su TTL.',
+    brief: 'Un post viral manda 600 personas por segundo durante 40 segundos. Tu base de datos está fija en el tier pequeño y los datos de producto pueden tener como mucho 60 segundos de retraso. ¿Cuánto tiempo debe guardar la caché las respuestas?',
+    guidedHint: 'Con un TTL de 10 s, la mayoría de peticiones aún llega a la base de datos. Selecciona la caché y sube su TTL.',
   },
   '06-server-goes-down': {
     title: 'Se cae un servidor',
-    brief: 'El tráfico es estable, 300 personas por segundo, y a los 20 s se cae una de tus instancias de app server. En un buen día bastan dos instancias. ¿Bastan en un mal día?',
+    brief: 'El tráfico es estable, 300 personas por segundo, y a los 10 segundos de la oleada se cae una de tus instancias de app server. En un buen día bastan tres instancias. ¿Bastan en un mal día?',
     guidedHint: 'Cuando se cae una instancia, las demás deben llevar su tráfico. Añade una instancia más de las que necesitas.',
   },
   '07-tight-budget': {
     title: 'Presupuesto ajustado',
-    brief: 'Vuelve la venta flash, y esta vez finanzas limitó la factura a $230 al mes. Una base de datos más grande aguantaría, pero se pasaría del presupuesto. Encuentra el diseño más barato que aún aguante.',
-    guidedHint: 'Mejorar la base de datos cuesta demasiado aquí. Pon la cache delante de la base de datos pequeña.',
+    brief: 'Vuelve la venta flash, y esta vez el dinero es escaso. Una base de datos más grande aguantaría, pero no te la puedes permitir. Encuentra la base más barata que aún aguante.',
+    guidedHint: 'Mejorar la base de datos cuesta demasiado aquí. Pon la caché delante de la base de datos pequeña.',
   },
   '08-black-friday': {
     title: 'Black Friday',
-    brief: 'Todo a la vez: el tráfico se dobla a 500 personas por segundo durante 15 segundos, una instancia de app server se cae en mitad del pico y el presupuesto es ajustado. Es el examen final del capítulo.',
+    brief: 'Todo a la vez: 500 personas por segundo durante 40 segundos, una instancia de app server se cae a los 15 segundos de la oleada y el dinero es escaso. Es el examen final del capítulo.',
     guidedHint: 'Durante el pico se cae un app server. Añade instancias hasta que las demás aún puedan llevar 500 req/s.',
   },
 };

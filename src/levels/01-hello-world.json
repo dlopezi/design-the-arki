@@ -37,7 +37,7 @@
       ]
     }
   },
-  "guidedHint": "Connect the app server to the database so it can answer requests, then press Play.",
+  "guidedHint": "Connect the app server to the database so it can answer requests, then bring the users in.",
   "startingDesigns": {
     "guided": {
       "components": [
@@ -126,8 +126,7 @@
       }
     },
     {
-      "text": "Requests reach the app server but go no further. Drag from its right handle to the database to connect them.",
-      "textCompact": "Requests reach the app server but go no further. In the inspector, choose Database under \"Sends requests to\" to connect them.",
+      "text": "Requests reach the app server but go no further. Drag from the app server to the database to connect them.",
       "target": {
         "component": "database"
       },
@@ -139,7 +138,7 @@
       }
     },
     {
-      "text": "Press Play to send 60 seconds of traffic through your design.",
+      "text": "Press “Bring them now!” to start the wave, or wait for the countdown.",
       "target": {
         "control": "play"
       },
@@ -148,7 +147,7 @@
       }
     },
     {
-      "text": "The run replays in a few seconds: watch the clock and each component's load, then read the report.",
+      "text": "Watch the requests travel and come back. Hold on until the wave ends.",
       "until": {
         "event": "pass"
       }

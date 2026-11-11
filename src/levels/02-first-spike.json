@@ -33,7 +33,7 @@
       "maxInstances": 4
     }
   },
-  "guidedHint": "One app server instance handles about 200 req/s. Select it and add a second instance.",
+  "guidedHint": "One app server instance handles about 200 req/s. Select the app server and add instances until each one stays under 70% load.",
   "startingDesigns": {
     "guided": {
       "components": [

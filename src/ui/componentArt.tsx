@@ -13,8 +13,8 @@ export const componentArt: Record<string, { color: string }> = {
   database: { color: '#9b6bff' },
 };
 
-/** The player-facing building name of a component type (the app server is a factory). */
-export const buildingName = (type: string) => t.archive.buildings[type]?.name ?? t.componentTypes[type] ?? type;
+/** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
+export const buildingName = (type: string) => t.componentTypes[type] ?? type;
 
 /** Grey for a failed instance, and for a type without art. */
 const GREY = '#5b6577';
