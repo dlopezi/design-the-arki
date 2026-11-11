@@ -34,7 +34,7 @@ _Avoid_: Goals, objectives
 The maximum monthly cost a design may have in a level.
 
 **Stars**:
-Extra score awarded for passing a level below given cost thresholds.
+One for lasting the wave, plus one for each money threshold reached by the money left at the end.
 
 **Reference Design**:
 A known-good design stored with each level and used in tests to prove the level is solvable.
@@ -59,8 +59,8 @@ A directed link along which requests flow from one component to another.
 _Avoid_: Edge, wire, link
 
 **Building**:
-How a component type is drawn and named for players (e.g. the app server is a factory); every instance is one building.
-_Avoid_: Unit, structure
+A component as it stands on the map, drawn as a small isometric building in its type's colour and always called by its real name (app server, database…); every instance is one building.
+_Avoid_: Unit, structure, made-up names (factory, silos…)
 
 **Building Archive**:
 The page that explains what each building (component) does, when to build it and which level brings it; shown as a **Briefing** before level 1.
@@ -83,6 +83,22 @@ _Avoid_: Engine component (clashes with Component)
 **Technology Pack**:
 A set of component types and levels for one technology area (web core, async, CI) built from existing primitives.
 _Avoid_: Module, plugin, DLC
+
+**Wave**:
+The one burst of users a level sends after the build phase, at a set number of requests per second for a set time (ADR-0005).
+_Avoid_: Run, round, attack
+
+**Build Phase**:
+The first 30 seconds of a level, before the wave, when the player builds; "Bring them now!" ends it early for a bonus.
+_Avoid_: Setup, preparation
+
+**Money**:
+What the player spends to build. It grows by itself and with every answered request, and buildings cost maintenance each second; the money left decides the extra stars.
+_Avoid_: Minerals, gold, budget (the old monthly limit)
+
+**Reputation**:
+The base's health during the wave: it falls while requests fail or are too slow, and the level is lost at 0.
+_Avoid_: Health, HP, lives
 
 **Simulation**:
 A deterministic, seeded run of a level's traffic through a design that produces metrics and a pass/fail result.

@@ -14,35 +14,25 @@ Decisions settled in the initial design grilling session (2026-11-04).
 
 ## Gameplay
 
-- **Core loop**: read the level's requirements, place and configure **Components**, connect them, run the **Simulation**, pass or fail.
-- **Scoring**: pass = meet the SLA (latency, availability, throughput). Extra **Stars** for lower monthly cost.
-- **Component configuration**: a few key parameters per component (instance count, size/tier, cache TTL, …), each with a visible cost.
-- **Failure events**: scripted per level (traffic spikes, node or zone outages), introduced in advanced levels.
-- **Feedback on failure**: metrics charts, the **Bottleneck** highlighted on the diagram, and a short **Hint** naming the concept.
+Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototypes/rts-loop.prototype.html`; ADR-0005):
+
+- **Build phase** (30 s): the player builds components with money; each one takes seconds to build and connects itself the usual way (load balancer in front of the app servers, cache in front of the database). The player can change any connection by dragging from one building to another, or select a line and press Delete. "Bring them now!" starts the wave early and pays a bonus.
+- **One wave per level**: users arrive from the Internet at a fixed rate for a set time; each level teaches one idea, so one wave is enough. The player keeps building during the wave.
+- **Money** grows by itself (+$2/s) and with each answered visit ($1 per 100), and each building costs maintenance (its monthly cost ÷ 100 per second). **Reputation** falls while errors (−6/s) or latency (−4/s) break the level's requirements, and rises slowly otherwise; at 0 the base is lost.
+- **Scoring**: lasting the wave passes the level; the money left decides the extra stars.
+- **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
-- **Visual style**: strategy-game look (see *Look and feel*): components drawn as buildings of a base, dark mode, requests animated along connections.
 
 ## Game screen
 
-Chosen from the UI prototype (variant D in `prototypes/game-ui`, 2026-11-04): the mission-style HUD combined with the studio tool's detail panels.
+Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
 
-- **Canvas first**: full-bleed diagram with floating HUD: objectives as checkboxes (top-left), cost meter with star thresholds (top-right), simulation clock with live rps / p95 / errors while it runs, and a bottom hotbar of components plus a big Play button.
-- **Component icons** (chosen 2026-11-07 from a three-style prototype: colour cards, line icons and characters with faces; kept on branch `prototype/component-icons`, commit b33e47d): each component type has its own glyph and colour, so players tell components apart at a glance. The hotbar shows colour cards (glyph on the type's colour, name, cost on a band); on the diagram each component and instance has a badge in the same colour, grey when the instance is down. Every new component type needs a glyph and a colour (`src/ui/componentArt.tsx`).
-- **C4-style grouping**: players appear as a C4 *person* outside the system boundary; inside it, components sit in container boundaries (edge, application, data) labelled with name, type and technology.
-- **Real resources**: every **Instance** is drawn as its own node (`api-1`, `api-2`, …) with its own load, and a failed instance turns grey and stops receiving traffic. No "×N" badges.
-- **Inspector** (right, collapsible with `I`): deployment settings (instances, instance size), an *Advanced* section (queue size, service time, timeout), capacity and cost breakdown, and per-instance stats after a run.
-- **Results drawer** (bottom, collapsible with `R`): verdict, stars, hint, rps / p95 / error charts, and load per resource.
-- **Report card** after each run, with "View details" opening the inspector on the bottleneck.
-- **Phone and tablet** (planned 2026-11-05, `.scratch/mobile/spec.md`): below 700 px a compact layout with a top bar, the diagram, a bottom sheet with tabs (Mission / Inspector / Results) and the component bar with Play; connections can also be made from the inspector ("Sends requests to"). Between 700 and 1100 px one side panel with Mission / Inspector tabs on the left, the cost top right, and the results drawer (two rows on tall screens) at the bottom (chosen 2026-11-05 over narrower panels, which left the diagram about 250 px wide).
-
-
-
-Target 20+ levels covering four component groups:
-
-1. **Core**: client, load balancer, app server, database, cache.
-2. **Async**: message queue, workers, pub/sub.
-3. **Data scale**: read replicas, sharding, object storage.
-4. **Edge/network**: CDN, API gateway, rate limiter, DNS / multi-region.
+- **Resource bar** on top: back to the levels, level name, money (with its rate per second), the phase timer, reputation, Feedback.
+- **Map** in the middle: the Internet globe on the left and your base on the right, drawn in **C4 layers** (1 Context, 2 Containers, 3 Components; layer 3 by default). It starts as an empty construction zone; zones appear with their first building. Drag the ground to pan, use the wheel to zoom.
+- **Connections** are thin curved lines from a building's right side to the next one's left side, bending around other buildings; their colour shows health (teal fine, yellow busy, red losing requests, grey not used) and the req/s appear on hover or selection. **Requests** travel along them and come back (round trip): green when answered, red with "503" from the building that failed.
+- A selected building lights its own base in neon, in its type's colour. Buildings warn "no way in" or "no way out" when a connection is missing.
+- **Console** at the bottom: live results (req/s, p95, errors, income and maintenance), the inspector (state, instances, where it sends requests, load, capacity, size or tier, cache TTL, add or remove instances), and the build card with "Bring them now!", pause and speed (1×, 2×, 4×).
+- The **mission** panel shows the mode, the guided hint, the brief, the wave, the incident and the objectives.
 
 ## Home screen (level map)
 
@@ -54,17 +44,15 @@ A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tec
 
 ## Title screen
 
-The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** (Play level 1 / Continue: level N, Level map, How to play) and the playable demo as a **Training** panel, over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). "How to play" opens the three steps (Build, Run, Earn stars) in a dialog. On a computer everything fits without scrolling; on a phone the menu is on the first screen and Training is below it.
+The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, How to play, Building archive, Your base, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). "How to play" opens the three steps (Build, Run, Earn stars) in a dialog. On a computer everything fits without scrolling.
 
 ## Look and feel
 
 Strategy-game (RTS) look, chosen 2026-11-09 and replacing the System Defense look chosen the same day: the player builds and runs a base. Original art and names, inspired by the genre, not by any one game.
 
 - **Palette**: dark steel panels with a bevel and cut corners, a teal accent, green for selection and good, red / yellow for bad / warning, gold for money. Monospace, uppercase labels for titles and numbers; system sans-serif for body text. Tokens live in `:root` in `src/ui/styles.css`.
-- **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`): load balancer = relay tower, app server = factory, cache = generator, database = silos. A failed instance is grey with smoke. Every new component type needs a colour and a building.
-- **Command console** (wide screens): a resource bar on top (back, level, monthly cost against the budget, Inspector / Results toggles, Feedback), the mission on the left, the results panel above the console, and at the bottom a console with the minimap (left), the selected building's portrait and settings (centre) and the build card with the buildings and the big Play button (right). Tablet and phone keep their layouts with the same look.
-- **C4 layers**: a switch over the diagram shows the first three layers of the C4 model: 1 Context (the users and the system as one box with its buildings), 2 Containers (zones and components, instances folded into "× N"), 3 Components (every instance; the default). Building something from layer 1 switches to layer 3.
-- **The diagram** sits on a grid floor: the system boundary is the base wall, zones are districts, load bars are segmented like health bars.
+- **Components are buildings**: each type is a small isometric building in its colour, on a pad (`src/ui/componentArt.tsx`), always called by its real name (load balancer, app server, cache, database). A failed instance is grey with smoke. Every new component type needs a colour and a building.
+- **The game screen** is described under *Game screen*: a resource bar, the map of the base in C4 layers on a grid floor (the system boundary is the base wall, zones are plots of land, load bars are segmented like health bars), and the console.
 
 ## Building Archive and briefing
 
