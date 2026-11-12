@@ -61,8 +61,8 @@ test('the campaign top bar opens the difficulty, the field manual and the option
   await expect(page).toHaveURL(/#levels$/);
   await expect(page.getByRole('link', { name: /Mode: God/ })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Field manual' }).click();
-  await expect(page.getByRole('heading', { name: 'Field manual', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Manual' }).click();
+  await expect(page.getByRole('heading', { name: 'Manual', level: 1 })).toBeVisible();
   await page.goBack();
   await page.getByRole('link', { name: 'Options' }).click();
   await expect(page.getByRole('heading', { name: 'Options' })).toBeVisible();

@@ -47,7 +47,8 @@ test('without an analytics script the game still works', async ({ page }) => {
 
 test('Feedback opens from the level select and the game', async ({ page }) => {
   await openLevel(page, '01-hello-world');
-  await page.getByRole('button', { name: 'Send feedback' }).first().click();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('button', { name: 'Send feedback' }).click();
   await expect(page.getByRole('dialog', { name: 'Feedback' })).toBeVisible();
   // Keys typed in the message never reach the game's shortcuts (Delete removes the selection).
   await page.getByRole('textbox', { name: 'Your message' }).fill('Delete');

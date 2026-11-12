@@ -21,7 +21,7 @@ export const levelTextEs: Record<string, LevelText> = {
     tutorial: [
       { text: 'Selecciona el app server para ver su configuración en el inspector.' },
       { text: 'Las peticiones llegan al app server, pero no siguen. Arrastra desde el app server hasta la base de datos para conectarlos.' },
-      { text: 'Pulsa «¡Que vengan ya!» para empezar la oleada, o espera a que acabe la cuenta atrás.' },
+      { text: 'Pulsa «Release a producción» para empezar la oleada, o espera a que acabe la cuenta atrás.' },
       { text: 'Mira cómo viajan las peticiones y vuelven. Aguanta hasta que termine la oleada.' },
     ],
   },

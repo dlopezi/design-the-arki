@@ -188,7 +188,7 @@ export function Manual({ levels, progress, tab: initialTab, briefing = false, on
   const body = (
     <>
       <header className="page-head">
-        <span className="console-label">{briefing ? a.briefingEyebrow : m.title}</span>
+        {briefing && <span className="console-label">{a.briefingEyebrow}</span>}
         <h1 id={titleId}>{briefing ? a.briefingTitle : m.title}</h1>
         <p>{briefing ? a.briefingIntro : m.intro}</p>
       </header>

@@ -138,7 +138,7 @@
       }
     },
     {
-      "text": "Press “Bring them now!” to start the wave, or wait for the countdown.",
+      "text": "Press “Release to production” to start the wave, or wait for the countdown.",
       "target": {
         "control": "play"
       },
