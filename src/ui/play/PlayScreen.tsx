@@ -18,7 +18,7 @@ import { levelsHref, modeHref } from '../routes';
 import { Manual } from '../manual';
 import type { Progress } from '../../progress/progress';
 import { startFlowCanvas, type C4Layer, type Point } from './flowCanvas';
-import { Announcer, LinkTools, PrototypeSwitcher, protoVariant, VariantA, VariantB } from './mapControls.prototype'; // PROTOTYPE
+import { Announcer, C4Panel, LinkTools, MapTools, PrototypeSwitcher, protoVariant, TimeControls, VariantA, VariantB } from './mapControls.prototype'; // PROTOTYPE
 
 const variant = protoVariant(); // PROTOTYPE
 
@@ -157,7 +157,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const applyView = () => { if (world.current) world.current.style.transform = `translate(${view.current.x}px, ${view.current.y}px) scale(${view.current.z})`; };
   const centre = useCallback(() => {
     const r = field.current?.getBoundingClientRect();
-    view.current = { x: ((r?.width ?? 1200) - WORLD.w) / 2 + 140, y: ((r?.height ?? 560) - WORLD.h) / 2, z: 1 };
+    view.current = { x: ((r?.width ?? 1200) - WORLD.w) / 2, y: ((r?.height ?? 560) - WORLD.h) / 2, z: 1 };
     applyView();
   }, []);
   useEffect(() => { centre(); }, [centre]);
@@ -451,7 +451,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <a className="back" href={levelsHref}>← {t.rt.back}</a>
         <h1>{level.title}</h1>
         <span className="play-res" role="status" aria-label={t.rt.money}>💰 <b className="play-money">${Math.floor(game.money)}</b><span className={net >= 0 ? 'up' : 'down'}>{t.rt.rate(net)}</span></span>
-        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : t.rt.phase.end}</b></span>
+        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : t.rt.phase.end}</b>{variant === 'C' && <TimeControls paused={paused} togglePause={() => { setPaused(p => !p); }} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />}</span>
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>
@@ -491,6 +491,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <canvas className="play-fx" ref={canvasRef} aria-hidden="true" />
 
         {variant === 'A' && <VariantA layer={layer} setLayer={pickLayer} zoom={zoomCentre} centre={centre} />}
+        {variant === 'C' && <><C4Panel layer={layer} setLayer={pickLayer} /><MapTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} zoom={zoomCentre} centre={centre} /></>}
         {variant === 'B' && <VariantB layer={layer} step={d => { stepDetail(d); }} centre={centre} />}
         {variant && !over && <Announcer phase={game.phase} buildLeft={Math.ceil(BUILD_PHASE_S - game.t)} incident={incidentHappened} started={overlay !== 'start'} />}
         {!variant && <>
@@ -560,12 +561,12 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             })}
           </div>
           {variant === 'A' && <LinkTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} />}
-          <div className="play-controls">
+          {variant === 'C' ? (building && <button className={`btn go proto-c-call ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>) : <div className="play-controls">
             {building && <button className={`btn go ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>}
             <button className={`btn ${paused ? 'on' : ''}`} disabled={overlay !== null} onClick={() => setPaused(p => !p)}>{paused ? t.rt.build.resume : t.rt.build.pause}</button>
             {[1, 2, 4].map(x => <button key={x} className={`btn ${speed === x ? 'on' : ''}`} aria-pressed={speed === x} onClick={() => setSpeed(x)}>{x}×</button>)}
             <button className="btn" aria-label={t.rt.build.restart} title={t.rt.build.restart} onClick={restart}>↺</button>
-          </div>
+          </div>}
         </section>
       </footer>
 
@@ -607,6 +608,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               {!over && <button className="secondary" onClick={() => setOverlay('mission')}>{t.rt.menu.mission}</button>}
               <button className="secondary" onClick={() => setOverlay('manual')}>{t.rt.menu.manual}</button>
               <button className="secondary" onClick={() => setOverlay('feedback')}>{t.rt.menu.feedback}</button>
+              {variant === 'C' && <button className="secondary" onClick={() => { restart(); setOverlay(null); }}>↺ {t.rt.build.restart}</button>}
               <a className="secondary" href={modeHref(level.id)}>{t.rt.menu.mode}</a>
               <a className="secondary" href={levelsHref}>{t.rt.menu.levels}</a>
             </nav>

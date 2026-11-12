@@ -1153,3 +1153,24 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .proto-b-centre { margin-top: 6px; }
 .proto-links { display: flex; align-items: center; gap: 12px; font-size: 13px; }
 .proto-links label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+/* PROTOTYPE C */
+.proto-c-c4 { left: 12px; bottom: 40px; display: grid; gap: 2px; padding: 8px; min-width: 180px; }
+.proto-c-c4 .label { margin: 0 0 4px 4px; }
+.proto-c-c4 button { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid transparent; background: none; color: var(--muted); font: 700 12px var(--mono); text-align: left; cursor: pointer; }
+.proto-c-c4 button:hover { color: var(--fg); background: rgba(62, 224, 200, .08); }
+.proto-c-c4 button[aria-pressed="true"] { color: var(--fg); background: rgba(62, 224, 200, .16); border-color: var(--accent); }
+.proto-c-c4 button[aria-pressed="true"] .proto-b-dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.proto-c-tools, .proto-c-zoom { right: 12px; display: grid; }
+.proto-c-zoom { bottom: 40px; } .proto-c-tools { bottom: 172px; }
+.proto-c-tools button, .proto-c-zoom button { position: relative; width: 40px; height: 40px; border: 0; background: none; color: var(--fg); font: 700 18px var(--mono); cursor: pointer; }
+.proto-c-tools button + button, .proto-c-zoom button + button { border-top: 1px solid var(--line-strong); }
+.proto-c-tools button:hover, .proto-c-zoom button:hover { background: rgba(62, 224, 200, .12); }
+.proto-c-tools button[aria-pressed="true"] { background: rgba(62, 224, 200, .2); box-shadow: inset 3px 0 0 var(--accent); }
+.proto-c-tools button[aria-pressed="false"] { opacity: .55; }
+.proto-c-tools button::after, .proto-c-zoom button::after { content: attr(data-tip); position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); padding: 3px 8px; background: #000; border: 1px solid var(--line-strong); font: 700 11px var(--mono); white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.proto-c-tools button:hover::after, .proto-c-zoom button:hover::after, .proto-c-tools button:focus-visible::after, .proto-c-zoom button:focus-visible::after { opacity: 1; }
+.proto-c-time { display: inline-flex; margin-left: 10px; gap: 2px; }
+.proto-c-time button { padding: 2px 8px; border: 1px solid var(--line-strong); background: none; color: var(--muted); font: 700 12px var(--mono); cursor: pointer; }
+.proto-c-time button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: rgba(62, 224, 200, .16); }
+.proto-c-time button:disabled { opacity: .4; }
+.proto-c-call { width: 100%; padding: 12px; font-size: 14px; }

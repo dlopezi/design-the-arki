@@ -8,14 +8,14 @@ import { useEffect, useState } from 'react';
 import { lang } from '../../i18n';
 import type { C4Layer } from './flowCanvas';
 
-export type ProtoVariant = 'A' | 'B';
-const VARIANTS = ['Actual', 'A', 'B'] as const;
-const NAMES: Record<(typeof VARIANTS)[number], string> = { Actual: 'Actual', A: 'A · Iconos como un mapa', B: 'B · El zoom es la vista C4' };
+export type ProtoVariant = 'A' | 'B' | 'C';
+const VARIANTS = ['Actual', 'A', 'B', 'C'] as const;
+const NAMES: Record<(typeof VARIANTS)[number], string> = { Actual: 'Actual', A: 'A · Iconos como un mapa', B: 'B · El zoom es la vista C4', C: 'C · Cada control en su sitio' };
 
 export function protoVariant(): ProtoVariant | null {
   if (!import.meta.env.DEV) return null;
   const v = new URLSearchParams(location.search).get('variant');
-  return v === 'A' || v === 'B' ? v : null;
+  return v === 'A' || v === 'B' || v === 'C' ? v : null;
 }
 
 const es = () => lang() === 'es';
@@ -114,5 +114,48 @@ export function LinkTools({ autoLink, toggle, rewire }: { autoLink: boolean; tog
       <label><input type="checkbox" checked={autoLink} onChange={toggle} /> 🔗 {es() ? 'Auto-conectar' : 'Auto-connect'}</label>
       <button className="btn" onClick={rewire}>⟲ {es() ? 'Reconectar' : 'Reconnect'}</button>
     </div>
+  );
+}
+
+/** C: the C4 view as its own panel with names, bottom-left. */
+export function C4Panel({ layer, setLayer }: { layer: C4Layer; setLayer: (k: C4Layer) => void }) {
+  return (
+    <div className="play-panel proto-c-c4" role="group" aria-label="Vista C4">
+      <span className="label">{es() ? 'Vista C4' : 'C4 view'}</span>
+      {([1, 2, 3] as const).map(k => (
+        <button key={k} aria-pressed={layer === k} onClick={() => setLayer(k)}>
+          <span className="proto-b-dot" aria-hidden="true" /><span aria-hidden="true">{LAYERS[k].icon}</span> {name(k)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** C: one column of icon tools bottom-right: auto-connect, reconnect, zoom, center. */
+export function MapTools({ autoLink, toggle, rewire, zoom, centre }: { autoLink: boolean; toggle: () => void; rewire: () => void; zoom: (f: number) => void; centre: () => void }) {
+  const tip = (e: string, en: string) => (es() ? e : en);
+  const b = (label: string, icon: string, onClick: () => void, pressed?: boolean) => (
+    <button onClick={onClick} aria-label={label} aria-pressed={pressed} data-tip={label}>{icon}</button>
+  );
+  return <>
+    <div className="play-panel proto-c-tools" role="group" aria-label={tip('Conexiones', 'Links')}>
+      {b(tip(`Auto-conectar: ${autoLink ? 'sí' : 'no'}`, `Auto-connect: ${autoLink ? 'on' : 'off'}`), '🔗', toggle, autoLink)}
+      {b(tip('Reconectar todo', 'Reconnect all'), '⟲', rewire)}
+    </div>
+    <div className="play-panel proto-c-zoom" role="group" aria-label={tip('Mapa', 'Map')}>
+      {b(tip('Acercar', 'Zoom in'), '+', () => zoom(1.2))}
+      {b(tip('Alejar', 'Zoom out'), '−', () => zoom(1 / 1.2))}
+      {b(tip('Centrar', 'Center'), '⌖', centre)}
+    </div>
+  </>;
+}
+
+/** C: pause and speed next to the clock in the top bar. */
+export function TimeControls({ paused, togglePause, speed, setSpeed, disabled }: { paused: boolean; togglePause: () => void; speed: number; setSpeed: (x: number) => void; disabled: boolean }) {
+  return (
+    <span className="proto-c-time" role="group" aria-label={es() ? 'Velocidad' : 'Speed'}>
+      <button aria-pressed={paused} disabled={disabled} onClick={togglePause} aria-label={paused ? (es() ? 'Seguir' : 'Resume') : (es() ? 'Pausa' : 'Pause')} title={es() ? 'Pausa (Espacio)' : 'Pause (Space)'}>{paused ? '▶' : '⏸'}</button>
+      {[1, 2, 4].map(x => <button key={x} aria-pressed={!paused && speed === x} onClick={() => setSpeed(x)}>{x}×</button>)}
+    </span>
   );
 }
