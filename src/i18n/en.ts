@@ -49,7 +49,6 @@ export const en = {
     playFirst: 'Play level 1',
     continueAt: (n: number) => `Continue: level ${n}`,
     playAgain: 'Play again',
-    freeNote: 'Free · no sign-up · runs in your browser',
     menu: 'Main menu',
     firstNote: (title: string) => `${title} · with a short tutorial`,
     allPassed: 'Every level passed: try a harder mode',
