@@ -153,9 +153,16 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
 
   // ───────── Map: centred at the start, then panned and zoomed by the player ─────────
   const applyView = () => { if (world.current) world.current.style.transform = `translate(${view.current.x}px, ${view.current.y}px) scale(${view.current.z})`; };
+  // Centre on what is built (the Internet and the system), shrinking it to fit a narrow screen.
   const centre = useCallback(() => {
     const r = field.current?.getBoundingClientRect();
-    view.current = { x: ((r?.width ?? 1200) - WORLD.w) / 2, y: ((r?.height ?? 560) - WORLD.h) / 2, z: 1 };
+    const w = r?.width ?? 1200, h = r?.height ?? 560;
+    const parts = [...(world.current?.querySelector('.play-scene')?.children ?? [])] as HTMLElement[];
+    if (!parts.length) { view.current = { x: (w - WORLD.w) / 2, y: (h - WORLD.h) / 2, z: 1 }; applyView(); return; }
+    const left = Math.min(...parts.map(p => p.offsetLeft)), right = Math.max(...parts.map(p => p.offsetLeft + p.offsetWidth));
+    const top = Math.min(...parts.map(p => p.offsetTop)), bottom = Math.max(...parts.map(p => p.offsetTop + p.offsetHeight));
+    const z = Math.max(0.5, Math.min(1, (w - 48) / (right - left), (h - 48) / (bottom - top)));
+    view.current = { x: w / 2 - ((left + right) / 2) * z, y: h / 2 - ((top + bottom) / 2) * z, z };
     applyView();
   }, []);
   useEffect(() => { centre(); }, [centre]);
@@ -528,7 +535,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               );
             })}
           </div>
-          {building && <ReleaseButton highlight={tutorialOnCall} bonus={Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S)} onClick={() => setGame(g => callNow(g))} />}
+          {building
+            ? <ReleaseButton highlight={tutorialOnCall} bonus={Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S)} onClick={() => setGame(g => callNow(g))} />
+            : game.phase === 'wave' && <p className="play-live" role="note">{t.rt.release.live}</p>}
         </section>
       </footer>
 

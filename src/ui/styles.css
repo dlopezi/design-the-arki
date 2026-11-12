@@ -1137,7 +1137,8 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .play-time button { padding: 2px 8px; border: 1px solid var(--line-strong); background: none; color: var(--muted); font: 700 12px var(--mono); cursor: pointer; }
 .play-time button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: rgba(62, 224, 200, .16); }
 .play-time button:disabled { opacity: .4; cursor: default; }
-.play-build:has(.play-release) { grid-template-rows: auto auto 1fr; height: 100%; }
+.play-build:has(.play-release), .play-build:has(.play-live) { grid-template-rows: auto auto 1fr; height: 100%; }
+.play-live { align-self: end; margin: 0; padding: 10px 12px; border: 1px dashed var(--line-strong); color: var(--warn); font-size: 13px; text-align: center; }
 .play-release { align-self: end; width: 100%; padding: 10px 12px; display: grid; gap: 2px; justify-items: center; }
 .play-release .main { font: 900 15px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .play-release small { font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none; opacity: .85; }

@@ -356,7 +356,7 @@ export const es: Strings = {
     money: 'Dinero',
     rate: (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}/s`,
     announce: { build: '¡A construir!', live: '🚀 ¡En producción!', incident: '⚡ ¡Se cae un servidor!' },
-    release: { title: '🚀 Release a producción', note: (bonus: number) => `Los usuarios llegan ya · +$${bonus} por adelantarte` },
+    release: { title: '🚀 Release a producción', note: (bonus: number) => `Los usuarios llegan ya · +$${bonus} por adelantarte`, live: '🚀 En producción. Aún puedes construir y escalar.' },
     time: { label: 'Velocidad', pause: 'Pausa (Espacio)', resume: 'Seguir (Espacio)' },
     tools: { links: 'Conexiones', rewire: 'Reconectar todo', help: 'Ayuda y eventos', controls: 'Controles', events: 'Últimos eventos', none: 'Nada todavía' },
     internet: 'Internet',

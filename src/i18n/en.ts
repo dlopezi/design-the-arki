@@ -354,7 +354,7 @@ export const en = {
     money: 'Money',
     rate: (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}/s`,
     announce: { build: 'Build!', live: '🚀 Live!', incident: '⚡ A server is down!' },
-    release: { title: '🚀 Release to production', note: (bonus: number) => `Users arrive now · +$${bonus} for going early` },
+    release: { title: '🚀 Release to production', note: (bonus: number) => `Users arrive now · +$${bonus} for going early`, live: '🚀 In production. You can still build and scale.' },
     time: { label: 'Speed', pause: 'Pause (Space)', resume: 'Resume (Space)' },
     tools: { links: 'Connections', rewire: 'Reconnect all', help: 'Help and events', controls: 'Controls', events: 'Latest events', none: 'Nothing yet' },
     internet: 'Internet',
