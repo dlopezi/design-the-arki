@@ -18,6 +18,9 @@ import { levelsHref, modeHref } from '../routes';
 import { Manual } from '../manual';
 import type { Progress } from '../../progress/progress';
 import { startFlowCanvas, type C4Layer, type Point } from './flowCanvas';
+import { Announcer, LinkTools, PrototypeSwitcher, protoVariant, VariantA, VariantB } from './mapControls.prototype'; // PROTOTYPE
+
+const variant = protoVariant(); // PROTOTYPE
 
 type Props = {
   level: LevelDefinition;
@@ -164,9 +167,24 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     view.current = { x: px - (px - v.x) * k, y: py - (py - v.y) * k, z };
     applyView();
   };
+  const zoomCentre = (factor: number) => { const r = field.current!.getBoundingClientRect(); zoomAt(factor, r.left + r.width / 2, r.top + r.height / 2); };
+  const pickLayer = (k: C4Layer) => { setLayer(k); canvasApi.current?.clearRequests(); };
+  // PROTOTYPE (B): more detail = Context → Containers → Components, then zoom in; less detail goes back. True if the layer changed.
+  const stepDetail = (dir: 1 | -1, wheel = false): boolean => {
+    const l = live.current.layer, z = view.current.z;
+    if (dir > 0) { if (l < 3) { pickLayer((l + 1) as C4Layer); centre(); return true; } zoomCentre(wheel ? 1.1 : 1.2); return false; }
+    if (l === 3 && z > 1.01) { zoomCentre(wheel ? 1 / 1.1 : 1 / 1.2); return false; }
+    if (l > 1) { pickLayer((l - 1) as C4Layer); centre(); return true; }
+    return false;
+  };
   useEffect(() => {
     const el = field.current; if (!el) return;
-    const onWheel = (e: WheelEvent) => { if ((e.target as HTMLElement).closest('.play-panel')) return; e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY); };
+    let lastStep = 0; // PROTOTYPE (B)
+    const onWheel = (e: WheelEvent) => {
+      if ((e.target as HTMLElement).closest('.play-panel')) return; e.preventDefault();
+      if (variant === 'B') { const now = Date.now(); if (now - lastStep > 350 && stepDetail(e.deltaY < 0 ? 1 : -1, true)) lastStep = now; return; }
+      zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY);
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
@@ -472,6 +490,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         </div>
         <canvas className="play-fx" ref={canvasRef} aria-hidden="true" />
 
+        {variant === 'A' && <VariantA layer={layer} setLayer={pickLayer} zoom={zoomCentre} centre={centre} />}
+        {variant === 'B' && <VariantB layer={layer} step={d => { stepDetail(d); }} centre={centre} />}
+        {variant && !over && <Announcer phase={game.phase} buildLeft={Math.ceil(BUILD_PHASE_S - game.t)} incident={incidentHappened} started={overlay !== 'start'} />}
+        {!variant && <>
         <div className="play-panel play-c4" role="group" aria-label={t.c4.label}>
           <span className="label">{t.c4.label}</span>
           {([1, 2, 3] as const).map(k => <button key={k} aria-pressed={layer === k} onClick={() => { setLayer(k); canvasApi.current?.clearRequests(); }}>{k} {t.c4.layers[k]}</button>)}
@@ -487,6 +509,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {!over && <div className={`play-banner ${incidentHappened && game.phase === 'wave' ? 'bad' : game.phase === 'wave' ? 'warn' : ''}`} role="status">
           {building ? `⏱ ${t.rt.banner.build(Math.ceil(BUILD_PHASE_S - game.t))}` : incidentHappened ? t.rt.banner.incident : t.rt.banner.wave(level.play.wave.rps)}
         </div>}
+        </>}
         {tutorial && tutorialState !== 'skipped' && (step || tutorialState === 'done') && (
           <section className="play-panel play-tutorial" aria-label={t.tutorial.title} aria-live="polite">
             {step ? <>
@@ -517,6 +540,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <section className="play-frame play-inspector" aria-label={t.inspector.title}>
           <span className="label">{t.inspector.title}</span>
           {inspector()}
+          {variant === 'B' && !selection && <LinkTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} />}
         </section>
         <section className="play-frame play-build" aria-label={t.rt.build.title}>
           <span className="label">{t.rt.build.title}</span>
@@ -535,6 +559,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               );
             })}
           </div>
+          {variant === 'A' && <LinkTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} />}
           <div className="play-controls">
             {building && <button className={`btn go ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>}
             <button className={`btn ${paused ? 'on' : ''}`} disabled={overlay !== null} onClick={() => setPaused(p => !p)}>{paused ? t.rt.build.resume : t.rt.build.pause}</button>
@@ -570,6 +595,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           </div>
         </div>
       )}
+      <PrototypeSwitcher />
       {overlay === 'menu' && (
         <div className="backdrop play-briefing-backdrop" onClick={() => setOverlay(null)}>
           <div className="report play-menu" role="dialog" aria-modal="true" aria-labelledby={menuId} onClick={e => e.stopPropagation()}>
