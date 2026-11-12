@@ -3,7 +3,6 @@ import { expect, test } from '@playwright/test';
 test('a new visitor learns what the game is and starts the tutorial', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Watch your system break.');
-  await expect(page.getByText('A puzzle game for system-design interviews')).toBeVisible();
 
   // A new player first reads the briefing: what each building is for.
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Play level 1' }).click();
@@ -46,10 +45,10 @@ test('the menu works from the keyboard like a game menu', async ({ page }) => {
   const menu = page.getByRole('navigation', { name: 'Main menu' });
   await expect(menu.getByRole('link', { name: 'Play level 1' })).toHaveAttribute('data-selected', 'true');
 
-  // ↓ ↓ selects the Field manual; ↑ goes back to "Level map"; Enter opens it.
+  // ↓ ↓ selects the Manual; ↑ goes back to "Level map"; Enter opens it.
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('link', { name: /Field manual/ })).toBeFocused();
+  await expect(menu.getByRole('link', { name: /^Manual/ })).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#levels$/);
@@ -69,8 +68,8 @@ test('the title screen menu opens the field manual, with how to play, the buildi
   await page.goto('/');
   const menu = page.getByRole('navigation', { name: 'Main menu' });
   await expect(menu.getByRole('link', { name: /Your base/ })).toHaveCount(0);
-  await menu.getByRole('link', { name: /Field manual/ }).click();
-  await expect(page.getByRole('heading', { name: 'Field manual', level: 1 })).toBeVisible();
+  await menu.getByRole('link', { name: /^Manual/ }).click();
+  await expect(page.getByRole('heading', { name: 'Manual', level: 1 })).toBeVisible();
   await expect(page.getByRole('tabpanel')).toContainText('Bring the users');
 
   await page.getByRole('tab', { name: 'Buildings' }).click();

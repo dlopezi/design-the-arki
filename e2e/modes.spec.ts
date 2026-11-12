@@ -35,7 +35,7 @@ test('the briefing holds the clock until the player starts building', async ({ p
   await expect(page.getByRole('dialog')).toContainText('Game paused');
   await page.getByRole('button', { name: /Resume/ }).click();
   await page.getByRole('button', { name: /Manual/ }).click();
-  await expect(page.getByRole('dialog', { name: 'Field manual' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Manual' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
 });

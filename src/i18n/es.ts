@@ -49,7 +49,6 @@ export const es: Strings = {
   landing: {
     headline: 'Mira cómo se rompe tu sistema.',
     headlineAccent: 'Luego arréglalo.',
-    pitch: 'Un juego de puzles para entrevistas de system design. Construye una arquitectura, mándale tráfico real y mantenla rápida y barata.',
     playFirst: 'Jugar nivel 1',
     continueAt: (n: number) => `Continuar: nivel ${n}`,
     playAgain: 'Jugar otra vez',
@@ -292,7 +291,7 @@ export const es: Strings = {
     pick: 'Elige un edificio de la lista para leer su ficha.',
   },
   manual: {
-    title: 'Manual de campo',
+    title: 'Manual',
     menuNote: 'Cómo se juega · edificios · conceptos',
     intro: 'Todo lo que necesitas para jugar, y qué significa cada parte en sistemas reales.',
     tabs: { howto: 'Cómo se juega', buildings: 'Edificios', concepts: 'Conceptos' } as Record<'howto' | 'buildings' | 'concepts', string>,

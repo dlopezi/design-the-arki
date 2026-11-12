@@ -45,7 +45,7 @@ A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tec
 
 ## Title screen
 
-The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Field manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
+The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline (the one-line pitch was removed on 2026-11-11), a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
 
 ## Look and feel
 

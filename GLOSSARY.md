@@ -62,9 +62,9 @@ _Avoid_: Edge, wire, link
 A component as it stands on the map, always called by its real name (app server, database…). Each of its instances is drawn as its own small isometric building in the type's colour.
 _Avoid_: Unit, structure, made-up names (factory, silos…)
 
-**Field Manual**:
+**Manual**:
 The help pages, in three tabs: How to play, Buildings (what each building does in the game and in real life, and which level brings it) and Concepts (p95, error rate, scaling…). Its Buildings tab is shown as a **Briefing** before level 1.
-_Avoid_: Codex, encyclopedia, Building Archive (old name)
+_Avoid_: Codex, encyclopedia, Field Manual and Building Archive (old names)
 
 **Mission Briefing**:
 The card that opens a mission over the game screen: story, objectives, new buildings and the star rule. The build clock waits until the player presses Start building.

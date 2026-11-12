@@ -46,7 +46,6 @@ export const en = {
   landing: {
     headline: 'Watch your system break.',
     headlineAccent: 'Then fix it.',
-    pitch: 'A puzzle game for system-design interviews. Build an architecture, send real traffic through it, and keep it fast and cheap.',
     playFirst: 'Play level 1',
     continueAt: (n: number) => `Continue: level ${n}`,
     playAgain: 'Play again',
@@ -290,7 +289,7 @@ export const en = {
     pick: 'Choose a building in the list to read its card.',
   },
   manual: {
-    title: 'Field manual',
+    title: 'Manual',
     menuNote: 'How to play · buildings · concepts',
     intro: 'Everything you need to play, and what each part means in real systems.',
     tabs: { howto: 'How to play', buildings: 'Buildings', concepts: 'Concepts' } as Record<'howto' | 'buildings' | 'concepts', string>,

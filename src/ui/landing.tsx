@@ -105,7 +105,6 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
               <span className="title-logo"><span className="logo-a">{logoA.trimEnd()}</span>{' '}<span className="logo-b">{logoB}</span></span>
               <span className="title-tagline">{l.headline} <span>{l.headlineAccent}</span></span>
             </h1>
-            <p className="title-pitch">{l.pitch}</p>
           </div>
 
           <div className="title-panels">
