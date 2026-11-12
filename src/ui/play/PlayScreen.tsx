@@ -18,7 +18,7 @@ import { levelsHref, modeHref } from '../routes';
 import { Manual } from '../manual';
 import type { Progress } from '../../progress/progress';
 import { startFlowCanvas, type C4Layer, type Point } from './flowCanvas';
-import { Announcer, C4Panel, LinkTools, MapTools, PrototypeSwitcher, protoVariant, TimeControls, VariantA, VariantB } from './mapControls.prototype'; // PROTOTYPE
+import { Announcer, C4Panel, LinkTools, MapTools, ReleaseButton, PrototypeSwitcher, protoVariant, TimeControls, VariantA, VariantB } from './mapControls.prototype'; // PROTOTYPE
 
 const variant = protoVariant(); // PROTOTYPE
 
@@ -491,7 +491,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <canvas className="play-fx" ref={canvasRef} aria-hidden="true" />
 
         {variant === 'A' && <VariantA layer={layer} setLayer={pickLayer} zoom={zoomCentre} centre={centre} />}
-        {variant === 'C' && <><C4Panel layer={layer} setLayer={pickLayer} /><MapTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} zoom={zoomCentre} centre={centre} /></>}
+        {variant === 'C' && <><C4Panel layer={layer} setLayer={pickLayer} /><MapTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} zoom={zoomCentre} centre={centre} help={t.rt.help} log={[...log].reverse().map(l => ({ time: fmt(l.t), text: l.text, tone: l.tone }))} /></>}
         {variant === 'B' && <VariantB layer={layer} step={d => { stepDetail(d); }} centre={centre} />}
         {variant && !over && <Announcer phase={game.phase} buildLeft={Math.ceil(BUILD_PHASE_S - game.t)} incident={incidentHappened} started={overlay !== 'start'} />}
         {!variant && <>
@@ -520,8 +520,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             </> : <p>{t.tutorial.done}</p>}
           </section>
         )}
-        <div className="play-help">{t.rt.help}</div>
-        <div className="play-log" aria-live="polite">{log.map((l, k) => <div key={k} className={l.tone}>[{fmt(l.t)}] {l.text}</div>)}</div>
+        {variant !== 'C' && <div className="play-help">{t.rt.help}</div>}
+        {variant !== 'C' && <div className="play-log" aria-live="polite">{log.map((l, k) => <div key={k} className={l.tone}>[{fmt(l.t)}] {l.text}</div>)}</div>}
       </main>
 
       <footer className="play-console">
@@ -561,7 +561,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             })}
           </div>
           {variant === 'A' && <LinkTools autoLink={game.autoLink} toggle={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))} />}
-          {variant === 'C' ? (building && <button className={`btn go proto-c-call ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>) : <div className="play-controls">
+          {variant === 'C' ? (building && <ReleaseButton className={tutorialOnCall ? 'tutorial-target' : ''} bonus={Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S)} onClick={() => setGame(g => callNow(g))} />) : <div className="play-controls">
             {building && <button className={`btn go ${tutorialOnCall ? 'tutorial-target' : ''}`} onClick={() => setGame(g => callNow(g))}>{t.rt.build.call(Math.round((BUILD_PHASE_S - game.t) * EARLY_BONUS_PER_S))}</button>}
             <button className={`btn ${paused ? 'on' : ''}`} disabled={overlay !== null} onClick={() => setPaused(p => !p)}>{paused ? t.rt.build.resume : t.rt.build.pause}</button>
             {[1, 2, 4].map(x => <button key={x} className={`btn ${speed === x ? 'on' : ''}`} aria-pressed={speed === x} onClick={() => setSpeed(x)}>{x}×</button>)}

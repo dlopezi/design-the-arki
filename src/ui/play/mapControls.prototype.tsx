@@ -63,7 +63,7 @@ export function Announcer({ phase, buildLeft, incident, started }: { phase: stri
     setTimeout(() => setFlash(f => (f?.id === id ? null : f)), ms);
   };
   useEffect(() => { if (started) show(es() ? '¡A construir!' : 'Build!', 'ok', 1400); }, [started]);
-  useEffect(() => { if (phase === 'wave') show(es() ? '¡Llegan los usuarios!' : 'Here they come!', 'warn'); }, [phase]);
+  useEffect(() => { if (phase === 'wave') show(es() ? '🚀 ¡En producción!' : '🚀 Live!', 'warn'); }, [phase]);
   useEffect(() => { if (incident) show(es() ? '⚡ ¡Se cae un servidor!' : '⚡ A server is down!', 'bad'); }, [incident]);
   const count = phase === 'build' && started && buildLeft <= 3 && buildLeft > 0 ? buildLeft : null;
   if (count) return <div key={`c${count}`} className="proto-announce count" aria-hidden="true">{count}</div>;
@@ -132,7 +132,8 @@ export function C4Panel({ layer, setLayer }: { layer: C4Layer; setLayer: (k: C4L
 }
 
 /** C: one column of icon tools bottom-right: auto-connect, reconnect, zoom, center. */
-export function MapTools({ autoLink, toggle, rewire, zoom, centre }: { autoLink: boolean; toggle: () => void; rewire: () => void; zoom: (f: number) => void; centre: () => void }) {
+export function MapTools({ autoLink, toggle, rewire, zoom, centre, help, log }: { autoLink: boolean; toggle: () => void; rewire: () => void; zoom: (f: number) => void; centre: () => void; help: string; log: { time: string; text: string; tone: string }[] }) {
+  const [open, setOpen] = useState(false);
   const tip = (e: string, en: string) => (es() ? e : en);
   const b = (label: string, icon: string, onClick: () => void, pressed?: boolean) => (
     <button onClick={onClick} aria-label={label} aria-pressed={pressed} data-tip={label}>{icon}</button>
@@ -141,7 +142,16 @@ export function MapTools({ autoLink, toggle, rewire, zoom, centre }: { autoLink:
     <div className="play-panel proto-c-tools" role="group" aria-label={tip('Conexiones', 'Links')}>
       {b(tip(`Auto-conectar: ${autoLink ? 'sí' : 'no'}`, `Auto-connect: ${autoLink ? 'on' : 'off'}`), '🔗', toggle, autoLink)}
       {b(tip('Reconectar todo', 'Reconnect all'), '⟲', rewire)}
+      {b(tip('Ayuda y eventos', 'Help and events'), '?', () => setOpen(o => !o), open)}
     </div>
+    {open && (
+      <div className="play-panel proto-c-help" role="dialog" aria-label={tip('Ayuda', 'Help')}>
+        <span className="label">{tip('Controles', 'Controls')}</span>
+        <ul>{help.split(' · ').map(h => <li key={h}>{h}</li>)}</ul>
+        <span className="label">{tip('Últimos eventos', 'Latest events')}</span>
+        <ul className="proto-c-events">{log.length ? log.map((l, k) => <li key={k} className={l.tone}><b>[{l.time}]</b> {l.text}</li>) : <li className="muted">—</li>}</ul>
+      </div>
+    )}
     <div className="play-panel proto-c-zoom" role="group" aria-label={tip('Mapa', 'Map')}>
       {b(tip('Acercar', 'Zoom in'), '+', () => zoom(1.2))}
       {b(tip('Alejar', 'Zoom out'), '−', () => zoom(1 / 1.2))}
@@ -157,5 +167,15 @@ export function TimeControls({ paused, togglePause, speed, setSpeed, disabled }:
       <button aria-pressed={paused} disabled={disabled} onClick={togglePause} aria-label={paused ? (es() ? 'Seguir' : 'Resume') : (es() ? 'Pausa' : 'Pause')} title={es() ? 'Pausa (Espacio)' : 'Pause (Space)'}>{paused ? '▶' : '⏸'}</button>
       {[1, 2, 4].map(x => <button key={x} aria-pressed={!paused && speed === x} onClick={() => setSpeed(x)}>{x}×</button>)}
     </span>
+  );
+}
+
+/** C: the early-wave button, as a release to production, at the bottom of the Build panel. */
+export function ReleaseButton({ bonus, onClick, className }: { bonus: number; onClick: () => void; className: string }) {
+  return (
+    <button className={`btn go proto-c-call ${className}`} onClick={onClick}>
+      <span className="proto-c-call-main">🚀 {es() ? 'Release a producción' : 'Release to production'}</span>
+      <small>{es() ? `Los usuarios llegan ya · +$${bonus} por adelantarte` : `Users arrive now · +$${bonus} for going early`}</small>
+    </button>
   );
 }
