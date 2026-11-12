@@ -27,12 +27,12 @@ Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototyp
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
 
-- **Resource bar** on top: back to the levels, level name, money (with its rate per second), the phase timer, reputation, Feedback.
-- **Map** in the middle: the Internet globe on the left and your base on the right, drawn in **C4 layers** (1 Context, 2 Containers, 3 Components; layer 3 by default). It starts as an empty construction zone; zones appear with their first building. Drag the ground to pan, use the wheel to zoom.
+- **Resource bar** on top: back to the levels, level name, money (with its rate per second), the phase timer with pause and speed (1×, 2×, 4×), reputation, and **☰ Menu** (pauses the game: Resume, Mission, Manual, Send feedback, Restart level, Change mode, Level map; Esc opens it too). Chosen 2026-11-12 from map-control prototype C (branch `prototype/map-controls`).
+- **Map** in the middle: the Internet globe on the left and your base on the right, drawn in **C4 layers** (1 Context, 2 Containers, 3 Components; layer 3 by default), switched in the **C4 view** panel at the bottom-left, with the layer names always shown. It starts as an empty construction zone; zones appear with their first building. Drag the ground to pan, use the wheel to zoom. Icon tools at the bottom-right: 🔗 auto-connect, ⟲ reconnect all, ? (controls help and the latest events), then +, − and ⌖ center. Big announcements show once and fade, like a fighting game: "Build!", a 3-2-1 count, "🚀 Live!" when the wave starts, and "⚡ A server is down!".
 - **Connections** are thin curved lines from a building's right side to the next one's left side, bending around other buildings; their colour shows health (teal fine, yellow busy, red losing requests, grey not used) and the req/s appear on hover or selection. **Requests** travel along them and come back (round trip): green when answered, red with "503" from the building that failed.
 - A selected building lights its own base in neon, in its type's colour. Buildings warn "no way in" or "no way out" when a connection is missing.
-- **Console** at the bottom: live results (req/s, p95, errors, income and maintenance), the inspector (state, instances, where it sends requests, load, capacity, size or tier, cache TTL, add or remove instances), and the build card with "Bring them now!", pause and speed (1×, 2×, 4×).
-- The **mission** panel shows the mode, the guided hint, the brief, the wave, the incident and the objectives.
+- **Console** at the bottom: live results (req/s, p95, errors, income and maintenance), the inspector (state, instances, where it sends requests, load, capacity, size or tier, cache TTL, add or remove instances), and the build card: the building cards and, at the bottom, "🚀 Release to production", which starts the wave early for a bonus.
+- The **mission** (mode, guided hint, brief, wave, incident, objectives) opens as a briefing card at the start and from ☰ Menu → Mission; there is no mission panel on the map since 2026-11-12.
 
 ## Home screen (level map)
 
@@ -45,7 +45,7 @@ A **campaign map**, chosen 2026-11-09 from three HTML mockups (campaign map, tec
 
 ## Title screen
 
-The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline and one-line pitch, a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Field manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
+The landing page at the site root (`#`) looks like a game's title screen (chosen 2026-11-07, replacing the scrolling landing page): a player bar (stars collected, current chapter with levels passed), a big glowing logo with the tagline (the one-line pitch was removed on 2026-11-11), a **main menu** in two columns (Play level 1 / Continue: level N, Level map, Manual, Options, Feedback; the Training demo was removed on 2026-11-09), over a moving backdrop (a small network with travelling requests and a grid floor; still when the player prefers reduced motion). The menu works like a game menu: ↑ / ↓ move the selection and Enter starts it ("Press Enter to start", shown only with a keyboard and mouse). On a computer everything fits without scrolling.
 
 ## Look and feel
 

@@ -11,7 +11,7 @@ async function play(page: Page, title: string, mode = 'God') {
 
 async function passLevel1(page: Page) {
   await play(page, 'Hello world');
-  await expect(page.getByRole('region', { name: 'Mission' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
   await buildKeys(page, '12');
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');

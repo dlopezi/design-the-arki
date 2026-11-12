@@ -105,7 +105,6 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
               <span className="title-logo"><span className="logo-a">{logoA.trimEnd()}</span>{' '}<span className="logo-b">{logoB}</span></span>
               <span className="title-tagline">{l.headline} <span>{l.headlineAccent}</span></span>
             </h1>
-            <p className="title-pitch">{l.pitch}</p>
           </div>
 
           <div className="title-panels">
@@ -142,8 +141,6 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
         <footer className="title-foot">
           <span className="title-best">🏆 {l.levelsPassed(passed)}</span>
           <span className="title-foot-right">
-            <span>{l.freeNote}</span>
-            <span className="title-badge">{l.earlyAccess}</span>
             <span className="lang-switch" role="group" aria-label={t.footer.language}>
               {LANGS.map(code => (
                 <button key={code} type="button" aria-pressed={lang() === code} onClick={() => setLang(code)}>{code.toUpperCase()}</button>

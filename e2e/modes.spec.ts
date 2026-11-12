@@ -12,7 +12,8 @@ test('the difficulty is asked once, then every mission opens in it', async ({ pa
   await modes.getByRole('link', { name: /Normal/ }).click();
   await expect(page.getByRole('heading', { name: 'Hello world', level: 1 })).toBeVisible();
   await startMission(page);
-  await expect(page.getByText('Mode: Normal')).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(page.getByRole('dialog', { name: 'Game paused' })).toContainText('Mission 1 · Normal');
 
   // Next time the map plays straight away, in the same mode.
   await page.goto('/#levels');
@@ -30,12 +31,16 @@ test('the briefing holds the clock until the player starts building', async ({ p
   await startMission(page);
   await expect(page.locator('.play-phase')).not.toHaveText('Build 0:30', { timeout: 3000 });
 
-  // The mission can be read again later; the clock stops while it is open.
+  // The menu holds the mission, the manual and feedback; the clock stops while it is open.
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(page.getByRole('dialog', { name: 'Game paused' })).toBeVisible();
   await page.getByRole('button', { name: /Mission/ }).click();
   await expect(page.getByRole('dialog')).toContainText('Game paused');
   await page.getByRole('button', { name: /Resume/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Game paused' })).toBeVisible();
   await page.getByRole('button', { name: /Manual/ }).click();
-  await expect(page.getByRole('dialog', { name: 'Field manual' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Manual' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
 });
@@ -45,6 +50,8 @@ test('guided mode starts almost complete, already built, and shows its hint from
   await expect(unit(page, 'app-1')).toBeVisible();
   await expect(unit(page, 'Database')).toBeVisible();
   await expect(unit(page, 'app-1')).not.toContainText('building');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('button', { name: /Mission/ }).click();
   await expect(page.getByRole('note')).toContainText('Connect the app server to the database');
 });
 
@@ -75,6 +82,7 @@ test('hard mode hands over a broken design; fixing it earns the Hard badge', asy
 test('the game screen links back to the mode picker and the level map', async ({ page }) => {
   await openLevel(page, '02-first-spike', 'god');
   await buildKeys(page, '1');
+  await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByRole('link', { name: 'Change mode' }).click();
   await expect(page.getByRole('list', { name: 'Modes' })).toBeVisible();
 });
