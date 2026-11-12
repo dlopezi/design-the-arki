@@ -25,7 +25,7 @@ export async function dragConnect(page: Page, from: string, to: string) {
 
 /** Calls the users now (when still possible) and plays at 4× until the wave ends; returns the end dialog. */
 export async function playWave(page: Page) {
-  const call = page.getByRole('button', { name: /Bring them now/ });
+  const call = page.getByRole('button', { name: /Release to production/ });
   if (await call.isVisible()) await call.click();
   await page.getByRole('button', { name: '4×' }).click();
   const end = page.getByRole('dialog');

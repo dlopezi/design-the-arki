@@ -19,9 +19,9 @@ test('a new player learns the controls in a guided tutorial on level 1, which un
   await expect(tutorial).toContainText('Step 2 of 4');
   await dragConnect(page, 'app-1', 'Database');
   await expect(tutorial).toContainText('Step 3 of 4');
-  await expect(page.getByRole('button', { name: /Bring them now/ })).toHaveClass(/tutorial-target/);
+  await expect(page.getByRole('button', { name: /Release to production/ })).toHaveClass(/tutorial-target/);
 
-  await page.getByRole('button', { name: /Bring them now/ }).click();
+  await page.getByRole('button', { name: /Release to production/ }).click();
   await expect(tutorial).toContainText('Step 4 of 4');
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');

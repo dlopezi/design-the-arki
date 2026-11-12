@@ -89,7 +89,7 @@ The one burst of users a level sends after the build phase, at a set number of r
 _Avoid_: Run, round, attack
 
 **Build Phase**:
-The first 30 seconds of a level, before the wave, when the player builds; "Bring them now!" ends it early for a bonus.
+The first 30 seconds of a level, before the wave, when the player builds; "Release to production" ends it early for a bonus.
 _Avoid_: Setup, preparation
 
 **Money**:

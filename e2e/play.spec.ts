@@ -4,7 +4,9 @@ import { buildCard, buildKeys, dragConnect, internet, openLevel, playWave, unit 
 test('the map starts empty; built components connect themselves and a well-built base survives the wave', async ({ page }) => {
   await openLevel(page, '02-first-spike');
   await expect(page.getByText('Construction zone')).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'Users arrive in' })).toBeVisible();
+  // The build phase opens with a big announcement that fades away.
+  await expect(page.getByRole('status').filter({ hasText: 'Build!' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Build!' })).toBeHidden({ timeout: 3000 });
 
   // 1 load balancer, 3 app server instances, 1 database: the cards follow the level's order.
   await buildKeys(page, '12223');
@@ -25,7 +27,7 @@ test('without a load balancer only the first instance gets traffic; the base is 
   await openLevel(page, '02-first-spike', 'normal');
   await buildKeys(page, '222');
   await page.waitForTimeout(500);
-  await page.getByRole('button', { name: /Bring them now/ }).click();
+  await page.getByRole('button', { name: /Release to production/ }).click();
   await expect(unit(page, 'app-2')).toContainText('no traffic', { timeout: 10_000 });
   const end = await playWave(page);
   await expect(end).toContainText('Base lost');
@@ -94,7 +96,7 @@ test('a scripted incident takes an instance down during the wave', async ({ page
   await page.getByRole('button', { name: /Resume/ }).click();
   await buildKeys(page, '12222');
   await page.waitForTimeout(6000);
-  await page.getByRole('button', { name: /Bring them now/ }).click();
+  await page.getByRole('button', { name: /Release to production/ }).click();
   await page.getByRole('button', { name: '4×' }).click();
   await expect(page.locator('.play-log')).toContainText('App server went down!', { timeout: 15_000 });
   await expect(page.locator('.play-unit.down')).toHaveCount(1);
