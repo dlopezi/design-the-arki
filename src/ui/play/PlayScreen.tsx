@@ -12,7 +12,7 @@ import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
 
 const componentColor = (type: string) => componentArt[type]?.color ?? '#5b6577';
-import { FeedbackButton } from '../feedbackDialog';
+import { FeedbackDialog } from '../feedbackDialog';
 import { Stars } from '../stars';
 import { levelsHref, modeHref } from '../routes';
 import { Manual } from '../manual';
@@ -82,7 +82,7 @@ function Spark({ values, max, color, limit }: { values: number[]; max: number; c
 
 /** The real-time game screen: a map of your base in C4 layers, the console below, and one wave of users (ADR-0005). */
 /** What covers the map and stops the clock: the briefing before the build phase, the mission again, or the manual. */
-type Overlay = 'start' | 'mission' | 'manual' | null;
+type Overlay = 'start' | 'menu' | 'mission' | 'manual' | 'feedback' | null;
 
 export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, progress, onPassed, tutorial: tutorialAtStart, onTutorialDone }: Props) {
   const fresh = useCallback(() => createGame(level, startingDesign(level, mode)), [level, mode]);
@@ -110,7 +110,16 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const endId = useId();
   const briefId = useId();
   const startRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (overlay === 'start' || overlay === 'mission') startRef.current?.focus(); }, [overlay]);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+  useEffect(() => {
+    if (overlay === 'start' || overlay === 'mission') startRef.current?.focus();
+    if (overlay !== 'menu') return;
+    menuRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOverlay(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [overlay]);
   const closeManual = useCallback(() => setOverlay(null), []);
   const over = game.phase === 'won' || game.phase === 'lost';
 
@@ -192,7 +201,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       const index = Number(e.key) - 1;
       if (Number.isInteger(index) && level.allowedComponents[index]) { doBuild(level.allowedComponents[index]!); e.preventDefault(); }
       else if (e.code === 'Space' && !target.closest('button')) { setPaused(p => !p); e.preventDefault(); }
-      else if (e.key === 'Escape') setSelection(null);
+      // Esc first drops the selection, then opens the pause menu.
+      else if (e.key === 'Escape') { if (live.current.selection) setSelection(null); else setOverlay('menu'); }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && live.current.selection?.kind === 'link') {
         const { link } = live.current.selection;
         setGame(g => disconnect(g, link.from, link.to)); setSelection(null);
@@ -428,13 +438,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>
         <span className="play-bar-tools">
-          {([['mission', t.rt.briefing.open], ['manual', t.rt.briefing.manual]] as const).map(([which, label]) => {
-            // "📋 Mission": the icon always shows, the word only when there is room (it stays the button's name).
-            const [icon, ...words] = label.split(' ');
-            return <button key={which} className="btn icon-btn" aria-label={words.join(' ')} title={words.join(' ')} disabled={which === 'mission' && over}
-              onClick={() => setOverlay(which)}><span aria-hidden="true">{icon}</span><span className="btn-word" aria-hidden="true"> {words.join(' ')}</span></button>;
-          })}
-          <FeedbackButton info={() => ({ level: level.id, mode, result: over ? (game.phase === 'won' ? `passed ${stars}★` : 'failed') : undefined })} />
+          <button className="btn" aria-haspopup="dialog" onClick={() => setOverlay('menu')}>{t.rt.menu.open}</button>
         </span>
       </header>
 
@@ -468,20 +472,6 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         </div>
         <canvas className="play-fx" ref={canvasRef} aria-hidden="true" />
 
-        <section className="play-panel play-mission" aria-label={t.rt.mission}>
-          <span className="label">{t.rt.mission}</span>
-          <p className="mode-line">{t.modes.current(t.modes[mode].name)} · <a href={modeHref(level.id)}>{t.modes.change}</a></p>
-          {mode === 'guided' && <p role="note" className="play-lesson">{level.guidedHint}</p>}
-          <p className="muted">{level.brief}</p>
-          <p className="muted">{t.rt.waveInfo(level.play.wave.rps, level.play.wave.lengthS)}</p>
-          {level.play.incident && <p className="play-incident">⚡ {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</p>}
-          <ul className="objectives" aria-label={t.objectives}>
-            {[[t.objectiveP95(level.requirements.p95Ms), flow && rps ? flow.p95 <= level.requirements.p95Ms : null], [t.objectiveErrors(level.requirements.maxErrorRate), flow && rps ? flow.errors <= level.requirements.maxErrorRate : null]].map(([label, ok]) => (
-              <li key={String(label)} data-state={ok === null ? 'pending' : ok ? 'met' : 'failed'}><span className="box" aria-hidden="true">{ok === null ? '' : ok ? '✓' : '✕'}</span>{label}</li>
-            ))}
-          </ul>
-          {newTypes.length > 0 && <p className="play-new">{t.newLabel} {newTypes.map(buildingName).join(', ')}</p>}
-        </section>
         <div className="play-panel play-c4" role="group" aria-label={t.c4.label}>
           <span className="label">{t.c4.label}</span>
           {([1, 2, 3] as const).map(k => <button key={k} aria-pressed={layer === k} onClick={() => { setLayer(k); canvasApi.current?.clearRequests(); }}>{k} {t.c4.layers[k]}</button>)}
@@ -560,7 +550,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <span className="console-label">{t.rt.briefing.eyebrow(number, t.modes[mode].name)}</span>
             <h2 id={briefId}>{level.title}</h2>
             <p>{level.brief}</p>
-            {mode === 'guided' && <p className="play-lesson">{level.guidedHint}</p>}
+            {mode === 'guided' && <p role="note" className="play-lesson">{level.guidedHint}</p>}
             <ul className="play-brief-goals" aria-label={t.objectives}>
               <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)}</li>
               <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
@@ -580,6 +570,24 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           </div>
         </div>
       )}
+      {overlay === 'menu' && (
+        <div className="backdrop play-briefing-backdrop" onClick={() => setOverlay(null)}>
+          <div className="report play-menu" role="dialog" aria-modal="true" aria-labelledby={menuId} onClick={e => e.stopPropagation()}>
+            <span className="console-label">{t.rt.briefing.eyebrow(number, t.modes[mode].name)}</span>
+            <h2 id={menuId}>{t.rt.menu.title}</h2>
+            <p className="muted">{level.title}</p>
+            <nav className="play-menu-list" aria-label={t.rt.menu.open}>
+              <button ref={menuRef} className="primary-link play-start" onClick={() => setOverlay(null)}>{t.rt.briefing.resume}</button>
+              {!over && <button className="secondary" onClick={() => setOverlay('mission')}>{t.rt.menu.mission}</button>}
+              <button className="secondary" onClick={() => setOverlay('manual')}>{t.rt.menu.manual}</button>
+              <button className="secondary" onClick={() => setOverlay('feedback')}>{t.rt.menu.feedback}</button>
+              <a className="secondary" href={modeHref(level.id)}>{t.rt.menu.mode}</a>
+              <a className="secondary" href={levelsHref}>{t.rt.menu.levels}</a>
+            </nav>
+          </div>
+        </div>
+      )}
+      {overlay === 'feedback' && <FeedbackDialog info={{ level: level.id, mode, result: over ? (game.phase === 'won' ? `passed ${stars}★` : 'failed') : undefined }} onClose={closeManual} />}
       {overlay === 'manual' && <Manual levels={levels} progress={progress} onClose={closeManual} />}
       {over && (
         <div className="backdrop">

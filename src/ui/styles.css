@@ -904,8 +904,6 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .play-ctx { display: flex; gap: 8px; align-items: center; } .play-ctx b { font: 800 12px var(--mono); }
 
 .play-panel { position: absolute; z-index: 5; background: var(--steel); border: 1px solid var(--line-strong); box-shadow: var(--bevel); cursor: default; }
-.play-mission { top: 12px; left: 12px; width: 280px; max-height: calc(100% - 70px); overflow: auto; padding: 12px 14px; display: grid; gap: 6px; }
-.play-mission p { margin: 0; font-size: 13px; }
 .play-lesson { padding: 6px 8px; border-left: 3px solid var(--accent); background: rgba(62, 224, 200, .07); color: var(--fg) !important; }
 .play-incident { color: var(--warn); }
 .play-new { color: var(--ok); }
@@ -957,7 +955,6 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 /* Tablet: narrower console columns and a smaller mission panel. */
 @media (max-width: 1100px) {
   .play-console { grid-template-columns: minmax(220px, 1fr) minmax(0, 1.3fr) minmax(300px, 1fr); }
-  .play-mission { width: 230px; }
   .play-help { display: none; }
   .play-tutorial { width: min(420px, calc(100% - 300px)); }
 }
@@ -1095,7 +1092,12 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .play-brief-new b { color: var(--ok); }
 .play-brief-stars { font-size: 13px; }
 .play-briefing .note { border-left-color: var(--accent); }
-.play-briefing .actions { justify-content: flex-end; }
+.play-briefing .actions { justify-content: center; }
+.play-menu { width: min(360px, 100%); padding: 24px 26px; }
+.play-menu h2 { color: var(--accent); margin: 0; }
+.play-menu p { margin: 0; }
+.play-menu-list { display: grid; gap: 8px; margin-top: 6px; }
+.play-menu-list > * { width: 100%; text-align: center; text-decoration: none; }
 .play-start { padding: 12px 22px; font: 900 15px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
 @media (max-width: 760px) { .play-bar-tools .btn { padding: 4px 8px; font-size: 11px; } }
 /* The grid always takes the last, flexible row, with or without a notice above it. */
@@ -1118,7 +1120,6 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
   .campaign-go { position: sticky; bottom: 0; z-index: 2; margin: 6px -16px -14px; padding: 10px 16px 12px; background: linear-gradient(180deg, rgba(9, 16, 18, .85), #091012 40%); border-top: 1px solid var(--line); }
 }
 .play-bar h1 { min-width: 0; }
-@media (max-width: 1100px) { .play-bar-tools .btn-word { display: none; } .play-bar-tools .btn { padding: 4px 8px; } }
 .play-screen { grid-template-columns: minmax(0, 1fr); }
 .play-bar h1 { flex: 1 1 0; }
 .manual-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }

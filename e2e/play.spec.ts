@@ -74,7 +74,10 @@ test('the map shows the first three C4 layers: context, containers and component
 
 test('the inspector changes a cache\'s TTL, and a new component is introduced in the mission', async ({ page }) => {
   await openLevel(page, '04-flash-sale');
-  await expect(page.getByRole('region', { name: 'Mission' })).toContainText('New: Cache');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('button', { name: /Mission/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Flash sale' })).toContainText('New: Cache');
+  await page.getByRole('button', { name: /Resume/ }).click();
   await buildKeys(page, '3');
   await unit(page, 'Cache').click();
   const inspector = page.getByRole('region', { name: 'Inspector' });
@@ -85,7 +88,10 @@ test('the inspector changes a cache\'s TTL, and a new component is introduced in
 
 test('a scripted incident takes an instance down during the wave', async ({ page }) => {
   await openLevel(page, '06-server-goes-down');
-  await expect(page.getByRole('region', { name: 'Mission' })).toContainText('10 s into the wave, one App server instance goes down.');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /Mission/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('10 s into the wave, one App server instance goes down.');
+  await page.getByRole('button', { name: /Resume/ }).click();
   await buildKeys(page, '12222');
   await page.waitForTimeout(6000);
   await page.getByRole('button', { name: /Bring them now/ }).click();

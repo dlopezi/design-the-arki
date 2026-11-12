@@ -36,7 +36,8 @@ test('a new player learns the controls in a guided tutorial on level 1, which un
 test('modes other than guided cannot be opened by link before the tutorial', async ({ page }) => {
   await page.goto('/#01-hello-world/god');
   await startMission(page);
-  await expect(page.getByText('Mode: Guided')).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(page.getByRole('dialog', { name: 'Game paused' })).toContainText('Mission 1 · Guided');
   await page.goto('/#mode');
   await expect(page.getByRole('list', { name: 'Modes' }).getByRole('listitem').filter({ hasText: 'God' })).toContainText('Finish the tutorial first');
 });
