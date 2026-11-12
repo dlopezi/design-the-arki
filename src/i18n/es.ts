@@ -53,7 +53,6 @@ export const es: Strings = {
     continueAt: (n: number) => `Continuar: nivel ${n}`,
     playAgain: 'Jugar otra vez',
     freeNote: 'Gratis · sin registro · en tu navegador',
-    earlyAccess: 'Acceso anticipado',
     menu: 'Menú principal',
     firstNote: (title: string) => `${title} · con un tutorial corto`,
     allPassed: 'Todos los niveles superados: prueba un modo más difícil',

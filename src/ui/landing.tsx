@@ -142,7 +142,6 @@ export function Landing({ levels, progress }: { levels: LevelDefinition[]; progr
           <span className="title-best">🏆 {l.levelsPassed(passed)}</span>
           <span className="title-foot-right">
             <span>{l.freeNote}</span>
-            <span className="title-badge">{l.earlyAccess}</span>
             <span className="lang-switch" role="group" aria-label={t.footer.language}>
               {LANGS.map(code => (
                 <button key={code} type="button" aria-pressed={lang() === code} onClick={() => setLang(code)}>{code.toUpperCase()}</button>
