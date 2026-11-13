@@ -451,7 +451,7 @@ export const es: Strings = {
     waveShort: (rps: number, s: number) => `Una oleada: ${rps} req/s durante ${s} s`,
     mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)} % ${({ watch: 'visionados', job: 'trabajos de subida', read: 'lecturas', write: 'escrituras', readYourWrites: 'Read-your-writes', upload: 'subidas' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Edad de la cola', messages: (n: number) => `${n} ${n === 1 ? 'mensaje' : 'mensajes'}`,
-    replicationLag: 'Replication Lag',
+    replicationLag: 'Replication Lag', lagShort: 'Lag',
     lagOf: (lag: number, max: number | undefined) => (max === undefined ? `${lag.toFixed(1)} s` : `${lag.toFixed(1)} s / máx. ${max} s`),
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / máx. ${max} s`),
     waveInfo: (rps: number, s: number) => `Una oleada de ${rps} req/s durante ${s} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero que te quede.`,

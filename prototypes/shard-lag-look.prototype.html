@@ -1,0 +1,98 @@
+<!doctype html>
+<!--
+  PROTOTYPE (throwaway, not part of the build): ticket #42.
+  Question: how should the map and the console show each Shard and its load, the Hot Shard, and the Replication Lag next to its maximum?
+  Three variants on one page, switch with ?variant=A|B|C, the bar at the bottom, or the left/right arrow keys.
+    A  Bars on the map      : a load bar under each Shard, a "Hot Shard" mark, lag as a readout in the top bar (what the game shipped first)
+    B  Heat tiles           : each Shard is a tile coloured by load, the hot one pulses; lag shown as a ghost copy that trails the primary
+    C  Console first        : the map stays calm; the console has side-by-side Shard bars and a lag chart with the maximum as a red line
+  Play with the two switches: Shard Key (even / skewed) and Writes (low / high). State is in memory only.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Prototype: Shards and Replication Lag look</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#0b1214; --panel:#101b1e; --line:#27393d; --fg:#d7e6e8; --muted:#7b9296; --ok:#3ee0c8; --warn:#fbbf24; --bad:#f87171; font-family: ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--fg); }
+  .top { display:flex; gap:10px; align-items:center; padding:8px 14px; background:#142226; border-bottom:2px solid var(--line); font-size:13px; flex-wrap:wrap; }
+  .pill { padding:3px 10px; border:1px solid var(--line); background:#060b0c; font-weight:800; }
+  .bad { color:var(--bad); } .warn { color:var(--warn); } .ok { color:var(--ok); }
+  .stage { display:grid; grid-template-columns: 1fr 340px; gap:12px; padding:12px; min-height: calc(100vh - 110px); }
+  .map, .console { background:var(--panel); border:1px solid var(--line); padding:14px; }
+  .controls { display:flex; gap:8px; margin-bottom:10px; } .controls button { background:#16262a; color:var(--fg); border:1px solid var(--line); padding:5px 10px; cursor:pointer; font:inherit; }
+  .controls button.on { border-color:var(--ok); color:var(--ok); }
+  .zone { border:1px dashed var(--line); padding:14px; display:flex; gap:22px; align-items:flex-end; flex-wrap:wrap; }
+  .unit { text-align:center; width:96px; } .unit .glyph { font-size:34px; line-height:1; } .unit .name { font-size:11px; margin-top:4px; } .unit .sub { font-size:10px; min-height:13px; }
+  .bar { height:6px; background:#0a1112; border:1px solid var(--line); margin-top:5px; } .bar > span { display:block; height:100%; }
+  .h2 { font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; margin:0 0 8px; }
+  .tile { width:96px; height:96px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid var(--line); font-weight:800; }
+  .tile.hot { animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(248,113,113,.45); } }
+  .ghost { position:relative; width:96px; height:70px; } .ghost .real, .ghost .copy { position:absolute; left:0; right:0; height:30px; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .ghost .copy { opacity:.55; border-style:dashed; transition: top .3s; }
+  .console h3 { margin:14px 0 6px; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
+  .cols { display:flex; gap:10px; align-items:flex-end; height:90px; border-bottom:1px solid var(--line); } .cols .c { flex:1; background:var(--ok); min-height:2px; position:relative; } .cols .c small { position:absolute; top:-15px; left:0; right:0; text-align:center; font-size:10px; }
+  .chart { position:relative; height:70px; border:1px solid var(--line); background:#060b0c; } .chart svg { width:100%; height:100%; display:block; } .limit { position:absolute; left:0; right:0; border-top:1px dashed var(--bad); }
+  .switcher { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:10px; align-items:center; background:#fff; color:#111; padding:7px 14px; border-radius:999px; box-shadow:0 6px 24px rgba(0,0,0,.5); font-weight:800; font-size:13px; }
+  .switcher button { border:0; background:#e5e7eb; border-radius:50%; width:26px; height:26px; cursor:pointer; font-weight:800; }
+  .note { color:var(--muted); font-size:11px; margin-top:12px; line-height:1.5; }
+</style></head>
+<body>
+<div class="top" id="top"></div>
+<div class="stage"><div class="map" id="map"></div><div class="console" id="console"></div></div>
+<div class="switcher"><button id="prev">←</button><span id="label"></span><button id="next">→</button></div>
+<script>
+  // ---- state (in memory only) ----
+  const MAX_LAG = 2, VARIANTS = { A: 'Bars on the map', B: 'Heat tiles', C: 'Console first' };
+  const KEYS = { even: [1/3, 1/3, 1/3], skewed: [0.65, 0.2, 0.15] };
+  const s = { key: 'skewed', writes: 'high', lag: 0, hist: [], loads: [0, 0, 0], t: 0 };
+  const params = new URLSearchParams(location.search); let variant = params.get('variant') in VARIANTS ? params.get('variant') : 'A';
+
+  // ---- tiny simulation: 900 req/s over 3 Shards of 400 req/s; a replica applies 100 or 250 writes/s (low/high writes arrive at 160/60) ----
+  function tick() {
+    s.t++; s.loads = KEYS[s.key].map(share => Math.min(1, (900 * share) / 400));
+    const writes = s.writes === 'high' ? 160 : 60, apply = 100; s.lag = Math.max(0, s.lag + (writes - apply) / apply * 0.5 - (writes <= apply ? 0.3 : 0));
+    s.hist.push(s.lag); if (s.hist.length > 60) s.hist.shift(); render();
+  }
+  const cls = l => (l >= .9 ? 'bad' : l >= .7 ? 'warn' : 'ok'), col = l => (l >= .9 ? 'var(--bad)' : l >= .7 ? 'var(--warn)' : 'var(--ok)');
+  const hot = () => { const m = Math.max(...s.loads); return m >= .9 && Math.min(...s.loads) < .7 ? s.loads.indexOf(m) : -1; };
+  const lagText = () => `${s.lag.toFixed(1)} s / max ${MAX_LAG} s`;
+  const controls = () => `<div class="controls">Shard Key: <button data-key="even" class="${s.key==='even'?'on':''}">User id (even)</button><button data-key="skewed" class="${s.key==='skewed'?'on':''}">Country (skewed)</button>
+    &nbsp; Writes: <button data-w="low" class="${s.writes==='low'?'on':''}">low</button><button data-w="high" class="${s.writes==='high'?'on':''}">high</button></div>`;
+
+  // ---- the three variants: structurally different, not just recoloured ----
+  const A = {
+    top: () => `<span class="pill">💰 $540</span><span class="pill">Wave · 0:21</span><span class="pill ${s.lag>MAX_LAG?'bad':''}">⏪ ${lagText()}</span><span class="pill">❤ 86%</span>`,
+    map: () => `${controls()}<p class="h2">Data zone</p><div class="zone">${s.loads.map((l,i)=>`<div class="unit"><div class="glyph">🛢</div><div class="name">shard-${i+1}</div>
+      <div class="sub ${hot()===i?'bad':''}">${hot()===i?'⚠ Hot Shard':''}</div><div class="bar"><span style="width:${l*100}%;background:${col(l)}"></span></div></div>`).join('')}
+      <div class="unit"><div class="glyph">📄</div><div class="name">replica-1</div><div class="sub ${s.lag>MAX_LAG?'bad':''}">${s.lag>MAX_LAG?'⚠ behind':''}</div></div></div>
+      <p class="note">Same grammar as the Queue Age: a load bar under every building, one warning word under the one that matters, the number in the top bar.</p>`,
+    con: () => `<h3>Inspector · Database</h3><div>Shards 3/3<br>Load ${s.loads.map(l=>Math.round(l*100)).join('/')}%<br>${hot()>=0?`<span class="bad">Hot Shard: shard-${hot()+1}</span>`:''}</div>`,
+  };
+  const B = {
+    top: () => `<span class="pill">💰 $540</span><span class="pill">Wave · 0:21</span><span class="pill">❤ 86%</span>`,
+    map: () => `${controls()}<p class="h2">Data zone</p><div class="zone">${s.loads.map((l,i)=>`<div class="tile ${hot()===i?'hot':''}" style="background:color-mix(in srgb, ${col(l)} ${Math.round(l*60)}%, #0b1214)"><div>shard-${i+1}</div><div style="font-size:22px">${Math.round(l*100)}%</div><small>${hot()===i?'HOT':''}</small></div>`).join('')}
+      <div><div class="h2">primary → replica</div><div class="ghost"><div class="real" style="top:0">primary</div><div class="copy" style="top:${Math.min(36, 8 + s.lag * 8)}px">replica · ${s.lag.toFixed(1)} s behind</div></div></div></div>
+      <p class="note">A heat map: the whole Data zone reads at a glance. The replica is drawn as a dashed copy that slides away from the primary as it falls behind.</p>`,
+    con: () => `<h3>Replication Lag</h3><div class="${s.lag>MAX_LAG?'bad':'ok'}" style="font-size:22px">${lagText()}</div>`,
+  };
+  const C = {
+    top: () => `<span class="pill">💰 $540</span><span class="pill">Wave · 0:21</span><span class="pill">❤ 86%</span>`,
+    map: () => `${controls()}<p class="h2">Data zone</p><div class="zone">${s.loads.map((_,i)=>`<div class="unit"><div class="glyph">🛢</div><div class="name">shard-${i+1}</div></div>`).join('')}<div class="unit"><div class="glyph">📄</div><div class="name">replica-1</div></div></div>
+      <p class="note">The map stays calm and shows only buildings; every number lives in the console, where the player already reads p95 and errors.</p>`,
+    con: () => `<h3>Load per Shard</h3><div class="cols">${s.loads.map((l,i)=>`<div class="c" style="height:${Math.max(3,l*100)}%;background:${col(l)}"><small class="${cls(l)}">${hot()===i?'HOT ':''}${Math.round(l*100)}%</small></div>`).join('')}</div>
+      <h3>Replication Lag · max ${MAX_LAG} s</h3><div class="chart"><svg viewBox="0 0 60 20" preserveAspectRatio="none"><polyline fill="none" stroke="var(--warn)" stroke-width="1.2" points="${s.hist.map((v,i)=>`${i},${20-Math.min(20,v*4)}`).join(' ')}"/></svg><div class="limit" style="top:${70-(MAX_LAG*4/20)*70}px"></div></div>`,
+  };
+  const V = { A, B, C };
+
+  function render() {
+    document.getElementById('top').innerHTML = V[variant].top();
+    document.getElementById('map').innerHTML = V[variant].map();
+    document.getElementById('console').innerHTML = `<p class="h2">Console</p>${V[variant].con()}`;
+    document.getElementById('label').textContent = `${variant} (${VARIANTS[variant]})`;
+    document.querySelectorAll('[data-key]').forEach(b => b.onclick = () => { s.key = b.dataset.key; render(); });
+    document.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { s.writes = b.dataset.w; render(); });
+  }
+  const go = d => { const keys = Object.keys(VARIANTS); variant = keys[(keys.indexOf(variant) + d + keys.length) % keys.length]; history.replaceState(null, '', `?variant=${variant}`); render(); };
+  document.getElementById('prev').onclick = () => go(-1); document.getElementById('next').onclick = () => go(1);
+  addEventListener('keydown', e => { if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+  render(); setInterval(tick, 500);
+</script></body></html>
