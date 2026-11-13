@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, createGame, demolish, disconnect, resize, run, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, createGame, demolish, disconnect, resize, run, setShardKey, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -436,5 +436,74 @@ describe('data scale: Read Replicas answer the reads and the primary database ke
     expect(s.money).toBe(500 - 50);
     s = build(s, 'readReplica', l);
     expect(s.buildings.find(b => b.type === 'readReplica')!.instances).toHaveLength(2);
+  });
+});
+
+describe('data scale: Shards hold more writes, and the Shard Key decides how traffic spreads over them', () => {
+  // A small database serves 400 requests per second. Two large app servers behind a load balancer take 600 without trouble.
+  const even = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].map(w => w / 12);
+  const shardLevel = (keys: Record<string, number[]> | undefined, rps = 600): GameLevel => ({
+    allowedComponents: ['loadBalancer', 'appServer', 'database'],
+    componentOptions: { database: { maxInstances: 4 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 800, wave: { rps, lengthS: 30, mix: { write: 1 } }, shardKeys: keys, starMoney: [100, 200] },
+  });
+  const sharded = (shards: number, key?: string): Design => ({
+    components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { size: 'large', instances: 2 } },
+      { id: 'db', type: 'database', params: { instances: shards, ...(key ? { shardKey: key } : {}) } }],
+    connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']],
+  });
+  const play = (l: GameLevel, d: Design) => run(callNow(createGame(l, d)), 5, l);
+  const keys = { userId: even, country: [0.7, 0.3] };
+
+  it('one Shard cannot take the writes; two can, each serving half', () => {
+    const l = shardLevel(keys);
+    expect(play(l, sharded(1)).flow!.errors).toBeCloseTo(1 / 3);
+    const two = play(l, sharded(2, 'userId'));
+    expect(two.flow!.errors).toBeCloseTo(0);
+    two.flow!.shards.db!.forEach(load => expect(load).toBeCloseTo(0.75));
+  });
+
+  it('a skewed Shard Key overloads one Shard while the others have room', () => {
+    const s = play(shardLevel(keys), sharded(2, 'country'));
+    expect(s.flow!.shards.db![0]).toBe(1);
+    expect(s.flow!.shards.db![1]).toBeLessThan(0.5);
+    expect(s.flow!.errors).toBeCloseTo(20 / 600); // the hot Shard gets 420 and serves 400
+  });
+
+  it('the first key on offer is used until the player picks another', () => {
+    const s = play(shardLevel(keys), sharded(2));
+    s.flow!.shards.db!.forEach(load => expect(load).toBeCloseTo(0.75));
+  });
+
+  it('the Shard Key can be picked in the build phase, and not once the wave has started', () => {
+    const l = shardLevel(keys);
+    const s = createGame(l, sharded(2, 'userId'));
+    expect(setShardKey(s, 'db', 'country', l).buildings.find(b => b.id === 'db')!.params.shardKey).toBe('country');
+    const locked = setShardKey(callNow(s), 'db', 'country', l);
+    expect(locked.buildings.find(b => b.id === 'db')!.params.shardKey).toBe('userId');
+    expect(locked.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'shardKeyLocked' });
+    expect(setShardKey(s, 'db', 'nope', l)).toBe(s);
+  });
+
+  it('a Shard is one more instance of the database, with its own price, only in a level that offers Shard Keys', () => {
+    const l = shardLevel(keys);
+    let s = build(createGame(l, { components: [{ id: 'db', type: 'database' }], connections: [] }), 'database', l);
+    expect(s.buildings[0]!.instances).toHaveLength(2);
+    expect(s.money).toBe(800 - 50);
+    expect(build(createGame(shardLevel(undefined), { components: [{ id: 'db', type: 'database' }], connections: [] }), 'database', shardLevel(undefined)).buildings[0]!.instances).toHaveLength(1);
+  });
+
+  it('keeps the number of Shards and the Shard Key in the saved design', () => {
+    const l = shardLevel(keys);
+    const design = toDesign(createGame(l, sharded(3, 'country')));
+    expect(design.components.find(c => c.id === 'db')!.params).toMatchObject({ instances: 3, shardKey: 'country' });
+  });
+
+  it('a Shard that is down loses its slice of the data', () => {
+    const l = shardLevel(keys, 400);
+    const live = callNow(createGame(l, sharded(2, 'userId')));
+    const down = { ...live, buildings: live.buildings.map(b => (b.id === 'db' ? { ...b, instances: b.instances.map((i, k) => (k === 0 ? { ...i, down: true } : i)) } : b)) };
+    expect(run(down, 5, l).flow!.errors).toBeCloseTo(0.5);
   });
 });

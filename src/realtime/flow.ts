@@ -12,7 +12,15 @@ import type { Catalog } from '../engine/types';
 
 /** One running copy of a building; it serves only when built and not down. */
 export type Instance = { buildLeftS: number; buildTotalS: number; down: boolean };
-export type Building = { id: string; type: string; params: { size?: string; ttlS?: number }; instances: Instance[] };
+export type Building = { id: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string }; instances: Instance[] };
+/** How traffic spreads over the values of each Shard Key: per key, the share of requests for each value (adds up to 1). */
+export type ShardKeys = Record<string, number[]>;
+/** Each value of a key lives on shard `value mod shards`; a Shard's share is the sum over its values. */
+export function shardShares(weights: number[], shards: number): number[] {
+  const shares = new Array<number>(shards).fill(0);
+  weights.forEach((w, value) => { shares[value % shards]! += w; });
+  return shares;
+}
 /** A connection; `client` is the users on the Internet. */
 export type Link = { from: string; to: string };
 
@@ -42,6 +50,8 @@ export type Flow = {
   release: Record<string, number>;
   /** Messages per second the serving Workers behind each queue can take; 0 when none serves. */
   releaseCapacity: Record<string, number>;
+  /** Share of capacity in use on each Shard (0–1), for each building that is split into several Shards. */
+  shards: Record<string, number[]>;
 };
 /** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
 export type Queues = { backlog: Record<string, number>; dt: number };
@@ -76,12 +86,13 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
  * Backlog of each queue from the step before; the result holds it after this one.
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
-  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }): Flow {
+  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
   const load: Record<string, number> = {}, usable: Record<string, number> = {};
   const backlog: Record<string, number> = {}, release: Record<string, number> = {}, releaseCapacity: Record<string, number> = {};
+  const shards: Record<string, number[]> = {};
   const add = (map: Record<string, number>, key: string, v: number) => { map[key] = (map[key] ?? 0) + v; };
   let answered = 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
@@ -91,7 +102,9 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   // A building marked `balanced` (a Read Replica) is spread over by whoever calls it.
   for (const b of buildings) {
     const spread = catalog[b.type]?.balanced || links.some(l => l.to === b.id && l.from !== CLIENT && catalog[byId.get(l.from)?.type ?? '']?.distributes);
-    usable[b.id] = spread ? serving(b.id) : Math.min(1, serving(b.id));
+    // Shards each serve their own slice, so every serving one works.
+    const split = catalog[b.type]?.shardable && keys && b.instances.length > 1;
+    usable[b.id] = spread || split ? serving(b.id) : Math.min(1, serving(b.id));
   }
   // Links never make a circle (the game refuses them), so a depth-first order from the users is a valid order.
   const order: string[] = [], seen = new Set<string>();
@@ -144,8 +157,14 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (id === CLIENT) { for (const t of types) send(id, t, rps * mix[t]!); continue; }
     const b = byId.get(id)!, spec = catalog[b.type]!;
     const capacity = usable[id]! * capacityOf(b, catalog);
-    const ok = Math.min(f, capacity);
-    load[id] = capacity ? ok / capacity : 1;
+    // A building split into Shards: each Shard gets its slice of the traffic from the Shard Key and serves only that;
+    // a Shard that is down or still being built drops its slice. The busiest Shard sets the building's load and latency.
+    const slices = spec.shardable && keys && b.instances.length > 1
+      ? shardShares(keys[b.params.shardKey ?? ''] ?? keys[Object.keys(keys)[0]!] ?? [1], b.instances.length).map((share, k) => f * share / (isServing(b.instances[k]!) ? capacityOf(b, catalog) : 0))
+      : null;
+    if (slices) shards[id] = slices.map(x => Math.min(1, x));
+    const ok = slices ? slices.reduce((sum, x, k) => sum + (isServing(b.instances[k]!) ? Math.min(x, 1) : 0) * capacityOf(b, catalog), 0) : Math.min(f, capacity);
+    load[id] = slices ? Math.max(...shards[id]!) : capacity ? ok / capacity : 1;
     add(drop, id, f - ok);
     // What gets in is a share of each channel, the same share for all.
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };
@@ -198,7 +217,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, inflow, drop, edge, load, usable, backlog, release, releaseCapacity,
+    rps, answered, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

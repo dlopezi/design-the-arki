@@ -33,7 +33,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
@@ -175,6 +175,43 @@ describe('level files', () => {
     it('loses with no Read Replica: the primary database takes every read', () => {
       const bare = { components: ref.components.filter(c => c.type !== 'readReplica'), connections: ref.connections.filter(([a, b]) => a !== 'replicas' && b !== 'replicas') };
       expect(play(bare).phase).toBe('lost');
+    });
+  });
+
+  describe('Shard Keys in a level file', () => {
+    const base = allLevels('en').find(l => l.id === '17-too-much-to-write')!;
+    const withKeys = (shardKeys: unknown) => ({ ...base, play: { ...base.play, shardKeys } });
+
+    it('accepts keys whose shares add up to 1', () => {
+      expect(parseLevel(withKeys({ userId: [0.5, 0.5], country: [0.8, 0.1, 0.1] })).play.shardKeys!.country).toEqual([0.8, 0.1, 0.1]);
+    });
+
+    it('rejects a key whose shares do not add up to 1, an empty key and a share of 0 or less', () => {
+      expect(() => parseLevel(withKeys({ userId: [0.5, 0.3] }))).toThrow(/must add up to 1/);
+      expect(() => parseLevel(withKeys({ userId: [] }))).toThrow(/Shard Key/);
+      expect(() => parseLevel(withKeys({ userId: [1, 0] }))).toThrow(/Shard Key/);
+    });
+
+    it('needs a database in a level that offers Shard Keys, and at least one key', () => {
+      expect(() => parseLevel({ ...withKeys({ userId: [0.5, 0.5] }), allowedComponents: ['loadBalancer', 'appServer'] })).toThrow(/must allow a database/);
+      expect(() => parseLevel(withKeys({}))).toThrow(/at least one/);
+    });
+
+    it('is optional: levels of chapters 1 and 2 have none', () => {
+      expect(allLevels('en').filter(l => l.chapter === 'Core' || l.chapter === 'Async').every(l => l.play.shardKeys === undefined)).toBe(true);
+    });
+  });
+
+  describe('17-too-much-to-write: one database cannot take the writes, so add Shards', () => {
+    const level = allLevels('en').find(l => l.id === '17-too-much-to-write')!;
+    const ref = level.referenceDesign;
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
+    const shards = (n: number) => ({ ...ref, components: ref.components.map(c => (c.type === 'database' ? { ...c, params: { ...c.params, instances: n } } : c)) });
+
+    it('wins with enough Shards, and loses with one database or with too few Shards', () => {
+      expect(play(ref)).toBe('won');
+      expect(play(shards(1))).toBe('lost');
+      expect(play(shards(2))).toBe('lost');
     });
   });
 

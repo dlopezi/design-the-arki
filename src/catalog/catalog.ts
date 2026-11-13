@@ -42,7 +42,9 @@ export const catalog: Catalog = {
     defaultSize: 'small',
     // It serves every kind of read (also Read-your-writes, which a Read Replica cannot), takes writes and the results Workers write; processing a job is not its work.
     accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE],
-    presentation: { zone: 'data', technology: 'PostgreSQL' },
+    // In a level that offers Shard Keys its instances are Shards (ADR-0007).
+    shardable: true,
+    presentation: { zone: 'data', technology: 'PostgreSQL', instancePrefix: 'shard' },
   },
   // Chapter 3 (Data scale). A copy of the primary database that answers reads only (ADR-0007). It gets the reads
   // before the primary does, and instances share them without a load balancer.

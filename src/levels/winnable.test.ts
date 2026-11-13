@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { build, BUILD_PHASE_S, createGame, demolish, resize, rewire, runToEnd, setTtl, starsOf, type GameState } from '../realtime/game';
+import { build, BUILD_PHASE_S, createGame, demolish, resize, rewire, runToEnd, setShardKey, setTtl, starsOf, type GameState } from '../realtime/game';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
 
@@ -34,6 +34,7 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
       if (b()!.instances.length === before) { log.push(`could not add a ${c.type} instance with $${Math.floor(s.money)}`); break; }
     }
     if (c.params?.ttlS !== undefined) s = setTtl(s, b()!.id, Number(c.params.ttlS));
+    if (c.params?.shardKey !== undefined) s = setShardKey(s, b()!.id, String(c.params.shardKey), level);
   }
   s = rewire(s);
   log.push(`money left after building: $${Math.floor(s.money)}`);

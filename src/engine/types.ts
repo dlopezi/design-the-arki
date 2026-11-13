@@ -48,6 +48,11 @@ export type StationPrimitive = {
    * those types here, and to the others only when it is not (a Read Replica takes the reads, the primary database the rest).
    */
   prefers?: string[];
+  /**
+   * Its instances can be Shards, in a level that offers Shard Keys (ADR-0007): each Shard holds one slice of the data,
+   * chosen by the Shard Key, and serves only that slice.
+   */
+  shardable?: boolean;
   /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
   balanced?: boolean;
   /** The type of building whose data it keeps a copy of: it may be connected to it without ending in a dead end (replication). */

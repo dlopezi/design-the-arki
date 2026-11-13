@@ -14,6 +14,10 @@ const waveMix = z.record(z.string(), z.number().positive().max(1))
   .refine(mix => unknownTypes(mix).length === 0, { error: issue => `Unknown Request Type: ${unknownTypes(issue.input as object).join(', ')}` })
   .refine(mix => Math.abs(Object.values(mix).reduce((a, v) => a + v, 0) - 1) < 1e-6, 'The shares of the mix must add up to 1');
 
+/** How traffic spreads over the values of one Shard Key: a share for each value, every share above 0, adding up to 1. */
+const shardKey = z.array(z.number().positive('Every share of a Shard Key must be above 0').max(1)).min(2, 'A Shard Key needs at least two values')
+  .refine(shares => Math.abs(shares.reduce((a, v) => a + v, 0) - 1) < 1e-6, 'The shares of a Shard Key must add up to 1');
+
 const designSchema = z.object({
   components: z.array(z.object({ id: z.string().min(1), type: componentType, params: z.record(z.string(), z.unknown()).optional() })),
   connections: z.array(z.tuple([z.string(), z.string()])),
@@ -46,6 +50,8 @@ const levelSchema = z.object({
     wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive(), mix: waveMix.optional() }),
     incident: z.object({ atS: z.number().min(0), componentType }).optional(),
     starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
+    /** Levels that teach Sharding: the Shard Keys on offer (the first is the default) and how traffic spreads over each one's values. */
+    shardKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Shard Keys needs at least one key').optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
@@ -74,6 +80,10 @@ const levelSchema = z.object({
   // A Read Replica is a copy of the primary database: without one there is nothing to copy (ADR-0007).
   if (allowed.has('readReplica') && !allowed.has('database')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that allows a readReplica must allow a database' });
+  }
+  // Shards are instances of the database: without one there is nothing to split (ADR-0007).
+  if (level.play.shardKeys && !allowed.has('database')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that offers Shard Keys must allow a database' });
   }
   // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
   if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
