@@ -63,18 +63,18 @@
       "maxInstances": 4
     }
   },
-  "guidedHint": "The Replication Lag may not pass 2 seconds. A small Read Replica applies 100 writes a second, but 176 arrive: it falls further behind every second. Use a medium Read Replica. Every part has its job: uploads straight to Object Storage, Read-your-writes to the primary database, jobs through the queue.",
+  "guidedHint": "The Replication Lag may not pass 2 seconds. A small Read Replica applies 100 writes a second, but 167 arrive: it falls further behind every second. Use a medium Read Replica. Every part has its job: uploads straight to Object Storage, Read-your-writes to the primary database, jobs through the queue.",
   "play": {
     "startMoney": 700,
     "wave": {
       "rps": 440,
       "lengthS": 30,
       "mix": {
-        "watch": 0.25,
-        "read": 0.2,
+        "watch": 0.36,
+        "read": 0.12,
         "readYourWrites": 0.08,
-        "write": 0.4,
-        "upload": 0.05,
+        "write": 0.38,
+        "upload": 0.04,
         "job": 0.02
       }
     },

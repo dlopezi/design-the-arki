@@ -293,7 +293,7 @@ describe('level files', () => {
     });
 
     it('loses when any one part of the review is missing', () => {
-      for (const type of ['readReplica', 'messageQueue', 'objectStorage']) expect(play(without(type)), type).toBe('lost');
+      for (const type of ['loadBalancer', 'cache', 'readReplica', 'messageQueue', 'worker', 'objectStorage']) expect(play(without(type)), type).toBe('lost');
     });
   });
 
