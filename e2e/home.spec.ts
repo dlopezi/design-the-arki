@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { maxStars } from './helpers';
+import { levelIds, maxStars } from './helpers';
 
 const levelNode = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
@@ -79,4 +79,39 @@ test('the campaign map scrolls with the mouse wheel, so the last chapter can be 
   await page.mouse.move(400, 400);
   await page.mouse.wheel(0, 3000);
   await expect(lastChapter).toBeInViewport();
+});
+
+// A player who passed levels 1-19: the next level (20, chapter 3) is selected on load.
+const farProgress = JSON.stringify({ version: 1, tutorialDone: true, mode: 'normal', levels: Object.fromEntries(levelIds.slice(0, 19).map(id => [id, { bestStars: 1, bestMode: 'normal' }])) });
+const screens = [{ width: 1280, height: 720 }, { width: 1366, height: 600 }, { width: 1024, height: 768 }];
+
+test('the campaign map scrolls to the selected level on load and when the arrow keys move it', async ({ page }) => {
+  await page.addInitScript(p => localStorage.setItem('design-the-arki:progress', p), farProgress);
+  for (const size of screens) {
+    const at = `${size.width}x${size.height}`;
+    await page.setViewportSize(size);
+    await page.goto('/#levels');
+    await page.reload();
+    const last = page.getByRole('button', { name: 'Play Release day' });
+    await expect(page.locator('.campaign-briefing').getByRole('heading', { name: 'Release day' })).toBeVisible();
+    await expect(last, `level 20 at ${at}`).toBeInViewport({ ratio: 1 });
+
+    // Arrow keys go back to chapter 1 and forward again: the list follows the selection.
+    for (let i = 0; i < 19; i++) await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('button', { name: 'Play Hello world' }), `level 1 at ${at}`).toBeInViewport({ ratio: 1 });
+    for (let i = 0; i < 19; i++) await page.keyboard.press('ArrowRight');
+    await expect(last, `level 20 again at ${at}`).toBeInViewport({ ratio: 1 });
+  }
+});
+
+test('the Play button stays visible in a long briefing on short screens', async ({ page }) => {
+  await page.addInitScript(p => localStorage.setItem('design-the-arki:progress', p), farProgress);
+  for (const size of screens) {
+    await page.setViewportSize(size);
+    await page.goto('/#levels');
+    await page.reload();
+    const briefing = page.locator('.campaign-briefing');
+    await expect(briefing.getByRole('heading', { name: 'Release day' })).toBeVisible();
+    await expect(briefing.locator('.campaign-play'), `Play at ${size.width}x${size.height}`).toBeInViewport({ ratio: 1 });
+  }
 });
