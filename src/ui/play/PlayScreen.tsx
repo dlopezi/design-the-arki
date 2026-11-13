@@ -334,6 +334,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const waiting = Math.round(game.backlog[b.id] ?? 0);
     // A queue shows its Backlog on the map, so the player sees whether the Workers keep up.
     const backlogNote = catalog[b.type]!.queue ? `${t.rt.backlog}: ${waiting}` : '';
+    // A queue shows its Queue Age as a gauge that fills towards the level's maximum, instead of a load bar.
+    const isQueue = !!catalog[b.type]!.queue, maxAge = level.requirements.maxQueueAgeS, age = game.queueAge[b.id] ?? 0;
+    const ageShare = isQueue && maxAge ? Math.min(1, age / maxAge) : 0;
     const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : backlogNote;
     const selected = selectedBuilding?.id === b.id;
     return (
@@ -343,7 +346,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {inst.buildLeftS > 0 && <span className="play-progress"><span style={{ width: `${100 - (inst.buildLeftS / Math.max(1, inst.buildTotalS)) * 100}%` }} /></span>}
         <span className="name">{label}</span>
         {sub && <span className="sub">{sub}</span>}
-        {active && !inst.down && <span className={`play-load ${loadClass(load)}`}><span style={{ width: `${Math.round(load * 100)}%` }} /></span>}
+        {active && !inst.down && (isQueue && maxAge
+          ? <span className={`play-load play-age-gauge ${loadClass(ageShare)}`} role="meter" aria-label={`${t.rt.queueAge}: ${t.rt.queueAgeOf(age, maxAge)}`} aria-valuemin={0} aria-valuemax={maxAge} aria-valuenow={Math.round(age)}><span style={{ width: `${Math.round(ageShare * 100)}%` }} /></span>
+          : <span className={`play-load ${loadClass(load)}`}><span style={{ width: `${Math.round(load * 100)}%` }} /></span>)}
       </button>
     );
   }
@@ -520,7 +525,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <section className="play-frame" aria-label={t.rt.live}>
           <span className="label">{t.rt.live}</span>
           <div className="play-charts">
-            <div className="play-chart">RPS<Spark values={game.history.map(h => h.rps)} max={Math.max(100, level.play.wave.rps * 1.2)} color="#3ee0c8" /><b>{rps}</b></div>
+            {hasQueue
+              ? <div className="play-chart">{t.rt.queueAge}<Spark values={game.history.map(h => h.age)} max={Math.max(10, (level.requirements.maxQueueAgeS ?? 5) * 2)} color={componentColor('messageQueue')} limit={level.requirements.maxQueueAgeS} /><b className={tooOld ? 'bad' : ''}>{Math.round(oldest)} s</b></div>
+              : <div className="play-chart">RPS<Spark values={game.history.map(h => h.rps)} max={Math.max(100, level.play.wave.rps * 1.2)} color="#3ee0c8" /><b>{rps}</b></div>}
             <div className="play-chart">P95<Spark values={game.history.map(h => h.p95)} max={Math.max(400, level.requirements.p95Ms * 3)} color="#fbbf24" limit={level.requirements.p95Ms} /><b className={(flow?.p95 ?? 0) > level.requirements.p95Ms ? 'bad' : ''}>{flow?.p95 ?? 0} ms</b></div>
             <div className="play-chart">{t.rt.errors}<Spark values={game.history.map(h => h.errors)} max={0.5} color="#f87171" limit={level.requirements.maxErrorRate} /><b className={(flow?.errors ?? 0) > level.requirements.maxErrorRate ? 'bad' : ''}>{((flow?.errors ?? 0) * 100).toFixed(1)}%</b></div>
           </div>
@@ -529,7 +536,6 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <dt>{t.rt.visitsIncome}</dt><dd>+${(((flow?.answered ?? 0) / 100) * PER_100_VISITS).toFixed(1)}/s</dd>
             <dt>{t.rt.upkeep}</dt><dd>−${upkeepPerS(game).toFixed(1)}/s</dd>
             {hasQueue && <>
-              <dt>{t.rt.queueAge}</dt><dd className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</dd>
               <dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(totalBacklog(game)))}</dd>
             </>}
           </dl>

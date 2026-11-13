@@ -43,7 +43,8 @@ export type GameLevel = {
 /** What happened, for the message log; the UI turns each kind into text. */
 export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
-export type Sample = { t: number; rps: number; p95: number; errors: number };
+/** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them. */
+export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number };
 export type GameState = {
   t: number;
   /** build → wave → (drain, while Messages are still waiting after the wave) → won or lost. */
@@ -292,7 +293,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
     const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
-  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors }];
+  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s) }];
   // End.
   if ((s.phase === 'wave' || s.phase === 'drain') && s.reputation <= 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'reputation' }); }
   else if (s.money < 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'money' }); }

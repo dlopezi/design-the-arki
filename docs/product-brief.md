@@ -61,7 +61,14 @@ Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: 
   5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
   6. *Launch day*: everything together, with a burst and a Worker outage. As the chapter's review, it also needs chapter 1 buildings: a load balancer in front of several app servers and a cache for watches.
 - **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
-- **To decide with a prototype**: how the map and console show the Backlog and the Queue Age. Until then (built 2026-11-13): the Backlog count on the Message Queue on the map, the Queue Age next to its maximum in the top bar and the console, and the Drain Phase on the phase timer (open ticket: the prototype and the owner's choice).
+- **Backlog and Queue Age look (decided 2026-11-13, without a prototype session)**: the owner asked for chapter 2 to be finished without human intervention, so the choice was made by real practice: queue dashboards graph the age of the oldest message against an alert line. Options weighed: a count on the queue, a bar that turns red near the maximum, Messages piling up on the map, a Backlog chart. Chosen: the bar and the chart together, because they answer "are my Workers keeping up?" at a glance (map) and over time (console).
+  ```
+  top bar:   $287 +0.5/s   ⏱ Drain · 47 left  [⏸ 1× 2× 4×]   ⏳ 12 s / max 30 s   ❤ 100%
+  map:       [Message queue]  Backlog: 47      gauge ▓▓▓░░░░░░  (fills to the maximum Queue Age; amber at 70%, red at 90%)
+  console:   Queue Age  ~~~~~ line with a red dashed limit ~~~~~  12 s   (replaces the RPS chart in levels with a queue)
+             P95 / Errors as before; "Backlog: 47 Messages" under the money rows; the inspector of the queue shows both numbers
+  ```
+  If the owner prefers another look (for example Messages piling up on the map), change `PlayScreen.tsx` only: the game keeps `backlog`, `queueAge` and their per-second history.
 - **Status (2026-11-13)**: the six missions (`09`–`14`), the Message Queue and Worker, the Drain Phase and the Manual entries are built, in English and Spanish.
 
 ## Game screen
