@@ -517,3 +517,89 @@ describe('data scale: Shards hold more writes, and the Shard Key decides how tra
     expect(run(down, 5, l).flow!.errors).toBeCloseTo(0.5);
   });
 });
+
+describe('data scale: big uploads go straight to Object Storage, not through the app server', () => {
+  // A medium app server serves 200 normal requests per second; an upload keeps it busy as long as 10 of them.
+  const uploadLevel = (mix: Record<string, number>, rps: number): GameLevel => ({
+    allowedComponents: ['loadBalancer', 'appServer', 'database', 'objectStorage'],
+    componentOptions: { appServer: { maxInstances: 4 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 500, wave: { rps, lengthS: 30, mix }, starMoney: [100, 200] },
+  });
+  const design = (links: [string, string][], withStorage = true): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, ...(withStorage ? [{ id: 'files', type: 'objectStorage' }] : [])],
+    connections: [['client', 'api'], ['api', 'db'], ...links],
+  });
+  const play = (l: GameLevel, d: Design) => run(callNow(createGame(l, d)), 5, l);
+
+  it('an upload sent through the app server keeps it busy: 40 uploads a second are 400 normal requests for a medium app server', () => {
+    const l = uploadLevel({ upload: 1 }, 40);
+    const s = play(l, design([['api', 'files']]));
+    expect(s.flow!.errors).toBeCloseTo(0.5);
+    expect(s.flow!.load.api).toBe(1);
+  });
+
+  it('an upload sent straight from the users to Object Storage leaves the app server free', () => {
+    const l = uploadLevel({ upload: 0.8, watch: 0.2 }, 100);
+    const s = play(l, design([['api', 'files'], ['client', 'files']]));
+    expect(s.flow!.inflow.files).toBeCloseTo(80);
+    expect(s.flow!.inflow.api).toBeCloseTo(20);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('the users can have two entrances: the app server for the work and Object Storage for the files; a new load balancer replaces only the first', () => {
+    const l = uploadLevel({ upload: 0.5, watch: 0.5 }, 20);
+    const s = connect(createGame(l, design([['api', 'files']])), 'client', 'files');
+    expect(named(s)).toEqual(expect.arrayContaining(['client>appServer', 'client>objectStorage']));
+    const withLb = named(build(s, 'loadBalancer', l));
+    expect(withLb).toContain('client>loadBalancer');
+    expect(withLb).toContain('client>objectStorage');
+    expect(withLb).not.toContain('client>appServer');
+  });
+
+  it('the users connecting to a building that is not an entrance for some types (a cache) still replace the way in, as before', () => {
+    const l = { ...uploadLevel({ watch: 1 }, 10), allowedComponents: ['appServer', 'cache', 'database', 'objectStorage'] };
+    const s = build(createGame(l, design([])), 'cache', l);
+    const cache = s.buildings.find(b => b.type === 'cache')!.id;
+    expect(named(connect(s, 'client', cache))).toEqual(expect.arrayContaining(['client>cache']));
+    expect(named(connect(s, 'client', cache))).not.toContain('client>appServer');
+  });
+
+  it('Object Storage takes uploads only: a watch is never sent to it, even from a connected user', () => {
+    const l = uploadLevel({ watch: 0.5, upload: 0.5 }, 100);
+    const s = play(l, design([['api', 'files'], ['client', 'files']]));
+    expect(s.flow!.inflow.files).toBeCloseTo(50); // the uploads only
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('the users cannot connect to Object Storage in a level with no uploads: it takes uploads only', () => {
+    const l = uploadLevel({ watch: 1 }, 10);
+    const s = createGame(l, design([]));
+    const files = s.buildings.find(b => b.type === 'objectStorage')!.id;
+    const refused = connect(s, 'client', files);
+    expect(refused.links).toBe(s.links);
+    expect(refused.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'uploadsOnly' });
+    const withUploads = uploadLevel({ watch: 0.5, upload: 0.5 }, 10);
+    expect(named(connect(createGame(withUploads, design([])), 'client', 'files'))).toContain('client>objectStorage');
+  });
+
+  it('with no way to store a file, an upload is an error', () => {
+    const l = uploadLevel({ upload: 1 }, 10);
+    expect(play(l, design([], false)).flow!.errors).toBe(1);
+  });
+
+  it('new buildings connect the app server to Object Storage by themselves, in any order, and keep the users at the app server', () => {
+    const l = uploadLevel({ upload: 1 }, 10);
+    const built = (order: string[]) => named(order.reduce((acc, type) => build(acc, type, l), createGame(l, empty))).sort();
+    const wired = ['appServer>database', 'appServer>objectStorage', 'client>appServer'];
+    expect(built(['appServer', 'database', 'objectStorage'])).toEqual(wired);
+    expect(built(['objectStorage', 'database', 'appServer'])).toEqual(wired);
+  });
+
+  it('Object Storage has a fixed price and no instances to add', () => {
+    const l = uploadLevel({ upload: 1 }, 10);
+    const s = build(createGame(l, empty), 'objectStorage', l);
+    expect(s.money).toBe(500 - 30);
+    expect(build(s, 'objectStorage', l).buildings.find(b => b.type === 'objectStorage')!.instances).toHaveLength(1);
+  });
+});

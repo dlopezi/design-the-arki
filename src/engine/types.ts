@@ -53,6 +53,11 @@ export type StationPrimitive = {
    * chosen by the Shard Key, and serves only that slice.
    */
   shardable?: boolean;
+  /**
+   * Request Types that keep the building busy longer than a normal request: the capacity one request of the type
+   * uses, in normal requests (an upload on an app server).
+   */
+  effort?: Record<string, number>;
   /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
   balanced?: boolean;
   /** The type of building whose data it keeps a copy of: it may be connected to it without ending in a dead end (replication). */

@@ -34,7 +34,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
@@ -93,7 +93,7 @@ describe('level files', () => {
     it('rejects an empty mix, a share of 0 and an unknown Request Type', () => {
       expect(() => parseLevel(withMix({}))).toThrow(/at least one/);
       expect(() => parseLevel(withMix({ watch: 1, job: 0 }))).toThrow(/mix/);
-      expect(() => parseLevel(withMix({ watch: 0.5, upload: 0.5 }))).toThrow(/Unknown Request Type: upload/);
+      expect(() => parseLevel(withMix({ watch: 0.5, telepathy: 0.5 }))).toThrow(/Unknown Request Type: telepathy/);
     });
 
     it('is optional: the levels of chapter 1 have none', () => {
@@ -241,6 +241,31 @@ describe('level files', () => {
 
     it('is not fixed by adding Shards while the key stays skewed', () => {
       expect(play(withDatabase({ instances: 4, shardKey: 'country' }))).toBe('lost');
+    });
+  });
+
+  describe('19-big-uploads: files go straight to Object Storage, not through the app server', () => {
+    const level = allLevels('en').find(l => l.id === '19-big-uploads')!;
+    const ref = level.referenceDesign;
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
+    const storageId = ref.components.find(c => c.type === 'objectStorage')!.id;
+    const withoutDirect = { ...ref, connections: ref.connections.filter(([a, b]) => !(a === 'client' && b === storageId)) };
+
+    it('wins when the users upload straight to Object Storage', () => {
+      expect(play(ref)).toBe('won');
+      expect(ref.connections).toContainEqual(['client', storageId]);
+    });
+
+    it('loses when the files go through the app servers, even with every app server the level allows', () => {
+      expect(play(withoutDirect)).toBe('lost');
+      const maxApps = level.componentOptions.appServer!.maxInstances!;
+      const bigger = { ...withoutDirect, components: withoutDirect.components.map(c => (c.type === 'appServer' ? { ...c, params: { instances: maxApps } } : c)) };
+      expect(play(bigger)).toBe('lost');
+    });
+
+    it('loses with no Object Storage at all: the files have nowhere to go', () => {
+      const none = { components: ref.components.filter(c => c.type !== 'objectStorage'), connections: ref.connections.filter(([a, b]) => a !== storageId && b !== storageId) };
+      expect(play(none)).toBe('lost');
     });
   });
 
