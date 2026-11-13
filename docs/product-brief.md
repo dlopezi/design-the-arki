@@ -61,7 +61,8 @@ Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: 
   5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
   6. *Launch day*: everything together, with a burst and a Worker outage. As the chapter's review, it also needs chapter 1 buildings: a load balancer in front of several app servers and a cache for watches.
 - **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
-- **To decide with a prototype**: how the map and console show the Backlog and the Queue Age.
+- **To decide with a prototype**: how the map and console show the Backlog and the Queue Age. Until then (built 2026-11-13): the Backlog count on the Message Queue on the map, the Queue Age next to its maximum in the top bar and the console, and the Drain Phase on the phase timer (open ticket: the prototype and the owner's choice).
+- **Status (2026-11-13)**: the six missions (`09`–`14`), the Message Queue and Worker, the Drain Phase and the Manual entries are built, in English and Spanish.
 
 ## Game screen
 
