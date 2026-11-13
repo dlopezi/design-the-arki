@@ -1,0 +1,248 @@
+{
+  "id": "10-watch-and-upload",
+  "chapter": "Async",
+  "title": "Watch and upload",
+  "brief": "Now people watch videos and upload them at the same time: 40 watches and 10 uploads every second. A watch must be answered at once, so it stays synchronous: the cache or the database answers it. Only the slow work, processing an upload, goes to the queue. Your app server sends each kind of request its own way.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 50
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxQueueAgeS": 20
+  },
+  "budget": 300,
+  "starCostThresholds": [
+    200,
+    160
+  ],
+  "allowedComponents": [
+    "appServer",
+    "cache",
+    "database",
+    "messageQueue",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "cache": {
+      "limits": {
+        "ttlS": 60
+      }
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 3
+    }
+  },
+  "guidedHint": "Only the slow work goes in the queue: watches stay synchronous. The app server sends each kind of request its own way. Add a Worker so the uploads do not pile up.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 50,
+      "lengthS": 30,
+      "mix": {
+        "watch": 0.8,
+        "job": 0.2
+      }
+    },
+    "starMoney": [
+      100,
+      200
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "cache",
+          "type": "cache"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "cache",
+          "type": "cache"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "cache",
+          "type": "cache"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "worker",
+          "type": "worker"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "api",
+        "type": "appServer"
+      },
+      {
+        "id": "cache",
+        "type": "cache"
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "queue",
+        "type": "messageQueue"
+      },
+      {
+        "id": "worker",
+        "type": "worker",
+        "params": {
+          "instances": 2
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ],
+      [
+        "api",
+        "queue"
+      ],
+      [
+        "queue",
+        "worker"
+      ],
+      [
+        "worker",
+        "db"
+      ]
+    ]
+  }
+}
