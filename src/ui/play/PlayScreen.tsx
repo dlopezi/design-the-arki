@@ -382,7 +382,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     }
     return here.map(b => (hasInstances(b.type)
       ? <div key={b.id} className="play-container" data-container={b.id}>
-          <span className="name">{buildingName(b.type)} · {t.instanceCount(b.instances.length)}</span>
+          <span className="name">{buildingName(b.type)} · {catalog[b.type]!.shardable && level.play.shardKeys ? t.shardCount(b.instances.length) : t.instanceCount(b.instances.length)}</span>
           {b.instances.map((_, k) => piece(b, k, 52))}
         </div>
       : piece(b, 0, 64)));

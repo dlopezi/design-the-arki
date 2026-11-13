@@ -85,6 +85,17 @@ const levelSchema = z.object({
   if (level.play.shardKeys && !allowed.has('database')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that offers Shard Keys must allow a database' });
   }
+  // A design can only pick a Shard Key the level offers.
+  const offered = Object.keys(level.play.shardKeys ?? {});
+  const designs: [string, z.infer<typeof designSchema>][] = [['referenceDesign', level.referenceDesign], ...Object.entries(level.startingDesigns).map(([mode, d]) => [`startingDesigns.${mode}`, d] as [string, z.infer<typeof designSchema>])];
+  for (const [path, design] of designs) {
+    for (const c of design.components) {
+      const key = c.params?.shardKey;
+      if (key !== undefined && !offered.includes(String(key))) {
+        ctx.addIssue({ code: 'custom', path: path.split('.'), message: `Shard Key "${String(key)}" is not on offer in this level` });
+      }
+    }
+  }
   // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
   if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
     ctx.addIssue({ code: 'custom', path: ['requirements', 'maxQueueAgeS'], message: 'A level that allows a messageQueue must set a maximum Queue Age' });

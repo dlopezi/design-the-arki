@@ -209,6 +209,7 @@ export const en = {
   zones: { edge: 'Edge', application: 'Application', data: 'Data' },
   container: 'Container',
   instanceCount: (n: number) => `${n} instance${n === 1 ? '' : 's'}`,
+  shardCount: (n: number) => `${n} Shard${n === 1 ? '' : 's'}`,
   inspector: {
     title: 'Inspector',
     empty: 'Select a component on the diagram to see and change its configuration.',

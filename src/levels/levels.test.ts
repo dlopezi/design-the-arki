@@ -197,6 +197,12 @@ describe('level files', () => {
       expect(() => parseLevel(withKeys({}))).toThrow(/at least one/);
     });
 
+    it('rejects a design that sets a Shard Key the level does not offer', () => {
+      const design = { components: [{ id: 'db', type: 'database', params: { instances: 2, shardKey: 'nope' } }], connections: [['client', 'db']] };
+      expect(() => parseLevel({ ...base, referenceDesign: design })).toThrow(/Shard Key "nope" is not on offer/);
+      expect(() => parseLevel({ ...base, startingDesigns: { ...base.startingDesigns, hard: design } })).toThrow(/Shard Key "nope" is not on offer/);
+    });
+
     it('is optional: levels of chapters 1 and 2 have none', () => {
       expect(allLevels('en').filter(l => l.chapter === 'Core' || l.chapter === 'Async').every(l => l.play.shardKeys === undefined)).toBe(true);
     });

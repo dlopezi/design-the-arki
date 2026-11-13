@@ -205,6 +205,7 @@ export const es: Strings = {
   zones: { edge: 'Borde', application: 'Aplicación', data: 'Datos' },
   container: 'Contenedor',
   instanceCount: (n: number) => `${n} instancia${n === 1 ? '' : 's'}`,
+  shardCount: (n: number) => `${n} Shard${n === 1 ? '' : 's'}`,
   inspector: {
     title: 'Inspector',
     empty: 'Selecciona un componente del diagrama para ver y cambiar su configuración.',
