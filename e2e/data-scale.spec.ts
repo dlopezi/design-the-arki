@@ -44,3 +44,18 @@ test('level 16: a design whose app server reaches only the Read Replicas loses, 
   await expect(end).toContainText('own change');
   await expect(end).toContainText('Read-your-writes');
 });
+
+test('level 17: one database cannot take the writes, the hint says to add Shards, and the Shard Key can be picked while building', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads', '16-just-saved-not-there']);
+  await openLevel(page, '17-too-much-to-write', 'normal');
+  await page.locator('[data-node-id="db"]').first().click();
+  await expect(page.getByRole('group', { name: 'Shard Key' }).getByRole('button', { name: 'Video id' })).toBeEnabled();
+  await page.getByRole('group', { name: 'Shard Key' }).getByRole('button', { name: 'Video id' }).click();
+  await expect(page.getByRole('group', { name: 'Shard Key' }).getByRole('button', { name: 'Video id' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 30_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Add Shards');
+});

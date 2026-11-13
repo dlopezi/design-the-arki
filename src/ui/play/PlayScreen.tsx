@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, capacityOf, hitRateOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
-  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
+  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -126,6 +126,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   }, [overlay]);
   const closeManual = useCallback(() => setOverlay(null), []);
   const over = game.phase === 'won' || game.phase === 'lost';
+  /** Whether a type can have several instances in this level: scaled out, or split into Shards when the level offers Shard Keys. */
+  const hasInstances = (type: string) => !!catalog[type]?.scalesOut || (!!catalog[type]?.shardable && !!level.play.shardKeys);
 
   // ───────── Time: 10 updates a second, faster with the speed buttons ─────────
   useEffect(() => {
@@ -319,6 +321,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
     if (!type) return null;
+    // A level that offers Shard Keys: a full database needs Shards, not a cache.
+    if (type === 'database' && level.play.shardKeys) return t.shardHint;
     // A size the level does not let the player change must not be the advice.
     const fixed = (level.componentOptions[type]?.sizes?.length ?? 2) < 2;
     return (fixed && t.fixedHints[type]) || (t.hints[type] ?? t.genericHint(buildingName(type)));
@@ -331,11 +335,12 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const noEntry = (b: Bld) => !game.links.some(l => l.to === b.id);
   const deadEnd = (b: Bld) => !catalog[b.type]!.endsRequests && !game.links.some(l => l.from === b.id);
   function piece(b: Bld, k: number, size: number) {
-    const inst = b.instances[k]!, scaled = !!catalog[b.type]!.scalesOut;
+    const inst = b.instances[k]!, scaled = hasInstances(b.type);
     const active = isServing(inst);
     const servingIndex = b.instances.slice(0, k + 1).filter(isServing).length;
     const idle = active && (game.phase === 'wave' || game.phase === 'drain') && servingIndex > (flow?.usable[b.id] ?? 0);
-    const load = active && !idle ? flow?.load[b.id] ?? 0 : 0;
+    // A building split into Shards shows each Shard's own load.
+    const load = active && !idle ? flow?.shards[b.id]?.[k] ?? flow?.load[b.id] ?? 0 : 0;
     const warn = noEntry(b) ? t.rt.inspector.noEntry : deadEnd(b) ? t.rt.inspector.deadEnd : '';
     const label = scaled ? instanceNames.get(b.id)?.[k] ?? b.type : buildingName(b.type);
     const waiting = Math.round(game.backlog[b.id] ?? 0);
@@ -375,9 +380,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         );
       });
     }
-    return here.map(b => (catalog[b.type]!.scalesOut
+    return here.map(b => (hasInstances(b.type)
       ? <div key={b.id} className="play-container" data-container={b.id}>
-          <span className="name">{buildingName(b.type)} · {t.instanceCount(b.instances.length)}</span>
+          <span className="name">{buildingName(b.type)} · {catalog[b.type]!.shardable && level.play.shardKeys ? t.shardCount(b.instances.length) : t.instanceCount(b.instances.length)}</span>
           {b.instances.map((_, k) => piece(b, k, 52))}
         </div>
       : piece(b, 0, 64)));
@@ -386,7 +391,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const instanceNames = useMemo(() => {
     const counters = new Map<string, number>(), names = new Map<string, string[]>();
     for (const b of game.buildings) {
-      if (!catalog[b.type]!.scalesOut) continue;
+      if (!hasInstances(b.type)) continue;
       const prefix = catalog[b.type]!.presentation?.instancePrefix ?? b.type;
       names.set(b.id, b.instances.map(() => { const n = (counters.get(prefix) ?? 0) + 1; counters.set(prefix, n); return `${prefix}-${n}`; }));
     }
@@ -417,6 +422,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const outs = game.links.filter(l => l.from === b.id).map(l => nameOf(game, l.to)).join(', ') || '—';
     const ttlMax = level.componentOptions[b.type]?.limits?.ttlS ?? 600;
     const problem = buildProblem(game, b.type, level);
+    // A database is split into Shards in a level that offers Shard Keys; the key is picked in the build phase only.
+    const sharded = !!spec.shardable && !!level.play.shardKeys;
+    const shardKeys = Object.keys(level.play.shardKeys ?? {});
+    const shardKey = b.params.shardKey ?? shardKeys[0];
     return <>
       <div className="play-ins-head">
         <span className="play-portrait" style={{ ['--c' as string]: componentColor(b.type) }}><Building type={b.type} size={56} /></span>
@@ -424,7 +433,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       </div>
       <dl className="play-rows">
         <dt>{i.state}</dt><dd>{b.instances.some(x => x.down) ? i.down : serving === b.instances.length ? i.serving : i.building(Math.ceil(Math.max(...b.instances.map(x => x.buildLeftS))))}</dd>
-        {spec.scalesOut && <><dt>{i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
+        {hasInstances(b.type) && <><dt>{sharded ? i.shards : i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
+        {sharded && b.instances.length > 1 && flow?.shards[b.id] && <><dt>{i.load}</dt><dd>{i.shardLoad(flow.shards[b.id]!)}</dd></>}
         <dt>{i.sendsTo}</dt><dd>{spec.endsRequests && !spec.shortcut ? i.answers : outs}</dd>
         <dt>{i.receives}</dt><dd>{i.perSecond(Math.round(flow?.inflow[b.id] ?? 0))}</dd>
         {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
@@ -443,6 +453,15 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           })}
         </fieldset>
       )}
+      {sharded && shardKeys.length > 0 && (
+        <fieldset className="play-sizes" aria-label={i.shardKey}>
+          <legend className="muted">{i.shardKey}{!building && <> · {i.shardKeyLocked}</>}</legend>
+          {shardKeys.map(key => (
+            <button key={key} className={`btn ${key === shardKey ? 'on' : ''}`} aria-pressed={key === shardKey} disabled={key === shardKey || !building}
+              onClick={() => setGame(g => setShardKey(g, b.id, key, level))}>{t.shardKeyNames[key] ?? key}</button>
+          ))}
+        </fieldset>
+      )}
       {spec.shortcut && (
         <div className="play-ttl"><span className="muted">{i.ttl}</span>
           <span className="stepper">
@@ -453,9 +472,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         </div>
       )}
       <div className="play-controls">
-        {spec.scalesOut && <button className="btn" disabled={!!problem} title={problem ? t.rt.build.reasons[problem] : ''} onClick={() => doBuild(b.type)}>{i.addInstance(price)}</button>}
-        {spec.scalesOut && b.instances.length > 1
-          ? <button className="btn" onClick={() => setGame(g => demolish(g, b.id))}>{i.removeInstance(Math.round(price * REFUND))}</button>
+        {hasInstances(b.type) && <button className="btn" disabled={!!problem} title={problem ? t.rt.build.reasons[problem] : ''} onClick={() => doBuild(b.type)}>{sharded ? i.addShard(price) : i.addInstance(price)}</button>}
+        {hasInstances(b.type) && b.instances.length > 1
+          ? <button className="btn" onClick={() => setGame(g => demolish(g, b.id))}>{sharded ? i.removeShard(Math.round(price * REFUND)) : i.removeInstance(Math.round(price * REFUND))}</button>
           : <button className="btn" onClick={() => { setGame(g => demolish(g, b.id)); setSelection(null); }}>{i.remove(Math.round(price * REFUND))}</button>}
       </div>
     </>;

@@ -1,6 +1,6 @@
 import { catalog as defaultCatalog } from '../catalog/catalog';
 import type { Catalog, Design } from '../engine/types';
-import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link } from './flow';
+import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
 /**
  * Real-time play (ADR-0005): a build phase, then one wave of users. Money grows by itself and with every answered
@@ -32,6 +32,8 @@ export type Play = {
   incident?: { atS: number; componentType: string };
   /** Money left at the end for the 2nd, 3rd… star. */
   starMoney: number[];
+  /** Levels that teach Sharding: the Shard Keys on offer and how traffic spreads over the values of each (ADR-0007). The first is the default. */
+  shardKeys?: ShardKeys;
 };
 export type GameLevel = {
   allowedComponents: string[];
@@ -81,7 +83,7 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
     id: c.id, type: c.type,
-    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}) },
+    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
@@ -93,7 +95,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
 /** The design on the map, to save it or show it in the player's Base. */
 export function toDesign(s: GameState): Design {
   return {
-    components: s.buildings.map(b => ({ id: b.id, type: b.type, params: { ...b.params, ...(defaultCatalog[b.type]?.scalesOut ? { instances: b.instances.length } : {}) } })),
+    components: s.buildings.map(b => ({ id: b.id, type: b.type, params: { ...b.params, ...(defaultCatalog[b.type]?.scalesOut || (defaultCatalog[b.type]?.shardable && b.instances.length > 1) ? { instances: b.instances.length } : {}) } })),
     connections: s.links.map(l => [l.from, l.to]),
   };
 }
@@ -188,7 +190,8 @@ export function buildProblem(s: GameState, type: string, level: GameLevel, catal
   if (s.phase === 'won' || s.phase === 'lost') return 'over';
   if (!level.allowedComponents.includes(type)) return 'notInLevel';
   const existing = s.buildings.find(b => b.type === type);
-  if (existing && !catalog[type]!.scalesOut) return 'built';
+  // A database can have several instances only as Shards, in a level that offers Shard Keys.
+  if (existing && !catalog[type]!.scalesOut && !(catalog[type]!.shardable && level.play.shardKeys)) return 'built';
   const max = level.componentOptions[type]?.maxInstances ?? 8;
   if (existing && existing.instances.length >= max) return 'maxInstances';
   if (s.money < instancePrice(existing ?? { type, params: {} }, catalog)) return 'money';
@@ -243,6 +246,15 @@ export function resize(s: GameState, id: string, size: string, catalog: Catalog 
     events: log(s, { kind: 'resized', type: b.type, id }),
   };
 }
+/**
+ * Picks the Shard Key of a database. Only in the build phase: in real life re-sharding means moving data and downtime,
+ * so once the wave has started the key is locked.
+ */
+export function setShardKey(s: GameState, id: string, key: string, level: GameLevel): GameState {
+  if (!level.play.shardKeys?.[key] || !s.buildings.some(b => b.id === id)) return s;
+  if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'shardKeyLocked' }) };
+  return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, shardKey: key } } : b)) };
+}
 /** Changes a cache's TTL: free and immediate. */
 export const setTtl = (s: GameState, id: string, ttlS: number): GameState =>
   ({ ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, ttlS } } : b)) });
@@ -285,7 +297,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt });
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt }, level.play.shardKeys);
   s.flow = flow;
   s.backlog = flow.backlog;
   s.queueAge = Object.fromEntries(Object.entries(flow.backlog).map(([id, waiting]) => {

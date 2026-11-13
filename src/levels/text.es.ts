@@ -102,4 +102,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Un usuario publica un comentario, la página se recarga y el comentario ha desaparecido. Una Read Replica siempre va un poco por detrás de la base de datos primaria, así que una lectura que cae en ella puede no mostrar lo que el usuario acaba de guardar. Algunas lecturas deben estar al día: Read-your-writes. Van a la base de datos primaria, nunca a una Read Replica; en una Read Replica cuentan como errores. Las lecturas normales aún pueden usar las Read Replicas, pero ahora la primaria tiene más trabajo, así que mantén el app server conectado a ella.',
     guidedHint: 'Una Read Replica va un poco por detrás, así que una lectura que debe mostrar el cambio del propio usuario (Read-your-writes) tiene que ir a la base de datos primaria. Conecta el app server a la primaria además de a las Read Replicas.',
   },
+  '17-too-much-to-write': {
+    title: 'Demasiado que escribir',
+    brief: 'Tu app de vídeo sigue creciendo: llegan 900 peticiones por segundo y siete de cada diez son escrituras (vídeos nuevos, comentarios, «me gusta»). Una Read Replica no ayuda con las escrituras, y una base de datos primaria atiende unas 400 peticiones por segundo. La respuesta es el sharding: reparte los datos en varias Shards, cada una una base de datos que guarda un trozo y atiende solo ese trozo. La Shard Key decide qué Shard guarda cada dato: aquí el id de usuario y el id de vídeo reparten el tráfico por igual. Añade Shards hasta que ninguna esté llena. Cada Shard cuesta dinero, así que no añadas más de las necesarias.',
+    guidedHint: 'Una base de datos no puede con 630 escrituras por segundo. Añade Shards: cada una es otra base de datos que guarda un trozo de los datos. Con tres Shards, cada una atiende unas 300 peticiones por segundo. La Shard Key decide cómo se reparte el tráfico: el id de usuario lo reparte por igual.',
+  },
 };
