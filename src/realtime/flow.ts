@@ -21,6 +21,9 @@ export function shardShares(weights: number[], shards: number): number[] {
   weights.forEach((w, value) => { shares[value % shards]! += w; });
   return shares;
 }
+/** A building is (nearly) full from this share of its capacity, and has room under the second share: the load bars use the same two. */
+export const FULL_LOAD = 0.9;
+export const ROOMY_LOAD = 0.7;
 /**
  * The Hot Shard among the loads of a building's Shards: the busiest one when it is (nearly) full while another still
  * has room, which is what a poor Shard Key does. When every Shard is full, the answer is more Shards, so none is hot.
@@ -28,7 +31,7 @@ export function shardShares(weights: number[], shards: number): number[] {
 export function hotShardOf(loads: number[] | undefined): number | null {
   if (!loads || loads.length < 2) return null;
   const busiest = Math.max(...loads);
-  return busiest >= 0.9 && Math.min(...loads) < 0.7 ? loads.indexOf(busiest) : null;
+  return busiest >= FULL_LOAD && Math.min(...loads) < ROOMY_LOAD ? loads.indexOf(busiest) : null;
 }
 /**
  * A building split into Shards (ADR-0007): the Shard Key sends each Shard its slice of `rps`, and a Shard serves only

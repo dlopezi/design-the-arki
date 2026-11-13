@@ -2,7 +2,7 @@
   "id": "18-hot-shard",
   "chapter": "Data scale",
   "title": "Hot Shard",
-  "brief": "The video app is sharded, but something is wrong: one Shard is full while the others sit idle. Your Shard Key is country, and most of your users live in one country, so one Shard gets most of the traffic. That is a Hot Shard. Adding more Shards will not fix it, because the same Shard still gets the same slice. A good Shard Key spreads the traffic evenly: user id does, country and date do not (all of today's writes land on the newest date). Change the Shard Key in the Build Phase. During the wave it is locked: in real life, changing it means moving data and downtime.",
+  "brief": "The video app is sharded, but something is wrong: one Shard is full while the others sit idle. Your Shard Key spreads the traffic badly. With country, most of your users live in one country, so one Shard gets most of the traffic. That is a Hot Shard. Adding more Shards will not fix it, because the same Shard still gets the same slice. A good Shard Key spreads the traffic evenly: user id does, country and date do not (all of today's writes land on the newest date). Change the Shard Key in the Build Phase. During the wave it is locked: in real life, changing it means moving data and downtime.",
   "durationS": 30,
   "traffic": [
     {

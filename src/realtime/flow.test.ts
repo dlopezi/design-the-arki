@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { solve, type Building, type Link } from './flow';
+import { FULL_LOAD, ROOMY_LOAD, hotShardOf, solve, type Building, type Link } from './flow';
 
 const ready = (n = 1) => Array.from({ length: n }, () => ({ buildLeftS: 0, buildTotalS: 5, down: false }));
 const b = (id: string, type: string, instances = 1, params: Building['params'] = {}): Building => ({ id, type, params, instances: ready(instances) });
@@ -160,5 +160,25 @@ describe('traffic in real time follows the connections', () => {
       const flow = solve(slowDb, [...wired, link('api', 'db')], 20, undefined, { watch: 0.5, job: 0.5 }, { backlog: { q: 100 }, dt: 1 });
       expect(flow.errors).toBe(0);
     });
+  });
+});
+
+describe('the Hot Shard among the Shards of a building', () => {
+  it('is the busiest Shard when it is nearly full while another still has room', () => {
+    expect(hotShardOf([1, 0.3, 0.2])).toBe(0);
+    expect(hotShardOf([0.4, 0.95])).toBe(1);
+  });
+
+  it('is none when every Shard is full (the answer is more Shards), when none is full, or when there is only one Shard', () => {
+    expect(hotShardOf([1, 1, 0.95])).toBeNull();
+    expect(hotShardOf([0.6, 0.5, 0.2])).toBeNull();
+    expect(hotShardOf([1])).toBeNull();
+    expect(hotShardOf(undefined)).toBeNull();
+  });
+
+  it('uses the same thresholds as the load bars: full from 90%, roomy under 70%', () => {
+    expect(hotShardOf([FULL_LOAD, ROOMY_LOAD - 0.01])).toBe(0);
+    expect(hotShardOf([FULL_LOAD - 0.01, 0.1])).toBeNull();
+    expect(hotShardOf([1, ROOMY_LOAD])).toBeNull();
   });
 });

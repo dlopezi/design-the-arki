@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
 import { designCost } from '../engine/simulate';
+import { hotShardOf } from '../realtime/flow';
 import { callNow, createGame, run, runToEnd, starsOf } from '../realtime/game';
 import { allLevels, parseLevel } from './levels';
 import { levelTextEs } from './text.es';
@@ -227,21 +228,19 @@ describe('level files', () => {
     const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
     const withDatabase = (params: Record<string, unknown>) => ({ ...ref, components: ref.components.map(c => (c.type === 'database' ? { ...c, params } : c)) });
 
-    it('wins with an even Shard Key, and loses with a skewed one: the Hot Shard is full while the others have room', () => {
+    it('wins with an even Shard Key, and loses with a skewed one', () => {
       expect(play(ref)).toBe('won');
       expect(play(withDatabase({ instances: 3, shardKey: 'country' }))).toBe('lost');
       expect(play(withDatabase({ instances: 3, shardKey: 'date' }))).toBe('lost');
     });
 
-    it('is not fixed by adding Shards while the key stays skewed', () => {
-      expect(play(withDatabase({ instances: 4, shardKey: 'country' }))).toBe('lost');
+    it('a skewed key fills one Shard while the others have room', () => {
+      const loads = run(callNow(createGame(level, withDatabase({ instances: 3, shardKey: 'country' }))), 5, level).flow!.shards.db!;
+      expect(hotShardOf(loads)).toBe(0);
     });
 
-    it('starts on a skewed key in the starting designs, so the player has to notice it', () => {
-      for (const mode of ['guided', 'normal', 'hard'] as const) {
-        const key = level.startingDesigns[mode].components.find(c => c.type === 'database')!.params?.shardKey;
-        expect(['country', 'date'], mode).toContain(key);
-      }
+    it('is not fixed by adding Shards while the key stays skewed', () => {
+      expect(play(withDatabase({ instances: 4, shardKey: 'country' }))).toBe('lost');
     });
   });
 

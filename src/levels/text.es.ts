@@ -109,7 +109,7 @@ export const levelTextEs: Record<string, LevelText> = {
   },
   '18-hot-shard': {
     title: 'Hot Shard',
-    brief: 'La app de vídeo ya usa sharding, pero algo va mal: una Shard está llena mientras las demás están ociosas. Tu Shard Key es el país, y casi todos tus usuarios viven en uno, así que una Shard recibe casi todo el tráfico. Eso es un Hot Shard. Añadir más Shards no lo arregla, porque la misma Shard sigue recibiendo el mismo trozo. Una buena Shard Key reparte el tráfico por igual: el id de usuario lo hace; el país y la fecha no (todas las escrituras de hoy caen en la fecha más nueva). Cambia la Shard Key en la fase de construcción. Durante la oleada está bloqueada: en la vida real, cambiarla significa mover datos y tener tiempo de inactividad.',
+    brief: 'La app de vídeo ya usa sharding, pero algo va mal: una Shard está llena mientras las demás están ociosas. Tu Shard Key reparte mal el tráfico. Con el país, casi todos tus usuarios viven en uno, así que una Shard recibe casi todo el tráfico. Eso es un Hot Shard. Añadir más Shards no lo arregla, porque la misma Shard sigue recibiendo el mismo trozo. Una buena Shard Key reparte el tráfico por igual: el id de usuario lo hace; el país y la fecha no (todas las escrituras de hoy caen en la fecha más nueva). Cambia la Shard Key en la fase de construcción. Durante la oleada está bloqueada: en la vida real, cambiarla significa mover datos y tener tiempo de inactividad.',
     guidedHint: 'Una Shard está llena mientras las demás tienen hueco: el país es una mala Shard Key, porque casi todos los usuarios viven en un país. Más Shards no ayudarían. Elige el id de usuario como Shard Key en la fase de construcción: reparte el tráfico por igual.',
   },
 };
