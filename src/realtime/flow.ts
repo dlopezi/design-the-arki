@@ -1,4 +1,4 @@
-import { catalog as defaultCatalog } from '../catalog/catalog';
+import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
 import type { Catalog } from '../engine/types';
 
 /**
@@ -6,6 +6,8 @@ import type { Catalog } from '../engine/types';
  * through the buildings. A capacity model, not the event simulation: every component serves up to
  * `workers × 1000 / meanServiceMs` requests per second per instance, drops the rest, and gets slower as it fills.
  * All numbers come from the catalog, so the model knows no technology (ADR-0004).
+ * A wave can mix Request Types (ADR-0006): each building sends each type only along the connections from which that
+ * type can still be finished, and a type with nowhere to go is dropped.
  */
 
 /** One running copy of a building; it serves only when built and not down. */
@@ -55,8 +57,12 @@ export function hitRateOf(b: Building, catalog: Catalog = defaultCatalog): numbe
   return Math.min(shortcut.max, value / (value + shortcut.halfAt));
 }
 
-/** Sends `rps` requests from the users through the buildings along the links. */
-export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog): Flow {
+/**
+ * Sends `rps` requests from the users through the buildings along the links. `mix` is the share of each Request Type
+ * (adds up to 1); left out, all requests are one type that every building accepts, as in chapter 1.
+ */
+export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
+  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -74,27 +80,53 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const visit = (id: string) => { if (seen.has(id)) return; seen.add(id); links.filter(l => l.from === id).forEach(l => visit(l.to)); order.unshift(id); };
   [CLIENT, ...buildings.map(b => b.id)].forEach(visit);
 
-  const send = (from: string, amount: number) => {
-    const targets = links.filter(l => l.from === from && usable[l.to]).map(l => l.to);
+  // Request Types. A building accepts a type unless its catalog entry lists other types. A type can still be finished
+  // from a building that accepts it and either leads nowhere (a dead end, as today) or leads on to a building that can.
+  // Only the connections decide, not which instances are serving, so a single type that all accept never changes a route.
+  const types = Object.keys(mix);
+  const accepts = (id: string, type: string) => { const list = catalog[byId.get(id)?.type ?? '']?.accepts; return !list || list.includes(type); };
+  const finishable = new Map<string, boolean>();
+  const canFinish = (id: string, type: string): boolean => {
+    const key = `${id}|${type}`;
+    if (!finishable.has(key)) {
+      finishable.set(key, false); // guards against a circle
+      const out = links.filter(l => l.from === id);
+      finishable.set(key, accepts(id, type) && (!out.length || out.some(l => canFinish(l.to, type))));
+    }
+    return finishable.get(key)!;
+  };
+  /** Requests per second of each type reaching each building. */
+  const inflowBy: Record<string, Record<string, number>> = {};
+  const send = (from: string, type: string, amount: number) => {
+    const open = links.filter(l => l.from === from && usable[l.to]);
+    // Where the type can be finished; if nowhere, it still goes to a building that accepts it and is dropped there,
+    // so the error shows at the building that has nowhere to send it (as a dead end does today).
+    let targets = open.filter(l => canFinish(l.to, type)).map(l => l.to);
+    if (!targets.length) targets = open.filter(l => accepts(l.to, type)).map(l => l.to);
     if (!targets.length) { add(drop, from, amount); return; }
-    for (const to of targets) { add(edge, `${from}>${to}`, amount / targets.length); add(inflow, to, amount / targets.length); }
+    for (const to of targets) {
+      add(edge, `${from}>${to}`, amount / targets.length); add(inflow, to, amount / targets.length);
+      add((inflowBy[to] ??= {}), type, amount / targets.length);
+    }
   };
   inflow[CLIENT] = rps;
   for (const id of order) {
     const f = inflow[id] ?? 0;
     if (!f) continue;
-    if (id === CLIENT) { send(id, f); continue; }
+    if (id === CLIENT) { for (const t of types) send(id, t, rps * mix[t]!); continue; }
     const b = byId.get(id)!, spec = catalog[b.type]!;
     const capacity = usable[id]! * capacityOf(b, catalog);
     const ok = Math.min(f, capacity);
     load[id] = capacity ? ok / capacity : 1;
     add(drop, id, f - ok);
+    // What gets in is a share of each type, the same share for all.
+    const taken = (t: string) => { const x = inflowBy[id]?.[t] ?? 0; return x === f ? ok : (x * ok) / f; };
     if (spec.shortcut) {
-      const hits = ok * hitRateOf(b, catalog);
-      answered += hits;
-      send(id, ok - hits);
+      const hit = hitRateOf(b, catalog);
+      answered += ok * hit;
+      for (const t of types) send(id, t, taken(t) - taken(t) * hit); // written this way so one type gives the same numbers as before
     } else if (spec.endsRequests) answered += ok;
-    else send(id, ok);
+    else for (const t of types) send(id, t, taken(t));
   }
 
   // Latency: each component adds its service time, longer as it fills; the tail follows the slowest busy path.

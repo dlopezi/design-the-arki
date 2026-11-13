@@ -36,6 +36,11 @@ export type StationPrimitive = {
   acceptsClients?: boolean;
   /** Whether it can spread requests over the instances of the next component. */
   distributes?: boolean;
+  /**
+   * The Request Types it accepts (real-time play, ADR-0006). Left out, it accepts every type: it just passes them on
+   * (a load balancer or an app server). A building that lists its types takes only those.
+   */
+  accepts?: string[];
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
   sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
   defaultSize?: string;

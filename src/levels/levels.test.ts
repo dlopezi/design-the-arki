@@ -72,6 +72,33 @@ describe('level files', () => {
     });
   }
 
+  describe('wave mix of Request Types', () => {
+    const base = allLevels('en')[0]!;
+    const withMix = (mix: unknown) => ({ ...base, play: { ...base.play, wave: { ...base.play.wave, mix } } });
+
+    it('accepts a mix whose shares add up to 1', () => {
+      expect(parseLevel(withMix({ watch: 0.7, job: 0.3 })).play.wave.mix).toEqual({ watch: 0.7, job: 0.3 });
+    });
+
+    it('ignores a tiny rounding error in the sum', () => {
+      expect(() => parseLevel(withMix({ watch: 0.1 + 0.2, job: 0.7 }))).not.toThrow(); // 0.30000000000000004 + 0.7
+    });
+
+    it('rejects a mix that does not add up to 1', () => {
+      expect(() => parseLevel(withMix({ watch: 0.5, job: 0.3 }))).toThrow(/must add up to 1/);
+    });
+
+    it('rejects an empty mix, a share of 0 and an unknown Request Type', () => {
+      expect(() => parseLevel(withMix({}))).toThrow(/at least one/);
+      expect(() => parseLevel(withMix({ watch: 1, job: 0 }))).toThrow(/mix/);
+      expect(() => parseLevel(withMix({ watch: 0.5, upload: 0.5 }))).toThrow(/Unknown Request Type: upload/);
+    });
+
+    it('is optional: the levels of chapter 1 have none', () => {
+      expect(allLevels('en').every(l => l.play.wave.mix === undefined)).toBe(true);
+    });
+  });
+
   it('rejects a level file without requirements', () => {
     const broken = { id: 'x', title: 'X', brief: 'b', durationS: 10, traffic: [{ fromS: 0, toS: 10, rps: 5 }],
       referenceDesign: { components: [], connections: [] } };

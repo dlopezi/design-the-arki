@@ -24,7 +24,8 @@ export const EARLY_BONUS_PER_S = PASSIVE_INCOME * 2;
 
 export type Play = {
   startMoney: number;
-  wave: { rps: number; lengthS: number };
+  /** `mix`: the share of each Request Type in the wave (adds up to 1); left out, all traffic is one type. */
+  wave: { rps: number; lengthS: number; mix?: Record<string, number> };
   /** At `atS` seconds into the wave, one serving instance of the first `componentType` goes down. */
   incident?: { atS: number; componentType: string };
   /** Money left at the end for the 2nd, 3rd… star. */
@@ -252,7 +253,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix);
   s.flow = flow;
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
