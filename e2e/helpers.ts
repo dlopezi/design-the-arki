@@ -33,7 +33,7 @@ export async function playWave(page: Page) {
   return end;
 }
 
-const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
+export const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
 
 /** The most stars a player can collect: three per level. */
 export const maxStars = levelIds.length * 3;
