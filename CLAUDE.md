@@ -16,11 +16,13 @@ A browser puzzle game about software architecture for developers preparing for s
 
 - `main` is production: every push to `main` deploys to design.thearki.com. Never push or merge to `main` directly.
 - `develop` is integration. Start each change on `feature/<name>` from `develop`, in its own worktree (other sessions share the main checkout). Never run git commands that switch the branch of the main checkout without asking.
-- A feature goes back by Pull Request: `gh pr create --base develop`. Its body says `Fixes #N` for each Issue it finishes; a workflow closes them on merge into `develop`.
+- A feature goes back by Pull Request: `gh pr create --base develop`. Merge it with `gh pr merge <N> --merge` once CI passes (GitHub auto-merge is off here). Its body says `Fixes #N` for each Issue it finishes; a workflow closes them on merge into `develop`.
 - To publish, open a Pull Request from `develop` to `main` and merge it on GitHub, only when the user asks. Bump `version` in package.json, then tag `vX.Y.Z` and create a GitHub Release.
 - A local `pre-push` hook blocks pushes to `main` (`scripts/pre-push`; install with `cp scripts/pre-push .git/hooks/pre-push`).
 
 ## Agent skills
+
+The skills come from the `mattpocock-skills` plugin; the repo keeps no copy. If they are missing, install the plugin.
 
 ### Issue tracker
 
@@ -29,6 +31,10 @@ Issues and specs live in GitHub Issues (`gh` CLI). Player Feedback arrives by em
 ### Triage labels
 
 The five default triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), as GitHub labels. See `docs/agents/triage-labels.md`.
+
+### Code map
+
+Adding a building or a level, and checking a level in the browser: `docs/agents/code-map.md`.
 
 ### Domain docs
 
