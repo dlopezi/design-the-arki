@@ -10,7 +10,8 @@ Issues and specs for this repo live in GitHub Issues on `dlopezi/design-the-arki
 
 ## Conventions
 
-- One Issue per bug, idea or ticket. A bigger feature has one spec Issue, and its tickets are sub-issues of it.
+- One Issue per bug, idea or ticket.
+- A bigger feature has one spec Issue, and its tickets are sub-issues of it. To make a ticket a sub-issue: `gh api -X POST repos/dlopezi/design-the-arki/issues/<parent>/sub_issues -F sub_issue_id=$(gh api repos/dlopezi/design-the-arki/issues/<child> --jq .id)`.
 - Labels: `bug` or `idea` for the kind, plus one triage role from `triage-labels.md`.
 - Always write the game Version (for example `v1.0.0`) in a bug Issue.
 - Conversation goes in Issue comments.
