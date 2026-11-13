@@ -71,4 +71,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Ahora la gente ve vídeos y los sube a la vez: 40 visionados y 10 subidas por segundo. Un visionado debe responderse al instante, así que sigue siendo síncrono: lo responde la caché o la base de datos. Solo el trabajo lento, procesar una subida, va a la cola. Tu app server manda cada tipo de petición por su camino.',
     guidedHint: 'Solo el trabajo lento va a la cola: los visionados siguen siendo síncronos. El app server manda cada tipo de petición por su camino. Añade un Worker para que las subidas no se acumulen.',
   },
+  '11-upload-rush': {
+    title: 'Avalancha de subidas',
+    brief: 'Un creador famoso lanza un reto y, durante 20 segundos, llegan 30 subidas por segundo: muchas más de las que tus Workers pueden procesar. La cola acepta cada trabajo al instante y deja que los Workers los saquen a su ritmo, lo que además protege a la base de datos pequeña del pico. Eso es load leveling (nivelar la carga). Pero una cola solo absorbe un pico. Si la carga se mantiene por encima de lo que tus Workers procesan, el Backlog y la edad de la cola crecen sin fin.',
+    guidedHint: 'Una cola absorbe un pico, pero no arregla una carga que se mantiene demasiado alta. Añade Workers hasta que la edad de la cola quede por debajo de su máximo mientras el Backlog se vacía.',
+  },
 };

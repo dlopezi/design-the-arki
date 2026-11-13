@@ -249,6 +249,24 @@ describe('async work: a queue answers at once and Workers take the jobs in the b
     expect(play(live(base(1), strict), 20, strict).reputation).toBeLessThan(100);
   });
 
+  it('a queue absorbs a peak but not a load that stays above the Workers capacity: the Queue Age passes its maximum and the reputation falls', () => {
+    // A peak: 12 s of 8 jobs/s against 4 jobs/s, then nothing. The queue absorbs it and the Backlog drains.
+    const peak: GameLevel = { ...asyncLevel, play: { ...asyncLevel.play, wave: { rps: 8, lengthS: 12, mix: { job: 1 } } } };
+    const absorbed = play(live(base(1), peak), 60, peak);
+    expect(absorbed.phase).toBe('won');
+    expect(absorbed.reputation).toBe(100);
+    // The same load, always: the Backlog and the Queue Age keep growing until the reputation is gone.
+    const always: GameLevel = { ...asyncLevel, play: { ...asyncLevel.play, wave: { rps: 8, lengthS: 200, mix: { job: 1 } } } };
+    let s = play(live(base(1), always), 20, always);
+    const early = { backlog: s.backlog['q']!, age: s.queueAge['q']! };
+    s = play(s, 20, always);
+    expect(s.queueAge['q']!).toBeGreaterThan(early.age);
+    expect(s.backlog['q']!).toBeGreaterThan(early.backlog);
+    expect(s.queueAge['q']!).toBeGreaterThan(always.requirements.maxQueueAgeS!);
+    expect(s.reputation).toBeLessThan(100);
+    expect(play(s, 100, always).phase).toBe('lost');
+  });
+
   it('a Worker going down keeps the Backlog and only lowers the rate at which it is taken', () => {
     const outage: GameLevel = { ...asyncLevel, play: { ...asyncLevel.play, wave: { ...asyncLevel.play.wave, rps: 6 }, incident: { atS: 8, componentType: 'worker' } } };
     let s = play(live(base(2), outage), 7.9, outage); // 8 jobs/s of capacity against 6 arriving
