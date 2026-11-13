@@ -101,3 +101,12 @@ test('a scripted incident takes an instance down during the wave', async ({ page
   await expect(page.locator('.play-log')).toContainText('App server went down!', { timeout: 15_000 });
   await expect(page.locator('.play-unit.down')).toHaveCount(1);
 });
+
+test('on a 720px-high screen the Release to production button is fully visible, even with many buildings', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openLevel(page, '20-release-day', 'normal');
+  const release = page.getByRole('button', { name: /Release to production/ });
+  await expect(release).toBeVisible();
+  const box = await release.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(720);
+});
