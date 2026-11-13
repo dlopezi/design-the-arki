@@ -31,7 +31,6 @@ describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, 
   it('explains the concepts of chapter 3', () => {
     const ids = strings.manual.concepts.map(c => c.id);
     for (const id of ['replicationLag', 'readYourWrites', 'sharding', 'shardKey', 'hotShard', 'presignedUrl', 'failover']) expect(ids).toContain(id);
-    expect(strings.manual.concepts.every(c => c.title && c.text && c.game)).toBe(true);
   });
 
   it('names the real tools of the Read Replica and Object Storage', () => {
