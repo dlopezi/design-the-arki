@@ -54,7 +54,7 @@ export const catalog: Catalog = {
   // before the primary does, and instances share them without a load balancer.
   readReplica: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true,
-    accepts: ['read'], prefers: ['read'], follows: 'database', buildS: 7,
+    accepts: ['read'], prefers: ['read'], follows: 'database', applyShare: 0.25, buildS: 7,
     sizes: {
       small: { workers: 8, monthlyCost: 50, vcpu: 1 },
       medium: { workers: 16, monthlyCost: 100, vcpu: 2 },

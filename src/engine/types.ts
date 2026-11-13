@@ -6,7 +6,8 @@ export type TrafficSegment = { fromS: number; toS: number; rps: number };
 export type Level = {
   durationS: number;
   traffic: TrafficSegment[];
-  requirements: { p95Ms: number; maxErrorRate: number; /** Real-time play only: the longest the oldest Message may wait in a queue. */ maxQueueAgeS?: number };
+  requirements: { p95Ms: number; maxErrorRate: number; /** Real-time play only: the longest the oldest Message may wait in a queue. */ maxQueueAgeS?: number;
+    /** Real-time play only: the longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number };
   /** Maximum monthly cost in dollars. */
   budget: number;
   /** Monthly costs at or below which the 2nd, 3rd… star is earned. */
@@ -60,6 +61,8 @@ export type StationPrimitive = {
   effort?: Record<string, number>;
   /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
   balanced?: boolean;
+  /** Share of one instance's capacity that goes to applying the writes copied from the building it follows (Replication Lag). */
+  applyShare?: number;
   /** The type of building whose data it keeps a copy of: it may be connected to it without ending in a dead end (replication). */
   follows?: string;
   /**

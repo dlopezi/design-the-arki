@@ -38,7 +38,8 @@ export type Play = {
 export type GameLevel = {
   allowedComponents: string[];
   componentOptions: Record<string, { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> }>;
-  requirements: { p95Ms: number; maxErrorRate: number; /** The longest the oldest Message may wait in a queue, in seconds. */ maxQueueAgeS?: number };
+  requirements: { p95Ms: number; maxErrorRate: number; /** The longest the oldest Message may wait in a queue, in seconds. */ maxQueueAgeS?: number;
+    /** The longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number };
   play: Play;
 };
 
@@ -46,7 +47,7 @@ export type GameLevel = {
 export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
 /** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them. */
-export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number };
+export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number };
 export type GameState = {
   t: number;
   /** build → wave → (drain, while Messages are still waiting after the wave) → won or lost. */
@@ -67,6 +68,9 @@ export type GameState = {
   backlog: Record<string, number>;
   /** How long the oldest Message of each queue has waited, estimated: the Backlog over the rate its Workers take it. */
   queueAge: Record<string, number>;
+  /** Writes each Read Replica has not applied yet, and how far behind the primary database that puts it, in seconds (ADR-0007). */
+  unapplied: Record<string, number>;
+  lag: Record<string, number>;
   history: Sample[];
   events: GameEvent[];
   nextId: number;
@@ -90,7 +94,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
-    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -314,7 +318,9 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt }, level.play.shardKeys);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys);
+  s.unapplied = flow.unapplied;
+  s.lag = flow.lag;
   s.flow = flow;
   s.backlog = flow.backlog;
   s.queueAge = Object.fromEntries(Object.entries(flow.backlog).map(([id, waiting]) => {
@@ -323,13 +329,15 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }));
   const maxAge = level.requirements.maxQueueAgeS;
   const tooOld = maxAge !== undefined && Object.values(s.queueAge).some(age => age > maxAge);
+  const maxLag = level.requirements.maxReplicationLagS;
+  const tooStale = maxLag !== undefined && Object.values(s.lag).some(l => l > maxLag);
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
   if (rps || s.phase === 'drain') {
-    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld ? REPUTATION.slow : REPUTATION.fine;
+    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || tooStale ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
-  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s) }];
+  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s), lag: Math.max(0, ...Object.values(s.lag)) }];
   // End.
   if ((s.phase === 'wave' || s.phase === 'drain') && s.reputation <= 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'reputation' }); }
   else if (s.money < 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'money' }); }

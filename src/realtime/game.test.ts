@@ -603,3 +603,47 @@ describe('data scale: big uploads go straight to Object Storage, not through the
     expect(build(s, 'objectStorage', l).buildings.find(b => b.type === 'objectStorage')!.instances).toHaveLength(1);
   });
 });
+
+describe('data scale: Replication Lag grows while writes are higher than a Read Replica can apply', () => {
+  // A small Read Replica applies 100 writes a second, a medium one 200. The wave brings 150 writes and 150 reads a second.
+  const lagLevel: GameLevel = {
+    allowedComponents: ['loadBalancer', 'appServer', 'database', 'readReplica'],
+    componentOptions: { appServer: { maxInstances: 4 }, readReplica: { maxInstances: 2 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01, maxReplicationLagS: 2 },
+    play: { startMoney: 800, wave: { rps: 300, lengthS: 60, mix: { read: 0.5, write: 0.5 } }, starMoney: [100, 200] },
+  };
+  const withReplica = (size: string): Design => ({
+    components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { size: 'large', instances: 2 } }, { id: 'db', type: 'database' },
+      { id: 'rep', type: 'readReplica', params: { size } }],
+    connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db'], ['api', 'rep'], ['rep', 'db']],
+  });
+  const play = (d: Design, seconds: number) => run(callNow(createGame(lagLevel, d)), seconds, lagLevel);
+  const lagOf = (s: GameState) => Math.max(0, ...Object.values(s.lag));
+
+  it('grows while the writes are higher than the replica applies, and is kept from one moment to the next', () => {
+    const early = lagOf(play(withReplica('small'), 5)), later = lagOf(play(withReplica('small'), 15));
+    expect(early).toBeGreaterThan(0);
+    expect(later).toBeGreaterThan(early);
+  });
+
+  it('stays at zero when the replica applies the writes as fast as they come: a bigger replica', () => {
+    expect(lagOf(play(withReplica('medium'), 20))).toBe(0);
+  });
+
+  it('is zero when there is no Read Replica: nothing is behind', () => {
+    const none: Design = { ...withReplica('small'), components: withReplica('small').components.filter(c => c.type !== 'readReplica'), connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']] };
+    expect(lagOf(play(none, 20))).toBe(0);
+  });
+
+  it('costs reputation while it is over the level maximum, as a slow base does', () => {
+    expect(play(withReplica('medium'), 25).reputation).toBe(100);
+    expect(play(withReplica('small'), 25).reputation).toBeLessThan(100);
+  });
+
+  it('shrinks again when the writes slow down', () => {
+    const behind = play(withReplica('small'), 15);
+    const quiet = { ...behind, buildings: behind.buildings };
+    const calmer: GameLevel = { ...lagLevel, play: { ...lagLevel.play, wave: { ...lagLevel.play.wave, mix: { read: 0.95, write: 0.05 } } } };
+    expect(lagOf(run(quiet, 15, calmer))).toBeLessThan(lagOf(behind));
+  });
+});

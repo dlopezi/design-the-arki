@@ -44,6 +44,7 @@ function Briefing({ level, number, state, newTypes, progress }: { level: LevelDe
         <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)} <a className="campaign-why" href={`${manualHref('concepts')}`} title={l.p95Tip}>{l.whatIsP95}</a></li>
         <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
         {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
+        {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
         <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
       </ul>
       {state !== 'locked' && (
