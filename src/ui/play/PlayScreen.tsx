@@ -296,6 +296,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const hasQueue = level.allowedComponents.some(type => catalog[type]?.queue);
   const oldest = Math.max(0, ...Object.values(game.queueAge));
   const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
+  const maxLag = level.requirements.maxReplicationLagS, lagNow = Math.max(0, ...Object.values(game.lag));
+  const lagTooHigh = maxLag !== undefined && lagNow > maxLag;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
   const net = PASSIVE_INCOME + ((flow?.answered ?? 0) / 100) * PER_100_VISITS - upkeepPerS(game);
   const building = game.phase === 'build';
@@ -315,6 +317,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     // Reads that no Read Replica receives all land on the primary database.
     const reads = (level.play.wave.mix?.read ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
+    if (lagTooHigh) return t.lagHint;
     if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
@@ -445,6 +448,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {hotShard !== null && <><dt>{i.hotShard}</dt><dd className="bad">{instanceNames.get(b.id)?.[hotShard]}</dd></>}
         <dt>{i.sendsTo}</dt><dd>{spec.endsRequests && !spec.shortcut ? i.answers : outs}</dd>
         <dt>{i.receives}</dt><dd>{i.perSecond(Math.round(flow?.inflow[b.id] ?? 0))}</dd>
+        {spec.follows && maxLag !== undefined && <><dt>{t.rt.replicationLag}</dt><dd className={(game.lag[b.id] ?? 0) > maxLag ? 'bad' : ''}>{t.rt.lagOf(game.lag[b.id] ?? 0, maxLag)}</dd></>}
         {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
         {!spec.presentation?.hideCapacity && <><dt>{i.capacity}</dt><dd>{i.perSecond(Math.round(capacityOf(b) * Math.max(1, serving)))}</dd></>}
         {spec.shortcut && <><dt>{i.hitRate}</dt><dd>{Math.round(hitRateOf(b) * 100)}%</dd></>}
@@ -499,6 +503,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
+        {maxLag !== undefined && <span className="play-res play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
         {hasQueue && <span className="play-res play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
@@ -612,6 +617,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)}</li>
               <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
               {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
+              {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
               <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
               {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
             </ul>

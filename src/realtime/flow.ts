@@ -74,11 +74,16 @@ export type Flow = {
   release: Record<string, number>;
   /** Messages per second the serving Workers behind each queue can take; 0 when none serves. */
   releaseCapacity: Record<string, number>;
+  /** Writes each Read Replica still has to apply after this step, and how far behind the primary database that puts it, in seconds. */
+  unapplied: Record<string, number>;
+  lag: Record<string, number>;
   /** Share of capacity in use on each Shard (0–1), for each building that is split into several Shards. */
   shards: Record<string, number[]>;
 };
 /** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
-export type Queues = { backlog: Record<string, number>; dt: number };
+export type Queues = { backlog: Record<string, number>; dt: number;
+  /** Writes each Read Replica has not applied yet (ADR-0007), kept from the step before like the Backlog. */
+  unapplied?: Record<string, number> };
 
 const perInstance = (b: Building, catalog: Catalog) => {
   const spec = catalog[b.type]!;
@@ -117,6 +122,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const load: Record<string, number> = {}, usable: Record<string, number> = {};
   const backlog: Record<string, number> = {}, release: Record<string, number> = {}, releaseCapacity: Record<string, number> = {};
   const shards: Record<string, number[]> = {};
+  /** Writes per second each building served: what a Read Replica has to copy. */
+  const writesServed: Record<string, number> = {};
   const add = (map: Record<string, number>, key: string, v: number) => { map[key] = (map[key] ?? 0) + v; };
   /** The capacity the requests reaching a building use, in normal requests per second: each Request Type weighs by its effort. */
   const demandOn = (id: string, spec: Catalog[string], requests: number) => {
@@ -197,6 +204,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     add(drop, id, f - ok);
     // What gets in is a share of each channel, the same share for all.
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };
+    if (inflowBy[id]?.['write']) writesServed[id] = taken('write');
     for (const c of channels) if (isBackground(c) && inflowBy[id]?.[c]) lostInBackground += inflowBy[id]![c]! - taken(c);
     if (spec.queue) {
       // A job is answered when it enters the queue; the queue then releases Messages to its Workers at their total
@@ -233,6 +241,21 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     }
   }
 
+  // Replication Lag (ADR-0007): each Read Replica must apply every write the database it follows has served. Writes it cannot
+  // apply as fast as they come pile up, and the pile is how far behind it is. Under the pile it is zero; no replica, no lag.
+  const unapplied: Record<string, number> = {}, lag: Record<string, number> = {};
+  for (const b of buildings) {
+    const spec = catalog[b.type];
+    if (!spec?.follows) continue;
+    const source = links.find(l => l.from === b.id && byId.get(l.to)?.type === spec.follows)?.to;
+    if (!source) continue;
+    // A replica that is not serving yet (still being built, or down) is not copying anything: the pile stays as it was.
+    const applies = serving(b.id) > 0 ? (spec.applyShare ?? 0) * capacityOf(b, catalog) : 0;
+    const before = queues.unapplied?.[b.id] ?? 0;
+    unapplied[b.id] = applies > 0 ? Math.max(0, before + ((writesServed[source] ?? 0) - applies) * (queues.dt || 1)) : before;
+    lag[b.id] = applies > 0 ? unapplied[b.id]! / applies : 0;
+  }
+
   // Latency: each component adds its service time, longer as it fills; the tail follows the slowest busy path.
   // A queue answers at once, so the time its Workers take is not the users' wait.
   const own = (id: string) => {
@@ -246,7 +269,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards,
+    rps, answered, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

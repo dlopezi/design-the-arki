@@ -32,7 +32,9 @@ const levelSchema = z.object({
   traffic: z.array(z.object({ fromS: z.number().min(0), toS: z.number().positive(), rps: z.number().positive() })).min(1),
   requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1),
     /** Async levels: the longest the oldest Message may wait in a queue (seconds). */
-    maxQueueAgeS: z.number().positive().optional() }),
+    maxQueueAgeS: z.number().positive().optional(),
+    /** Data levels: the longest a Read Replica may be behind the primary database (seconds). */
+    maxReplicationLagS: z.number().positive().optional() }),
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
@@ -80,6 +82,10 @@ const levelSchema = z.object({
   // A Read Replica is a copy of the primary database: without one there is nothing to copy (ADR-0007).
   if (allowed.has('readReplica') && !allowed.has('database')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that allows a readReplica must allow a database' });
+  }
+  // Replication Lag is how far a Read Replica is behind: without one there is nothing to measure.
+  if (level.requirements.maxReplicationLagS !== undefined && !allowed.has('readReplica')) {
+    ctx.addIssue({ code: 'custom', path: ['requirements', 'maxReplicationLagS'], message: 'A level with a maximum Replication Lag must allow a readReplica' });
   }
   // Shards are instances of the database: without one there is nothing to split (ADR-0007).
   if (level.play.shardKeys && !allowed.has('database')) {

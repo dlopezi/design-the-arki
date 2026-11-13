@@ -86,3 +86,15 @@ test('level 19: files sent through the app server lose, and the hint names Objec
   await expect(end).toContainText('Object Storage');
   await expect(end).toContainText('pre-signed URL');
 });
+
+test('level 20: the Replication Lag is shown next to its maximum, and a Read Replica that is too small loses with a hint about the lag', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads']);
+  await openLevel(page, '20-release-day', 'guided');
+  await expect(page.getByRole('status', { name: 'Replication Lag' })).toContainText('max 2 s');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 40_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Replication Lag');
+});

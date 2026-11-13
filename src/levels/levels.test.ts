@@ -34,7 +34,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads', '20-release-day']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
@@ -266,6 +266,34 @@ describe('level files', () => {
     it('loses with no Object Storage at all: the files have nowhere to go', () => {
       const none = { components: ref.components.filter(c => c.type !== 'objectStorage'), connections: ref.connections.filter(([a, b]) => a !== storageId && b !== storageId) };
       expect(play(none)).toBe('lost');
+    });
+  });
+
+  describe('20-release-day: the chapter review, with a maximum Replication Lag', () => {
+    const level = allLevels('en').find(l => l.id === '20-release-day')!;
+    const ref = level.referenceDesign;
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
+    const without = (type: string) => ({ components: ref.components.filter(c => c.type !== type), connections: ref.connections.filter(([a, b]) => ![a, b].some(id => ref.components.find(c => c.id === id)?.type === type)) });
+    const replicaSize = (size: string) => ({ ...ref, components: ref.components.map(c => (c.type === 'readReplica' ? { ...c, params: { ...c.params, size } } : c)) });
+
+    it('uses buildings of chapters 1, 2 and 3 together', () => {
+      const types = ref.components.map(c => c.type);
+      for (const type of ['loadBalancer', 'appServer', 'cache', 'database', 'messageQueue', 'worker', 'readReplica', 'objectStorage']) expect(types).toContain(type);
+      expect(level.requirements.maxReplicationLagS).toBeGreaterThan(0);
+    });
+
+    it('wins with the Reference Design', () => {
+      expect(play(ref)).toBe('won');
+    });
+
+    it('loses when the Read Replica is too small to apply the writes: the Replication Lag passes its maximum', () => {
+      expect(play(replicaSize('small'))).toBe('lost');
+      const behind = run(callNow(createGame(level, replicaSize('small'))), 15, level);
+      expect(Math.max(...Object.values(behind.lag))).toBeGreaterThan(level.requirements.maxReplicationLagS!);
+    });
+
+    it('loses when any one part of the review is missing', () => {
+      for (const type of ['loadBalancer', 'cache', 'readReplica', 'messageQueue', 'worker', 'objectStorage']) expect(play(without(type)), type).toBe('lost');
     });
   });
 

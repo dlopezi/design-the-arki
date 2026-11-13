@@ -124,6 +124,8 @@ export const en = {
   replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost with Read-your-writes in the wave and no connection from the app server to the primary database. */
   staleReadHint: 'A Read Replica copies each write from the primary a moment later, so it is always a little behind and a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
+  /** Lost while a Read Replica was too far behind the primary database. */
+  lagHint: 'A Read Replica fell too far behind the primary database: it could not apply the writes as fast as they came, so the Replication Lag passed its maximum. Use a bigger Read Replica, which applies writes faster, or send it fewer writes.',
   /** Lost with uploads in the wave while the users do not upload straight to Object Storage. */
   uploadHint: 'A file sent through the app server keeps it busy as long as ten normal requests. Connect the users straight to Object Storage (the pre-signed URL pattern): the app server only hands out the signed address, and the file goes to Object Storage.',
   /** Lost with one Shard full while the others had room: a poor Shard Key. */
@@ -178,6 +180,7 @@ export const en = {
   objectiveP95: (ms: number) => `p95 latency ≤ ${ms} ms`,
   objectiveErrors: (rate: number) => `Errors ≤ ${percent(rate)}`,
   objectiveQueueAge: (s: number) => `Queue Age ≤ ${s} s`,
+  objectiveReplicationLag: (s: number) => `Replication Lag ≤ ${s} s`,
   objectiveCost: (budget: number) => `Cost ≤ $${budget}/month`,
   objectiveState: { met: 'met', failed: 'not met', pending: 'not run yet' },
   traffic: (rps: number, fromS: number, toS: number) => `${rps} req/s from ${fromS} s to ${toS} s`,
@@ -449,6 +452,8 @@ export const en = {
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
     mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
+    replicationLag: 'Replication Lag',
+    lagOf: (lag: number, max: number | undefined) => (max === undefined ? `${lag.toFixed(1)} s` : `${lag.toFixed(1)} s / max ${max} s`),
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
     incidentInfo: (type: string, s: number) => `${s} s into the wave, one ${type} instance goes down.`,
