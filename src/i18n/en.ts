@@ -122,6 +122,8 @@ export const en = {
   queueHint: 'A job sent straight from the app server to the Worker runs inside the request, so everyone waits for it. Put a Message Queue in between: it answers at once, and the Worker takes the job in the background.',
   /** Lost with reads in the wave while no Read Replica receives them: the primary database takes them all. */
   replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
+  /** Lost with Read-your-writes in the wave and no connection from the app server to the primary database. */
+  staleReadHint: 'A Read Replica copies each write from the primary a moment later, so it is always a little behind and a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
   /** Lost while Messages were waiting too long. */
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
@@ -427,7 +429,7 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,

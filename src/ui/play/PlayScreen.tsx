@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { catalog } from '../../catalog/catalog';
+import { catalog, READ_YOUR_WRITES } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
@@ -306,7 +306,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const jobs = (level.play.wave.mix?.job ?? 0) > 0;
     if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
     if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
-    // Data levels: reads that no Read Replica receives all land on the primary database.
+    // Data levels: Read-your-writes that cannot reach the primary database are stale reads on a Read Replica.
+    const hasReadYourWrites = (level.play.wave.mix?.[READ_YOUR_WRITES] ?? 0) > 0;
+    const hasReadReplica = game.buildings.some(b => b.type === 'readReplica');
+    if (hasReadYourWrites && hasReadReplica && !game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'database')) return t.staleReadHint;
+    // Reads that no Read Replica receives all land on the primary database.
     const reads = (level.play.wave.mix?.read ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
     if (tooOld) return t.backlogHint;
