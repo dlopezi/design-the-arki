@@ -71,6 +71,30 @@ Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: 
   If the owner prefers another look (for example Messages piling up on the map), change `PlayScreen.tsx` only: the game keeps `backlog`, `queueAge` and their per-second history.
 - **Status (2026-11-13)**: the six missions (`09`–`14`), the Message Queue and Worker, the Drain Phase and the Manual entries are built, in English and Spanish.
 
+## Chapter 3: Data scale (planned 2026-11-13)
+
+Settled in a grilling session; engine rules in ADR-0007. Same rule as chapter 2: a real problem with the real solution and the real names, so players can use them in an interview. Built after chapter 2 is merged (it uses Request Types and the stateful rules from ADR-0006).
+
+- **Story**: the video app is a hit. Many people watch (reads), the data grows (writes and size), and uploads are big files. This also closes the open point of ADR-0006: the file goes to object storage and only the job goes to the queue.
+- **New buildings**: **Read Replica** (own building, connected to the database; answers reads only) and **Object Storage** (fixed price, no settings, like the Message Queue). **Sharding** is not a building: the database gets two settings, number of **Shards** and the **Shard Key**; each Shard is drawn as its own building with its own load.
+- **Rules**:
+  - Reads and writes are separate Request Types. An app server sends reads to Read Replicas and writes to the primary database.
+  - **Read-your-writes** is a Request Type that must go to the primary database; if it reaches a Read Replica it counts as an error (a stale read).
+  - **Replication Lag** is a number that grows when writes are high; a level may set a maximum, and reputation falls while it is over (same idea as Queue Age). Used in the review mission only.
+  - Each level says how traffic spreads over Shard Key values (for example user id: even; country: one country has most users; date: all writes hit the newest shard). A poor key makes a **Hot Shard**.
+  - The Shard Key can be changed only in the Build Phase; during the wave it is locked (re-sharding needs downtime in real life).
+  - An **upload** Request Type keeps an app server busy for a long time. If users connect straight to Object Storage (the pre-signed URL pattern) the app servers stay free.
+- **Unlock**: after the last level of chapter 2.
+- **Six levels**, each with one lesson:
+  1. *Too many reads*: the cache cannot help (data must be fresh), the primary database is full of reads; Read Replicas scale reads, not writes.
+  2. *Just saved, not there*: replicas are behind, so a user may not see their own change; read-your-writes goes to the primary.
+  3. *Too much to write*: one database cannot take the writes or the data; add Shards and choose the Shard Key.
+  4. *Hot shard*: a skewed key sends most traffic to one Shard; pick a better key in the Build Phase.
+  5. *Big uploads*: files through the app server block it; connect users to Object Storage.
+  6. *Release day*: the review. Everything together, plus a maximum Replication Lag, and chapter 1 and 2 buildings (load balancer, cache, queue and Workers; the processing job points to the stored file).
+- **Manual**: Buildings entries for Read Replica and Object Storage with *In real life* (PostgreSQL or MySQL read replicas, Amazon RDS, Amazon S3, Google Cloud Storage); Concepts for replication lag, read-your-writes, sharding, shard key, hot shard, pre-signed URL, and failover (explained, not simulated).
+- **Out of scope**: failover and promotion of a replica (Manual only; chapter 4 multi-region uses replicas), resharding during the wave, consistent hashing, cross-shard transactions (chapter 8), CDN (chapter 4), object storage settings and cost per GB.
+
 ## Game screen
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:

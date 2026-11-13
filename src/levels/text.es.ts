@@ -12,6 +12,7 @@ export type LevelText = {
 export const chaptersEs: Record<string, string> = {
   Core: 'Fundamentos',
   Async: 'Asíncrono',
+  'Data scale': 'Escala de datos',
 };
 
 export const levelTextEs: Record<string, LevelText> = {
@@ -90,5 +91,10 @@ export const levelTextEs: Record<string, LevelText> = {
     title: 'Día de lanzamiento',
     brief: 'La app de vídeo sale al público. Casi todos ven vídeos, 480 peticiones por segundo, y una de cada veinte es una subida que procesar. A mitad de la primera oleada se cae un Worker. Usa todo lo que has aprendido: un load balancer delante de varios app servers, una caché para que la base de datos pequeña no reciba una y otra vez la misma pregunta, y una cola con Workers que mantengan la edad de la cola por debajo de 20 segundos incluso sin uno de ellos.',
     guidedHint: 'Los visionados van por el load balancer y los app servers hasta la caché y la base de datos. Las subidas van a la cola y a los Workers. Un Worker se caerá, así que ten uno de repuesto: la edad de la cola debe seguir baja incluso con un Worker menos.',
+  },
+  '15-too-many-reads': {
+    title: 'Demasiadas lecturas',
+    brief: 'Tu app de vídeo es un éxito: llegan 480 peticiones por segundo y nueve de cada diez solo leen datos (listas de vídeos, comentarios, visionados). Una base de datos primaria atiende unas 400 peticiones por segundo, así que está llena. Los datos deben estar al día, por eso una caché no ayuda aquí. Una réplica de lectura (Read Replica) es una copia de la base de datos que solo responde lecturas. Añade Read Replicas: el app server les envía las lecturas y deja las escrituras para la base de datos primaria. Las Read Replicas escalan las lecturas, no las escrituras.',
+    guidedHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas: el app server les envía las lecturas y la primaria se queda con las escrituras. Las lecturas son 9 de cada 10 peticiones, así que una Read Replica no basta.',
   },
 };

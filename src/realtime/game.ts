@@ -110,7 +110,8 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (from !== CLIENT && !typeOf(s, from)) return 'missing';
   if (!typeOf(s, to)) return 'missing';
   const spec = catalog[typeOf(s, from) ?? ''];
-  if (spec && spec.endsRequests && !spec.shortcut) return 'endsRequests';
+  // A Read Replica ends requests, but it may be connected to the database it keeps a copy of (replication, no requests).
+  if (spec && spec.endsRequests && !spec.shortcut && !(spec.follows && spec.follows === typeOf(s, to))) return 'endsRequests';
   if (s.links.some(l => l.from === from && l.to === to)) return 'exists';
   if (reaches(s.links, to, from)) return 'circle';
   return null;
@@ -136,9 +137,9 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker');
-  // An app server that already sends to a queue or a Worker still needs its way to the data.
-  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker'].includes(typeOf(st, l.to) ?? ''));
+  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica');
+  // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
+  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
   if (b.type === 'loadBalancer') {
     next = addLink(next, CLIENT, b.id);
@@ -149,6 +150,7 @@ function autoLink(s: GameState, b: Building): GameState {
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);
+    for (const r of readReplicas) next = addLink(next, b.id, r.id);
   } else if (b.type === 'cache') {
     // The cache goes in front of the database: app servers that went straight to it now go through the cache.
     if (db) next = { ...next, links: next.links.filter(l => !(l.to === db.id && typeOf(next, l.from) === 'appServer')) };
@@ -158,6 +160,11 @@ function autoLink(s: GameState, b: Building): GameState {
     if (cache && !outOf(cache.id)) next = addLink(next, cache.id, b.id);
     else for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
     for (const w of workers) if (!outOf(w.id)) next = addLink(next, w.id, b.id);
+    for (const r of readReplicas) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
+  } else if (b.type === 'readReplica') {
+    // Reads come from the app servers; the link to the database is the replication.
+    for (const a of apps) next = addLink(next, a.id, b.id);
+    if (db) next = addLink(next, b.id, db.id);
   } else if (b.type === 'messageQueue') {
     for (const a of apps) next = addLink(next, a.id, b.id);
     for (const w of workers) next = addLink(next, b.id, w.id);

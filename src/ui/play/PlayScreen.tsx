@@ -42,7 +42,7 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
 /** The order buildings stand in a zone: the way a request travels. */
-const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'database'];
+const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -306,6 +306,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const jobs = (level.play.wave.mix?.job ?? 0) > 0;
     if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
     if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
+    // Data levels: reads that no Read Replica receives all land on the primary database.
+    const reads = (level.play.wave.mix?.read ?? 0) > 0;
+    if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
     if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]

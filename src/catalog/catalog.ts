@@ -5,7 +5,7 @@ import type { Catalog } from '../engine/types';
  * type, `watch`, so chapter 1 plays as it always did. Each building lists the types it `accepts` (all, when it does not say).
  */
 export const DEFAULT_REQUEST_TYPE = 'watch';
-export const requestTypes = ['watch', 'job'];
+export const requestTypes = ['watch', 'job', 'read', 'write'];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -38,9 +38,22 @@ export const catalog: Catalog = {
     // Tiers: connections the database serves at once.
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
-    // It serves reads and takes the results Workers write; processing a job is not its work.
-    accepts: ['watch', RESULT_TYPE],
+    // It serves reads and takes writes and the results Workers write; processing a job is not its work.
+    accepts: ['watch', 'read', 'write', RESULT_TYPE],
     presentation: { zone: 'data', technology: 'PostgreSQL' },
+  },
+  // Chapter 3 (Data scale). A copy of the primary database that answers reads only (ADR-0007). It gets the reads
+  // before the primary does, and instances share them without a load balancer.
+  readReplica: {
+    primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true,
+    accepts: ['read'], prefers: ['read'], follows: 'database', buildS: 7,
+    sizes: {
+      small: { workers: 8, monthlyCost: 50, vcpu: 1 },
+      medium: { workers: 16, monthlyCost: 100, vcpu: 2 },
+      large: { workers: 32, monthlyCost: 200, vcpu: 4 },
+    },
+    defaultSize: 'small',
+    presentation: { zone: 'data', technology: 'PostgreSQL replica', instancePrefix: 'replica' },
   },
   // Chapter 2 (Async). A managed queue: no settings, a fixed price, and a capacity that never fills in these levels.
   messageQueue: {

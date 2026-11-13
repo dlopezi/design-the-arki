@@ -111,6 +111,7 @@ export const en = {
     loadBalancer: 'The load balancer is saturated.',
     cache: 'The cache is saturated.',
     worker: 'The Workers cannot keep up with the jobs: add Workers or use bigger ones.',
+    readReplica: 'The Read Replicas cannot keep up with the reads: add Read Replica instances or use bigger ones.',
   } as Record<string, string>,
   /** Hints when the bottleneck cannot be resized in this level. */
   fixedHints: {
@@ -119,6 +120,8 @@ export const en = {
   } as Record<string, string>,
   /** Lost with a Worker called straight from the app server: the job runs inside the request. */
   queueHint: 'A job sent straight from the app server to the Worker runs inside the request, so everyone waits for it. Put a Message Queue in between: it answers at once, and the Worker takes the job in the background.',
+  /** Lost with reads in the wave while no Read Replica receives them: the primary database takes them all. */
+  replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost while Messages were waiting too long. */
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
@@ -132,6 +135,7 @@ export const en = {
     cache: 'answers repeated reads without asking the database; a longer TTL means more hits.',
     messageQueue: 'answers the app server at once and keeps each job as a Message until a Worker takes it.',
     worker: 'takes Messages from the queue and processes them in the background; its size and instances set how many jobs it takes each second.',
+    readReplica: 'a copy of the primary database that answers reads only; add instances to answer more reads each second.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
@@ -192,7 +196,7 @@ export const en = {
     loop: (labels: string[]) => `Requests would go round in a loop between ${labels.join(' and ')}. Remove one of those connections.`,
   },
   clients: 'Clients',
-  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker' } as Record<string, string>,
+  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica' } as Record<string, string>,
   person: 'Person',
   systemName: 'Your system',
   softwareSystem: 'Software system',
@@ -308,6 +312,14 @@ export const en = {
         diff: 'Real Workers can crash halfway through a job, and the job is then delivered again, so Workers must be idempotent. Real systems often add and remove Workers by themselves, following the Queue Age.',
         read: { label: 'Microsoft · Competing Consumers pattern', url: 'https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers' },
       },
+      readReplica: {
+        role: 'A copy of the primary database that answers reads only. The app server sends the reads to the Read Replicas and the writes to the primary database. You can run several; they share the reads.',
+        when: 'When the primary database is full of reads and the data must be fresh, so a cache does not help. Read Replicas scale reads, never writes.',
+        tools: ['PostgreSQL or MySQL read replicas', 'Amazon RDS read replicas', 'Amazon Aurora replicas', 'Google Cloud SQL read replicas'],
+        same: 'More Read Replica instances answer more reads each second, and they cost more. A write that reaches only a Read Replica is an error, because a Read Replica answers reads only.',
+        diff: 'Real Read Replicas are always a little behind the primary database (replication lag), so a user may not see their own change at once. A later mission covers this.',
+        read: { label: 'AWS · Amazon RDS read replicas', url: 'https://aws.amazon.com/rds/features/read-replicas/' },
+      },
     } as Record<string, { role: string; when: string; tools: string[]; same: string; diff: string; read: { label: string; url: string } }>,
     pick: 'Choose a building in the list to read its card.',
   },
@@ -415,7 +427,7 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,

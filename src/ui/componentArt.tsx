@@ -13,6 +13,7 @@ export const componentArt: Record<string, { color: string }> = {
   database: { color: '#9b6bff' },
   messageQueue: { color: '#ec6ba0' },
   worker: { color: '#22b8cf' },
+  readReplica: { color: '#7c8cff' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -136,6 +137,13 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <Cylinder cx={26} cy={52} r={11} h={27} p={p} />
     <path d="M34 34 L37 32" stroke={p.light} strokeWidth={2} />
     <circle cx={26} cy={25} r={2} fill={p.glow} />
+  </>,
+  // A copy of the database: two small silos side by side, with an arrow that carries the copy to the new one.
+  readReplica: p => <>
+    <Cylinder cx={20} cy={50} r={8} h={18} p={p} />
+    <Cylinder cx={44} cy={50} r={8} h={18} p={p} />
+    <path d="M28 25 L38 25 M34 21 L38 25 L34 29" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx={44} cy={25} r={2} fill={p.glow} />
   </>,
 };
 
