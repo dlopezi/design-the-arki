@@ -7,8 +7,6 @@ You MAY:
 - view the source code on GitHub;
 - clone or download it and run it on your own computer, for personal and
   non-commercial study, or to prepare a contribution (see below).
-- clone the repository to read it or run it on your own computer, for personal,
-  non-commercial use only;
 - play the game at https://design.thearki.com.
 
 You MAY NOT, without prior written permission from the copyright holder:
@@ -17,19 +15,12 @@ You MAY NOT, without prior written permission from the copyright holder:
 - publish, distribute, host, sublicense or sell it or any part of it;
 - use it, or any part of it, for commercial purposes.
 
-Third-party software used by this project (for example React and the other
-packages listed in package.json) is not covered by this notice. It keeps its
-own license.
-
-If you send a pull request, an issue or feedback, you give the copyright holder
-permission to use it in this project, without payment or credit.
-
 Viewing this repository grants no license or other rights, except where
 required by GitHub's Terms of Service. To ask for permission, contact the
 copyright holder through GitHub.
 
-Third-party dependencies (for example React, React DOM, @xyflow/react and Zod) are NOT covered by this
-notice. They keep their own licenses.
+Third-party dependencies (for example React, React DOM, @xyflow/react and Zod) are NOT
+covered by this notice. They keep their own licenses.
 
 Contributions: if you send a pull request, issue, idea or other feedback,
 you confirm you have the right to send it, and you give the copyright holder
