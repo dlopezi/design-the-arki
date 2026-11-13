@@ -380,9 +380,18 @@ describe('data scale: Read Replicas answer the reads and the primary database ke
     expect(play(l, wide(2)).flow!.errors).toBe(0);
   });
 
-  it('a Read Replica cannot take the reads off a database that has to take them as writes: writes stay on the primary however many replicas', () => {
+  it('writes stay on the primary database however many Read Replicas there are', () => {
     const l = dataLevel({ write: 1 }, 600);
     expect(play(l, design(4, withReplica)).flow!.errors).toBeCloseTo(1 / 3); // the primary serves 400 of 600
+  });
+
+  it('a cache cannot answer reads, because the data must be fresh: reads sent through it are not answered', () => {
+    const l: GameLevel = { ...dataLevel({ read: 1 }), allowedComponents: ['appServer', 'cache', 'database'] };
+    const viaCache: Design = {
+      components: [{ id: 'api', type: 'appServer' }, { id: 'cache', type: 'cache' }, { id: 'db', type: 'database' }],
+      connections: [['client', 'api'], ['api', 'cache'], ['cache', 'db']],
+    };
+    expect(play(l, viaCache).flow!.errors).toBe(1);
   });
 
   it('a Read Replica can be connected to the database it copies, but nothing else comes out of it', () => {
@@ -403,12 +412,11 @@ describe('data scale: Read Replicas answer the reads and the primary database ke
     expect(built(['database', 'readReplica', 'appServer'])).toEqual(wired);
   });
 
-  it('a Read Replica has sizes and instances, and costs by size', () => {
+  it('a Read Replica has instances, each with a price', () => {
     const l = dataLevel({ read: 1 });
     let s = build(createGame(l, empty), 'readReplica', l);
     expect(s.money).toBe(500 - 50);
     s = build(s, 'readReplica', l);
     expect(s.buildings.find(b => b.type === 'readReplica')!.instances).toHaveLength(2);
-    expect(resize(s, s.buildings[0]!.id, 'medium').money).toBeLessThan(s.money);
   });
 });

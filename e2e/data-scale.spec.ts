@@ -3,7 +3,7 @@ import { openLevel } from './helpers';
 
 const chapterOne = ['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday'];
 const chapterTwo = ['09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day'];
-const MISSION = '15-too-many-reads';
+const LEVEL = '15-too-many-reads';
 const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
 async function progressWith(page: Page, passed: string[]) {
@@ -22,9 +22,9 @@ test('chapter 3 is a new sector of the campaign map, locked until chapter 2 is f
   await expect(levelCard(page, 'Too many reads').getByRole('button', { name: /Play/ })).toBeVisible();
 });
 
-test('mission 1: with no Read Replica the primary database is full of reads, and the hint says to add Read Replicas', async ({ page }) => {
+test('level 15: with no Read Replica the primary database is full of reads, and the hint says to add Read Replicas', async ({ page }) => {
   await progressWith(page, [...chapterOne, ...chapterTwo]);
-  await openLevel(page, MISSION, 'normal');
+  await openLevel(page, LEVEL, 'normal');
   await page.getByRole('button', { name: /Release to production/ }).click();
   await page.getByRole('button', { name: '4×' }).click();
   const end = page.getByRole('dialog');

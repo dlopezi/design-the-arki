@@ -111,7 +111,7 @@ export const en = {
     loadBalancer: 'The load balancer is saturated.',
     cache: 'The cache is saturated.',
     worker: 'The Workers cannot keep up with the jobs: add Workers or use bigger ones.',
-    readReplica: 'The Read Replicas cannot keep up with the reads: add replicas or use bigger ones.',
+    readReplica: 'The Read Replicas cannot keep up with the reads: add Read Replica instances or use bigger ones.',
   } as Record<string, string>,
   /** Hints when the bottleneck cannot be resized in this level. */
   fixedHints: {
@@ -121,7 +121,7 @@ export const en = {
   /** Lost with a Worker called straight from the app server: the job runs inside the request. */
   queueHint: 'A job sent straight from the app server to the Worker runs inside the request, so everyone waits for it. Put a Message Queue in between: it answers at once, and the Worker takes the job in the background.',
   /** Lost with reads in the wave while no Read Replica receives them: the primary database takes them all. */
-  replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Replicas scale reads, not writes.',
+  replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost while Messages were waiting too long. */
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
@@ -313,11 +313,11 @@ export const en = {
         read: { label: 'Microsoft · Competing Consumers pattern', url: 'https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers' },
       },
       readReplica: {
-        role: 'A copy of the primary database that answers reads only. The app server sends the reads to the replicas and the writes to the primary database. You can run several; they share the reads.',
-        when: 'When the primary database is full of reads and the data must be fresh, so a cache does not help. Replicas scale reads, never writes.',
+        role: 'A copy of the primary database that answers reads only. The app server sends the reads to the Read Replicas and the writes to the primary database. You can run several; they share the reads.',
+        when: 'When the primary database is full of reads and the data must be fresh, so a cache does not help. Read Replicas scale reads, never writes.',
         tools: ['PostgreSQL or MySQL read replicas', 'Amazon RDS read replicas', 'Amazon Aurora replicas', 'Google Cloud SQL read replicas'],
-        same: 'More replica instances answer more reads each second, and they cost more. A write that reaches only a replica is an error, because a replica answers reads only.',
-        diff: 'Real replicas are always a little behind the primary database (replication lag), so a user may not see their own change at once. A later mission covers this.',
+        same: 'More Read Replica instances answer more reads each second, and they cost more. A write that reaches only a Read Replica is an error, because a Read Replica answers reads only.',
+        diff: 'Real Read Replicas are always a little behind the primary database (replication lag), so a user may not see their own change at once. A later mission covers this.',
         read: { label: 'AWS · Amazon RDS read replicas', url: 'https://aws.amazon.com/rds/features/read-replicas/' },
       },
     } as Record<string, { role: string; when: string; tools: string[]; same: string; diff: string; read: { label: string; url: string } }>,

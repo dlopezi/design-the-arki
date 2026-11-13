@@ -2,7 +2,7 @@
   "id": "15-too-many-reads",
   "chapter": "Data scale",
   "title": "Too many reads",
-  "brief": "Your video app is a hit: 480 requests arrive every second, and nine in ten only read data (video lists, comments, view counts). One primary database serves about 400 requests a second, so it is full. The data must be fresh, so a cache does not help here. A Read Replica is a copy of the database that answers reads only. Add Read Replicas: the app server sends the reads to them and keeps the writes for the primary database. Replicas scale reads, not writes.",
+  "brief": "Your video app is a hit: 480 requests arrive every second, and nine in ten only read data (video lists, comments, view counts). One primary database serves about 400 requests a second, so it is full. The data must be fresh, so a cache does not help here. A Read Replica is a copy of the database that answers reads only. Add Read Replicas: the app server sends the reads to them and keeps the writes for the primary database. Read Replicas scale reads, not writes.",
   "durationS": 30,
   "traffic": [
     {
@@ -46,7 +46,7 @@
       "maxInstances": 4
     }
   },
-  "guidedHint": "The primary database is full of reads. Add Read Replicas: the app server sends the reads to them, and the primary keeps the writes. Reads are 9 in 10 requests, so one replica is not enough.",
+  "guidedHint": "The primary database is full of reads. Add Read Replicas: the app server sends the reads to them, and the primary keeps the writes. Reads are 9 in 10 requests, so one Read Replica is not enough.",
   "play": {
     "startMoney": 400,
     "wave": {

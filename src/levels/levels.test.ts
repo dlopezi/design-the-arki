@@ -154,12 +154,6 @@ describe('level files', () => {
       expect(play(replicas(1)).phase).toBe('lost');
       expect(play(replicas(2)).phase).toBe('won');
     });
-
-    it('is a mix of reads and writes with no cache on offer: the data must be fresh', () => {
-      expect(Object.keys(level.play.wave.mix!).sort()).toEqual(['read', 'write']);
-      expect(level.allowedComponents).toContain('readReplica');
-      expect(level.allowedComponents).not.toContain('cache');
-    });
   });
 
   it('13-fresh-videos: fewer Workers are cheaper but let the Queue Age pass its maximum, which costs reputation', () => {

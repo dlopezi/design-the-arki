@@ -137,7 +137,7 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker'), replicas = ofType('readReplica');
+  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica');
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
   const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
@@ -150,7 +150,7 @@ function autoLink(s: GameState, b: Building): GameState {
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);
-    for (const r of replicas) next = addLink(next, b.id, r.id);
+    for (const r of readReplicas) next = addLink(next, b.id, r.id);
   } else if (b.type === 'cache') {
     // The cache goes in front of the database: app servers that went straight to it now go through the cache.
     if (db) next = { ...next, links: next.links.filter(l => !(l.to === db.id && typeOf(next, l.from) === 'appServer')) };
@@ -160,7 +160,7 @@ function autoLink(s: GameState, b: Building): GameState {
     if (cache && !outOf(cache.id)) next = addLink(next, cache.id, b.id);
     else for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
     for (const w of workers) if (!outOf(w.id)) next = addLink(next, w.id, b.id);
-    for (const r of replicas) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
+    for (const r of readReplicas) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
   } else if (b.type === 'readReplica') {
     // Reads come from the app servers; the link to the database is the replication.
     for (const a of apps) next = addLink(next, a.id, b.id);

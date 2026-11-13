@@ -94,7 +94,7 @@ export const levelTextEs: Record<string, LevelText> = {
   },
   '15-too-many-reads': {
     title: 'Demasiadas lecturas',
-    brief: 'Tu app de vídeo es un éxito: llegan 480 peticiones por segundo y nueve de cada diez solo leen datos (listas de vídeos, comentarios, visionados). Una base de datos primaria atiende unas 400 peticiones por segundo, así que está llena. Los datos deben estar al día, por eso una caché no ayuda aquí. Una réplica de lectura (Read Replica) es una copia de la base de datos que solo responde lecturas. Añade Read Replicas: el app server les envía las lecturas y deja las escrituras para la base de datos primaria. Las réplicas escalan las lecturas, no las escrituras.',
-    guidedHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas: el app server les envía las lecturas y la primaria se queda con las escrituras. Las lecturas son 9 de cada 10 peticiones, así que una réplica no basta.',
+    brief: 'Tu app de vídeo es un éxito: llegan 480 peticiones por segundo y nueve de cada diez solo leen datos (listas de vídeos, comentarios, visionados). Una base de datos primaria atiende unas 400 peticiones por segundo, así que está llena. Los datos deben estar al día, por eso una caché no ayuda aquí. Una réplica de lectura (Read Replica) es una copia de la base de datos que solo responde lecturas. Añade Read Replicas: el app server les envía las lecturas y deja las escrituras para la base de datos primaria. Las Read Replicas escalan las lecturas, no las escrituras.',
+    guidedHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas: el app server les envía las lecturas y la primaria se queda con las escrituras. Las lecturas son 9 de cada 10 peticiones, así que una Read Replica no basta.',
   },
 };
