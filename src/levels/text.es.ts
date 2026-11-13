@@ -76,4 +76,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Un creador famoso lanza un reto y, durante 20 segundos, llegan 30 subidas por segundo: muchas más de las que tus Workers pueden procesar. La cola acepta cada trabajo al instante y deja que los Workers los saquen a su ritmo, lo que además protege a la base de datos pequeña del pico. Eso es load leveling (nivelar la carga). Pero una cola solo absorbe un pico. Si la carga se mantiene por encima de lo que tus Workers procesan, el Backlog y la edad de la cola crecen sin fin.',
     guidedHint: 'Una cola absorbe un pico, pero no arregla una carga que se mantiene demasiado alta. Añade Workers hasta que la edad de la cola quede por debajo de su máximo mientras el Backlog se vacía.',
   },
+  '12-worker-goes-down': {
+    title: 'Se cae un Worker',
+    brief: 'Llegan ocho subidas por segundo y, a los 10 segundos de la oleada, se cae uno de tus Workers. No se pierde nada: los mensajes siguen en la cola y los demás Workers siguen tomándolos. Es la entrega at-least-once (al menos una vez). El precio es que un trabajo que el Worker estaba procesando al caerse se entregará otra vez, así que un trabajo puede ejecutarse dos veces, y los Workers reales deben ser idempotentes: ejecutar un trabajo dos veces debe dar el mismo resultado que ejecutarlo una vez. ¿Tienes Workers suficientes para un mal día?',
+    guidedHint: 'Cuando se cae un Worker, los mensajes siguen en la cola y los demás Workers deben tomarlos. Ten un Worker más de los que necesitas. Un trabajo puede ejecutarse dos veces, así que los Workers deben ser idempotentes.',
+  },
 };
