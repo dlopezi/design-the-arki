@@ -825,7 +825,8 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .campaign .home-topbar { position: static; padding: 10px 0; }
 .campaign-tools { display: flex; gap: 12px; align-items: center; font-size: 12.5px; }
 .campaign-grid { min-height: 0; height: 100%; align-items: stretch; }
-.campaign-sectors { min-height: 0; align-content: start; }
+/* The page is one screen tall, so the chapter list scrolls inside itself (more chapters than fit). */
+.campaign-sectors { min-height: 0; align-content: start; overflow-y: auto; overscroll-behavior: contain; }
 .campaign-sector { gap: 8px; padding: 10px 12px; }
 .campaign-head { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 14px; }
 .campaign-head .home-eyebrow { margin: 0; }
@@ -1101,6 +1102,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
   .campaign { height: auto; min-height: 100dvh; overflow: visible; grid-template-rows: none; }
   .campaign > .campaign-grid { grid-row: auto; height: auto; }
   .campaign-sectors, .campaign-sector { height: auto; }
+  .campaign-sectors { overflow: visible; }
   .campaign-briefing { max-height: none; overflow: visible; }
   .campaign-help { display: none; }
 }
