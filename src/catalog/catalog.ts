@@ -5,7 +5,7 @@ import type { Catalog } from '../engine/types';
  * type, `watch`, so chapter 1 plays as it always did. Each building lists the types it `accepts` (all, when it does not say).
  */
 export const DEFAULT_REQUEST_TYPE = 'watch';
-export const requestTypes = ['watch', 'job', 'read', 'write'];
+export const requestTypes = ['watch', 'job', 'read', 'write', 'readYourWrites'];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -39,7 +39,7 @@ export const catalog: Catalog = {
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
     // It serves reads and takes writes and the results Workers write; processing a job is not its work.
-    accepts: ['watch', 'read', 'write', RESULT_TYPE],
+    accepts: ['watch', 'read', 'write', 'readYourWrites', RESULT_TYPE],
     presentation: { zone: 'data', technology: 'PostgreSQL' },
   },
   // Chapter 3 (Data scale). A copy of the primary database that answers reads only (ADR-0007). It gets the reads

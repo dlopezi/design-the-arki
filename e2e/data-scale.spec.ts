@@ -32,3 +32,15 @@ test('level 15: with no Read Replica the primary database is full of reads, and 
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Add Read Replicas');
 });
+
+test('level 16: a design whose app server reaches only the Read Replicas loses, and the hint explains the stale read', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads']);
+  await openLevel(page, '16-just-saved-not-there', 'hard');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 30_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('own change');
+  await expect(end).toContainText('Read-your-writes');
+});

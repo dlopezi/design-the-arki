@@ -97,4 +97,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Tu app de vídeo es un éxito: llegan 480 peticiones por segundo y nueve de cada diez solo leen datos (listas de vídeos, comentarios, visionados). Una base de datos primaria atiende unas 400 peticiones por segundo, así que está llena. Los datos deben estar al día, por eso una caché no ayuda aquí. Una réplica de lectura (Read Replica) es una copia de la base de datos que solo responde lecturas. Añade Read Replicas: el app server les envía las lecturas y deja las escrituras para la base de datos primaria. Las Read Replicas escalan las lecturas, no las escrituras.',
     guidedHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas: el app server les envía las lecturas y la primaria se queda con las escrituras. Las lecturas son 9 de cada 10 peticiones, así que una Read Replica no basta.',
   },
+  '16-just-saved-not-there': {
+    title: 'Guardado, pero no está',
+    brief: 'Un usuario publica un comentario, la página se recarga y el comentario ha desaparecido. Una Read Replica siempre va un poco por detrás de la base de datos primaria, así que una lectura que cae en ella puede no mostrar lo que el usuario acaba de guardar. Algunas lecturas deben estar al día: Read-your-writes. Van a la base de datos primaria, nunca a una Read Replica; en una réplica cuentan como errores. Las lecturas normales aún pueden usar las Read Replicas, pero ahora la primaria tiene más trabajo, así que mantén el app server conectado a ella.',
+    guidedHint: 'Una Read Replica va un poco por detrás, así que una lectura que debe mostrar el cambio del propio usuario (Read-your-writes) tiene que ir a la base de datos primaria. Conecta el app server a la primaria además de a las Read Replicas.',
+  },
 };

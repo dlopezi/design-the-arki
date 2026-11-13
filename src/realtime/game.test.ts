@@ -385,6 +385,24 @@ describe('data scale: Read Replicas answer the reads and the primary database ke
     expect(play(l, design(4, withReplica)).flow!.errors).toBeCloseTo(1 / 3); // the primary serves 400 of 600
   });
 
+  it('sends Read-your-writes to the primary database, and plain reads to the Read Replica', () => {
+    const s = play(dataLevel({ read: 0.5, readYourWrites: 0.4, write: 0.1 }), design(1, withReplica));
+    expect(s.flow!.inflow.rep).toBeCloseTo(50);
+    expect(s.flow!.inflow.db).toBeCloseTo(50); // 40 Read-your-writes + 10 writes
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('a Read-your-writes request that reaches only a Read Replica is an error: a stale read', () => {
+    const s = play(dataLevel({ readYourWrites: 1 }), design(1, [['api', 'rep'], ['rep', 'db']]));
+    expect(s.flow!.errors).toBe(1);
+  });
+
+  it('a Read-your-writes request is answered when the app server is connected to the primary database', () => {
+    const s = play(dataLevel({ readYourWrites: 1 }), design(1, [['api', 'db']]));
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.inflow.db).toBeCloseTo(100);
+  });
+
   it('a cache cannot answer reads, because the data must be fresh: reads sent through it are not answered', () => {
     const l: GameLevel = { ...dataLevel({ read: 1 }), allowedComponents: ['appServer', 'cache', 'database'] };
     const viaCache: Design = {

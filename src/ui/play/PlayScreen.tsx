@@ -306,7 +306,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const jobs = (level.play.wave.mix?.job ?? 0) > 0;
     if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
     if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
-    // Data levels: reads that no Read Replica receives all land on the primary database.
+    // Data levels: Read-your-writes that cannot reach the primary database are stale reads on a Read Replica.
+    const fresh = (level.play.wave.mix?.readYourWrites ?? 0) > 0;
+    if (fresh && !game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'database')) return t.staleReadHint;
+    // Reads that no Read Replica receives all land on the primary database.
     const reads = (level.play.wave.mix?.read ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
     if (tooOld) return t.backlogHint;

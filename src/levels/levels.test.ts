@@ -33,7 +33,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
@@ -99,8 +99,9 @@ describe('level files', () => {
       expect(allLevels('en').filter(l => l.chapter === 'Core').every(l => l.play.wave.mix === undefined)).toBe(true);
     });
 
-    it('accepts reads and writes as Request Types', () => {
+    it('accepts reads, writes and Read-your-writes as Request Types', () => {
       expect(parseLevel(withMix({ read: 0.9, write: 0.1 })).play.wave.mix).toEqual({ read: 0.9, write: 0.1 });
+      expect(parseLevel(withMix({ read: 0.5, readYourWrites: 0.4, write: 0.1 })).play.wave.mix).toEqual({ read: 0.5, readYourWrites: 0.4, write: 0.1 });
     });
 
     it('needs the primary database in a level that allows a Read Replica', () => {
@@ -153,6 +154,31 @@ describe('level files', () => {
     it('needs enough replica instances: one is too few for the reads', () => {
       expect(play(replicas(1)).phase).toBe('lost');
       expect(play(replicas(2)).phase).toBe('won');
+    });
+  });
+
+  describe('16-just-saved-not-there: a replica is behind, so Read-your-writes goes to the primary', () => {
+    const level = allLevels('en').find(l => l.id === '16-just-saved-not-there')!;
+    const ref = level.referenceDesign;
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level);
+    const links = (pairs: [string, string][]) => ({ ...ref, connections: pairs });
+
+    it('wins when the app server reaches both the Read Replicas and the primary database', () => {
+      expect(play(ref).phase).toBe('won');
+    });
+
+    it('loses when the app server reaches only the Read Replicas: Read-your-writes and writes have nowhere to go', () => {
+      const replicaOnly = ref.connections.filter(([a, b]) => !(a === 'api' && b === 'db'));
+      expect(play(links(replicaOnly)).phase).toBe('lost');
+    });
+
+    it('loses with no Read Replica: the primary database takes every read', () => {
+      const bare = { components: ref.components.filter(c => c.type !== 'readReplica'), connections: ref.connections.filter(([a, b]) => a !== 'replicas' && b !== 'replicas') };
+      expect(play(bare).phase).toBe('lost');
+    });
+
+    it('has Read-your-writes in the mix', () => {
+      expect(level.play.wave.mix!.readYourWrites).toBeGreaterThan(0);
     });
   });
 
