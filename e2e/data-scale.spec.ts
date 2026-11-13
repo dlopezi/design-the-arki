@@ -98,3 +98,25 @@ test('level 20: the Replication Lag is shown next to its maximum, and a Read Rep
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Replication Lag');
 });
+
+test('the Manual: the Read Replica and Object Storage entries are locked until their level, and the Concepts tab explains data scale', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /Read Replica/ }).click();
+  await expect(page.getByRole('region', { name: /Read Replica/ })).toContainText('Reach level 15 to unlock this building.');
+  await page.getByRole('button', { name: /Object Storage/ }).click();
+  await expect(page.getByRole('region', { name: /Object Storage/ })).toContainText('Reach level 19 to unlock this building.');
+  await page.goto('/#manual/concepts');
+  for (const title of ['Replication Lag', 'Read-your-writes', 'Sharding', 'Shard Key', 'Hot Shard', 'Pre-signed URL', 'Failover']) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+});
+
+test('the Manual: once the levels are reached, the Read Replica and Object Storage entries say what they are in real life', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard']);
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /Read Replica/ }).click();
+  await expect(page.getByText('PostgreSQL or MySQL read replicas')).toBeVisible();
+  await page.getByRole('button', { name: /Object Storage/ }).click();
+  await expect(page.getByText('Amazon S3 · Google Cloud Storage')).toBeVisible();
+});
