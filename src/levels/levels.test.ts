@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
 import { designCost } from '../engine/simulate';
-import { callNow, createGame, run, starsOf, waveEnd } from '../realtime/game';
+import { callNow, createGame, run, runToEnd, starsOf } from '../realtime/game';
 import { allLevels, parseLevel } from './levels';
 import { levelTextEs } from './text.es';
 
@@ -32,17 +32,17 @@ describe('Spanish level texts', () => {
 });
 
 describe('level files', () => {
-  it('ships the 8 levels of chapter 1 in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday']);
+  it('ships the 8 levels of chapter 1 and then the Async chapter, in order', () => {
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing']);
   });
 
   for (const level of allLevels()) {
     it(`${level.id}: its reference design, bought at the start, lasts the wave: 2 stars, and all 3 when the users are called early`, () => {
       const bought = () => { const s = createGame(level, level.referenceDesign); return { ...s, money: s.money - designCost(level.referenceDesign) }; };
-      const plain = run(bought(), waveEnd(level) + 1, level);
+      const plain = runToEnd(bought(), level);
       expect(plain.phase).toBe('won');
       expect(starsOf(plain, level)).toBe(2);
-      const early = run(callNow(run(bought(), 10, level)), level.play.wave.lengthS + 1, level);
+      const early = runToEnd(callNow(run(bought(), 10, level)), level);
       expect(starsOf(early, level)).toBe(3);
     });
 
@@ -52,8 +52,8 @@ describe('level files', () => {
     });
 
     for (const mode of ['guided', 'normal', 'hard'] as const) {
-      it(`${level.id}: its ${mode} starting design, left as it is, does not last the wave`, () => {
-        expect(run(createGame(level, level.startingDesigns[mode]), waveEnd(level) + 1, level).phase).toBe('lost');
+      it(`${level.id}: its ${mode} starting design, left as it is, does not win`, () => {
+        expect(runToEnd(createGame(level, level.startingDesigns[mode]), level).phase).toBe('lost');
       });
     }
 
@@ -73,7 +73,7 @@ describe('level files', () => {
   }
 
   describe('wave mix of Request Types', () => {
-    const base = allLevels('en')[0]!;
+    const base = allLevels('en').find(l => l.id === '09-slow-processing')!;
     const withMix = (mix: unknown) => ({ ...base, play: { ...base.play, wave: { ...base.play.wave, mix } } });
 
     it('accepts a mix whose shares add up to 1', () => {
@@ -95,7 +95,18 @@ describe('level files', () => {
     });
 
     it('is optional: the levels of chapter 1 have none', () => {
-      expect(allLevels('en').every(l => l.play.wave.mix === undefined)).toBe(true);
+      expect(allLevels('en').filter(l => l.chapter === 'Core').every(l => l.play.wave.mix === undefined)).toBe(true);
+    });
+
+    it('needs a message queue and a worker in a level whose wave has jobs', () => {
+      expect(() => parseLevel({ ...base, allowedComponents: ['appServer', 'database'] })).toThrow(/must allow a messageQueue and a worker/);
+      expect(() => parseLevel({ ...base, allowedComponents: ['appServer', 'database', 'messageQueue'] })).toThrow(/messageQueue and a worker/);
+    });
+
+    it('needs a maximum Queue Age in a level that allows a message queue', () => {
+      const { maxQueueAgeS: _gone, ...requirements } = base.requirements;
+      expect(() => parseLevel({ ...base, requirements })).toThrow(/maximum Queue Age/);
+      expect(parseLevel({ ...base, requirements: { ...requirements, maxQueueAgeS: 12 } }).requirements.maxQueueAgeS).toBe(12);
     });
   });
 

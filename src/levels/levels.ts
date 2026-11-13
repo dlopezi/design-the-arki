@@ -26,7 +26,9 @@ const levelSchema = z.object({
   brief: z.string().min(1),
   durationS: z.number().positive(),
   traffic: z.array(z.object({ fromS: z.number().min(0), toS: z.number().positive(), rps: z.number().positive() })).min(1),
-  requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1) }),
+  requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1),
+    /** Async levels: the longest the oldest Message may wait in a queue (seconds). */
+    maxQueueAgeS: z.number().positive().optional() }),
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
@@ -62,6 +64,17 @@ const levelSchema = z.object({
       z.object({ event: z.enum(['run', 'pass']) }),
     ]),
   })).optional(),
+}).superRefine((level, ctx) => {
+  // A level with a mix of Request Types, or with a queue, needs the buildings that finish the work (ADR-0006).
+  const allowed = new Set(level.allowedComponents);
+  const mix = level.play.wave.mix;
+  if (mix && (mix.job ?? 0) > 0 && !(allowed.has('messageQueue') && allowed.has('worker'))) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has jobs must allow a messageQueue and a worker' });
+  }
+  // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
+  if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['requirements', 'maxQueueAgeS'], message: 'A level that allows a messageQueue must set a maximum Queue Age' });
+  }
 });
 
 export type TutorialStep = {

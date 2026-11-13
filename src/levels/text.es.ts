@@ -11,6 +11,7 @@ export type LevelText = {
 
 export const chaptersEs: Record<string, string> = {
   Core: 'Fundamentos',
+  Async: 'Asíncrono',
 };
 
 export const levelTextEs: Record<string, LevelText> = {
@@ -59,5 +60,10 @@ export const levelTextEs: Record<string, LevelText> = {
     title: 'Black Friday',
     brief: 'Todo a la vez: 500 personas por segundo durante 40 segundos, una instancia de app server se cae a los 15 segundos de la oleada y el dinero es escaso. Es el examen final del capítulo.',
     guidedHint: 'Durante el pico se cae un app server. Añade instancias hasta que las demás aún puedan llevar 500 req/s.',
+  },
+  '09-slow-processing': {
+    title: 'Procesamiento lento',
+    brief: 'Tu app de vídeo deja subir vídeos, y cada subida hay que procesarla: cerca de un segundo de trabajo. Llegan seis subidas por segundo. Procesar dentro de la petición hace esperar a todos los usuarios. Pon una cola de mensajes entre el app server y un Worker: la cola responde al instante y el Worker hace el trabajo en segundo plano.',
+    guidedHint: 'Procesar un vídeo dentro de la petición es lento. Conecta la cola de mensajes al Worker: la cola responde al instante y el Worker toma los trabajos en segundo plano.',
   },
 };

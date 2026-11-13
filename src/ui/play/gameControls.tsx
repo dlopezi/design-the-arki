@@ -15,6 +15,7 @@ export function Announcer({ phase, buildLeft, incident, started }: { phase: stri
   const a = t.rt.announce;
   useEffect(() => { if (started) show(a.build, 'ok', 1400); }, [started]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (phase === 'wave') show(a.live, 'warn'); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'drain') show(a.drain, 'warn', 2400); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (incident) show(a.incident, 'bad'); }, [incident]); // eslint-disable-line react-hooks/exhaustive-deps
   const count = phase === 'build' && started && buildLeft <= 3 && buildLeft > 0 ? buildLeft : null;
   if (count) return <div key={`c${count}`} className="play-announce count" aria-hidden="true">{count}</div>;

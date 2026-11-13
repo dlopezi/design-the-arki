@@ -6,7 +6,7 @@ export type TrafficSegment = { fromS: number; toS: number; rps: number };
 export type Level = {
   durationS: number;
   traffic: TrafficSegment[];
-  requirements: { p95Ms: number; maxErrorRate: number };
+  requirements: { p95Ms: number; maxErrorRate: number; /** Real-time play only: the longest the oldest Message may wait in a queue. */ maxQueueAgeS?: number };
   /** Maximum monthly cost in dollars. */
   budget: number;
   /** Monthly costs at or below which the 2nd, 3rd… star is earned. */
@@ -41,6 +41,13 @@ export type StationPrimitive = {
    * (a load balancer or an app server). A building that lists its types takes only those.
    */
   accepts?: string[];
+  /** The Request Type it passes on, when it turns what it takes into something else (a Worker saves the result of a job). */
+  emits?: string;
+  /**
+   * Queue primitive (real-time play): it answers at once and holds what reaches it as a Backlog that lasts from one
+   * tick to the next, then releases it to the buildings behind it at their total capacity. Never drops the Backlog.
+   */
+  queue?: boolean;
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
   sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
   defaultSize?: string;

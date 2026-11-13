@@ -21,6 +21,8 @@ export const REFUND = 0.5;
 export const REPUTATION = { failing: -6, slow: -4, fine: 1 };
 /** Bonus per second of build phase skipped by calling the users early. */
 export const EARLY_BONUS_PER_S = PASSIVE_INCOME * 2;
+/** A Backlog under this (half a Message) counts as empty. */
+export const EMPTY_BACKLOG = 0.5;
 
 export type Play = {
   startMoney: number;
@@ -34,17 +36,18 @@ export type Play = {
 export type GameLevel = {
   allowedComponents: string[];
   componentOptions: Record<string, { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> }>;
-  requirements: { p95Ms: number; maxErrorRate: number };
+  requirements: { p95Ms: number; maxErrorRate: number; /** The longest the oldest Message may wait in a queue, in seconds. */ maxQueueAgeS?: number };
   play: Play;
 };
 
 /** What happened, for the message log; the UI turns each kind into text. */
-export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'early' | 'incident' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
+export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
 export type Sample = { t: number; rps: number; p95: number; errors: number };
 export type GameState = {
   t: number;
-  phase: 'build' | 'wave' | 'won' | 'lost';
+  /** build → wave → (drain, while Messages are still waiting after the wave) → won or lost. */
+  phase: 'build' | 'wave' | 'drain' | 'won' | 'lost';
   money: number;
   reputation: number;
   buildings: Building[];
@@ -55,6 +58,10 @@ export type GameState = {
   visits: number;
   incidentDone: boolean;
   flow: Flow | null;
+  /** Messages waiting in each queue (ADR-0006): the one state that lasts from one step to the next. */
+  backlog: Record<string, number>;
+  /** How long the oldest Message of each queue has waited, estimated: the Backlog over the rate its Workers take it. */
+  queueAge: Record<string, number>;
   history: Sample[];
   events: GameEvent[];
   nextId: number;
@@ -64,6 +71,8 @@ const buildTime = (type: string, catalog: Catalog) => catalog[type]?.buildS ?? 5
 const ready = (n: number): Instance[] => Array.from({ length: n }, () => ({ buildLeftS: 0, buildTotalS: 0, down: false }));
 const log = (s: GameState, e: Omit<GameEvent, 't'>): GameEvent[] => [...s.events, { t: s.t, ...e }].slice(-40);
 export const waveEnd = (level: GameLevel) => BUILD_PHASE_S + level.play.wave.lengthS;
+/** Messages waiting in all queues. */
+export const totalBacklog = (s: Pick<GameState, 'backlog'>) => Object.values(s.backlog).reduce((a, v) => a + v, 0);
 export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = defaultCatalog) =>
   s.buildings.reduce((sum, b) => sum + instancePrice(b, catalog) * b.instances.length, 0) / UPKEEP_DIVISOR;
 
@@ -75,7 +84,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
-    visits: 0, incidentDone: false, flow: null, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -95,6 +104,8 @@ const reaches = (links: Link[], from: string, to: string): boolean => from === t
 export function linkProblem(s: GameState, from: string, to: string, catalog: Catalog = defaultCatalog): string | null {
   if (from === to) return 'self';
   if (to === CLIENT) return 'intoUsers';
+  // Jobs reach a queue through an API, never straight from the users.
+  if (from === CLIENT && catalog[typeOf(s, to) ?? '']?.queue) return 'queueNotPublic';
   if (from !== CLIENT && !typeOf(s, from)) return 'missing';
   if (!typeOf(s, to)) return 'missing';
   const spec = catalog[typeOf(s, from) ?? ''];
@@ -124,6 +135,9 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
+  const queue = ofType('messageQueue')[0], workers = ofType('worker');
+  // An app server that already sends to a queue or a Worker still needs its way to the data.
+  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
   if (b.type === 'loadBalancer') {
     next = addLink(next, CLIENT, b.id);
@@ -133,14 +147,22 @@ function autoLink(s: GameState, b: Building): GameState {
     else if (!outOf(CLIENT)) next = addLink(next, CLIENT, b.id);
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
+    if (queue) next = addLink(next, b.id, queue.id);
   } else if (b.type === 'cache') {
     // The cache goes in front of the database: app servers that went straight to it now go through the cache.
     if (db) next = { ...next, links: next.links.filter(l => !(l.to === db.id && typeOf(next, l.from) === 'appServer')) };
-    for (const a of apps) if (!next.links.some(l => l.from === a.id)) next = addLink(next, a.id, b.id);
+    for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
     if (db) next = addLink(next, b.id, db.id);
   } else if (b.type === 'database') {
     if (cache && !outOf(cache.id)) next = addLink(next, cache.id, b.id);
-    else for (const a of apps) if (!next.links.some(l => l.from === a.id)) next = addLink(next, a.id, b.id);
+    else for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
+    for (const w of workers) if (!outOf(w.id)) next = addLink(next, w.id, b.id);
+  } else if (b.type === 'messageQueue') {
+    for (const a of apps) next = addLink(next, a.id, b.id);
+    for (const w of workers) next = addLink(next, b.id, w.id);
+  } else if (b.type === 'worker') {
+    if (queue) next = addLink(next, queue.id, b.id);
+    if (db) next = addLink(next, b.id, db.id);
   }
   return next;
 }
@@ -253,19 +275,29 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt });
   s.flow = flow;
+  s.backlog = flow.backlog;
+  s.queueAge = Object.fromEntries(Object.entries(flow.backlog).map(([id, waiting]) => {
+    const rate = flow.releaseCapacity[id] ?? 0;
+    return [id, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.queueAge[id] ?? 0) + dt];
+  }));
+  const maxAge = level.requirements.maxQueueAgeS;
+  const tooOld = maxAge !== undefined && Object.values(s.queueAge).some(age => age > maxAge);
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
-  if (rps) {
-    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms ? REPUTATION.slow : REPUTATION.fine;
+  if (rps || s.phase === 'drain') {
+    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
   if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors }];
   // End.
-  if (s.phase === 'wave' && s.reputation <= 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'reputation' }); }
+  if ((s.phase === 'wave' || s.phase === 'drain') && s.reputation <= 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'reputation' }); }
   else if (s.money < 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'money' }); }
-  else if (s.phase === 'wave' && s.t >= waveEnd(level)) { s.phase = 'won'; events.push({ kind: 'won' }); }
+  // After the wave, Messages still waiting in a queue keep the game going until Workers have taken them all (the Drain Phase).
+  else if (s.phase === 'wave' && s.t >= waveEnd(level)) {
+    if (totalBacklog(s) < EMPTY_BACKLOG) { s.phase = 'won'; events.push({ kind: 'won' }); } else { s.phase = 'drain'; events.push({ kind: 'drain' }); }
+  } else if (s.phase === 'drain' && totalBacklog(s) < EMPTY_BACKLOG) { s.phase = 'won'; events.push({ kind: 'won' }); }
   if (events.length) s.events = [...s.events, ...events.map(e => ({ t: s.t, ...e }))].slice(-40);
   return s;
 }
@@ -274,6 +306,12 @@ export function run(s: GameState, seconds: number, level: GameLevel, catalog: Ca
   let next = s;
   const n = Math.ceil(seconds / 0.1);
   for (let i = 0; i < n; i++) next = step(next, seconds / n, level, catalog);
+  return next;
+}
+/** Plays on until the game is won or lost (the Drain Phase may run past the wave), for at most `limitS` seconds. */
+export function runToEnd(s: GameState, level: GameLevel, limitS = 900, catalog: Catalog = defaultCatalog): GameState {
+  let next = s;
+  for (let spent = 0; spent < limitS && next.phase !== 'won' && next.phase !== 'lost'; spent++) next = run(next, 1, level, catalog);
   return next;
 }
 /** 1 star for lasting the wave, one more for each money threshold reached; 0 when lost. */

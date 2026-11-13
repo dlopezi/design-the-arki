@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { build, BUILD_PHASE_S, createGame, demolish, resize, rewire, run, setTtl, starsOf, waveEnd, type GameState } from '../realtime/game';
+import { build, BUILD_PHASE_S, createGame, demolish, resize, rewire, runToEnd, setTtl, starsOf, type GameState } from '../realtime/game';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
 
 /**
  * A scripted player: from the mode's starting design, in the build phase, with the level's money and real build
  * times, turn the map into the level's reference design (take away what is not in it, build, add instances, resize,
- * set the TTL, connect the default way), then wait for the wave.
+ * set the TTL, connect the default way), then wait until the game ends (the Drain Phase may run past the wave).
  */
 function playToReference(level: LevelDefinition, mode: Mode): { state: GameState; log: string[] } {
   let s = createGame(level, startingDesign(level, mode));
@@ -37,7 +37,7 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
   }
   s = rewire(s);
   log.push(`money left after building: $${Math.floor(s.money)}`);
-  return { state: run(s, waveEnd(level) + 1, level), log };
+  return { state: runToEnd(s, level), log };
 }
 
 describe('every level can be won from every mode', () => {

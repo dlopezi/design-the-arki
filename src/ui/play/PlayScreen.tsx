@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, capacityOf, hitRateOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
-  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, upkeepPerS, waveEnd, type GameEvent, type GameState,
+  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -41,6 +41,8 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
+/** The order buildings stand in a zone: the way a request travels. */
+const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'database'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -57,6 +59,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'building': return ev.building(name);
     case 'ready': return ev.ready(name);
     case 'wave': return ev.wave(rps);
+    case 'drain': return ev.drain;
     case 'early': return ev.early(e.amount ?? 0);
     case 'incident': return ev.incident(name);
     case 'removed': return ev.removed(name, e.amount ?? 0);
@@ -68,7 +71,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'lost': return ev.lost[e.reason ?? 'reputation'] ?? '';
   }
 }
-const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' ? 'ok' : '');
+const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' ? 'ok' : '');
 
 function Spark({ values, max, color, limit }: { values: number[]; max: number; color: string; limit?: number }) {
   const n = 60, v = values.slice(-n), w = 200, h = 34;
@@ -288,6 +291,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
 
   // ───────── Numbers for the screen ─────────
   const flow = game.flow;
+  const hasQueue = level.allowedComponents.some(type => catalog[type]?.queue);
+  const oldest = Math.max(0, ...Object.values(game.queueAge));
+  const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
   const net = PASSIVE_INCOME + ((flow?.answered ?? 0) / 100) * PER_100_VISITS - upkeepPerS(game);
   const building = game.phase === 'build';
@@ -296,6 +302,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const selectedBuilding = selection?.kind === 'building' ? game.buildings.find(b => b.id === selection.id) ?? null : null;
   const hint = useMemo(() => {
     if (game.phase !== 'lost' || !hintAllowed(mode, true)) return null;
+    if (incidentHappened && !Object.keys(game.backlog).length) return t.redundancyHint;
+    // Async levels: a Worker called straight from the app server, or Messages that waited too long.
+    if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
+    if (totalBacklog(game) > 0) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
@@ -316,11 +326,14 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const inst = b.instances[k]!, scaled = !!catalog[b.type]!.scalesOut;
     const active = isServing(inst);
     const servingIndex = b.instances.slice(0, k + 1).filter(isServing).length;
-    const idle = active && game.phase === 'wave' && servingIndex > (flow?.usable[b.id] ?? 0);
+    const idle = active && (game.phase === 'wave' || game.phase === 'drain') && servingIndex > (flow?.usable[b.id] ?? 0);
     const load = active && !idle ? flow?.load[b.id] ?? 0 : 0;
     const warn = noEntry(b) ? t.rt.inspector.noEntry : deadEnd(b) ? t.rt.inspector.deadEnd : '';
     const label = scaled ? instanceNames.get(b.id)?.[k] ?? b.type : buildingName(b.type);
-    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : '';
+    const waiting = Math.round(game.backlog[b.id] ?? 0);
+    // A queue shows its Backlog on the map, so the player sees whether the Workers keep up.
+    const backlogNote = catalog[b.type]!.queue ? `${t.rt.backlog}: ${waiting}` : '';
+    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : backlogNote;
     const selected = selectedBuilding?.id === b.id;
     return (
       <button key={`${b.id}-${k}`} className={`play-unit ${inst.buildLeftS > 0 ? 'building' : ''} ${inst.down ? 'down' : ''} ${selected ? 'selected' : ''} ${warn ? 'warn' : ''} ${tutorialType === b.type ? 'tutorial-target' : ''}`}
@@ -335,7 +348,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   }
   function zoneContent(zone: string) {
     const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone)
-      .sort((a, b) => ['loadBalancer', 'appServer', 'cache', 'database'].indexOf(a.type) - ['loadBalancer', 'appServer', 'cache', 'database'].indexOf(b.type));
+      .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
     if (layer === 2) {
       return here.map(b => {
         const serving = b.instances.filter(isServing).length, load = flow?.load[b.id] ?? 0;
@@ -401,6 +414,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {spec.scalesOut && <><dt>{i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
         <dt>{i.sendsTo}</dt><dd>{spec.endsRequests && !spec.shortcut ? i.answers : outs}</dd>
         <dt>{i.receives}</dt><dd>{i.perSecond(Math.round(flow?.inflow[b.id] ?? 0))}</dd>
+        {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
         {!spec.presentation?.hideCapacity && <><dt>{i.capacity}</dt><dd>{i.perSecond(Math.round(capacityOf(b) * Math.max(1, serving)))}</dd></>}
         {spec.shortcut && <><dt>{i.hitRate}</dt><dd>{Math.round(hitRateOf(b) * 100)}%</dd></>}
         <dt>{i.upkeep}</dt><dd>{i.money((price * b.instances.length) / UPKEEP_DIVISOR)}</dd>
@@ -442,9 +456,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <a className="back" href={levelsHref}>← {t.rt.back}</a>
         <h1>{level.title}</h1>
         <span className="play-res" role="status" aria-label={t.rt.money}>💰 <b className="play-money">${Math.floor(game.money)}</b><span className={net >= 0 ? 'up' : 'down'}>{t.rt.rate(net)}</span></span>
-        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : t.rt.phase.end}</b>
+        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
+        {hasQueue && <span className="play-res play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>
@@ -512,6 +527,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <dt>{t.rt.fixedIncome}</dt><dd>+${PASSIVE_INCOME.toFixed(1)}/s</dd>
             <dt>{t.rt.visitsIncome}</dt><dd>+${(((flow?.answered ?? 0) / 100) * PER_100_VISITS).toFixed(1)}/s</dd>
             <dt>{t.rt.upkeep}</dt><dd>−${upkeepPerS(game).toFixed(1)}/s</dd>
+            {hasQueue && <>
+              <dt>{t.rt.queueAge}</dt><dd className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</dd>
+              <dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(totalBacklog(game)))}</dd>
+            </>}
           </dl>
         </section>
         <section className="play-frame play-inspector" aria-label={t.inspector.title}>
@@ -551,7 +570,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <ul className="play-brief-goals" aria-label={t.objectives}>
               <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)}</li>
               <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
-              <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}</li>
+              {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
+              <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
               {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
             </ul>
             {newTypes.length > 0 && (
