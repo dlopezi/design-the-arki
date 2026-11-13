@@ -92,6 +92,7 @@ test('level 20: the Replication Lag is shown next to its maximum, and a Read Rep
   await openLevel(page, '20-release-day', 'guided');
   await expect(page.getByRole('status', { name: 'Replication Lag' })).toContainText('max 2 s');
   await page.getByRole('button', { name: /Release to production/ }).click();
+  await expect(page.locator('.play-chart', { hasText: 'Lag' })).toBeVisible(); // the Replication Lag chart, with its maximum as a line
   await page.getByRole('button', { name: '4×' }).click();
   const end = page.getByRole('dialog');
   await expect(end).toBeVisible({ timeout: 40_000 });

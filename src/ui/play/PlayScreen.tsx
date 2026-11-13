@@ -572,6 +572,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             {hasQueue
               ? <div className="play-chart">{t.rt.queueAge}<Spark values={game.history.map(h => h.age)} max={Math.max(10, (level.requirements.maxQueueAgeS ?? 5) * 2)} color={componentColor('messageQueue')} limit={level.requirements.maxQueueAgeS} /><b className={tooOld ? 'bad' : ''}>{Math.round(oldest)} s</b></div>
               : <div className="play-chart">RPS<Spark values={game.history.map(h => h.rps)} max={Math.max(100, level.play.wave.rps * 1.2)} color="#3ee0c8" /><b>{rps}</b></div>}
+            {maxLag !== undefined && <div className="play-chart" title={t.rt.replicationLag}>{t.rt.lagShort}<Spark values={game.history.map(h => h.lag)} max={Math.max(4, maxLag * 3)} color={componentColor('readReplica')} limit={maxLag} /><b className={lagTooHigh ? 'bad' : ''}>{lagNow.toFixed(1)} s</b></div>}
             <div className="play-chart">P95<Spark values={game.history.map(h => h.p95)} max={Math.max(400, level.requirements.p95Ms * 3)} color="#fbbf24" limit={level.requirements.p95Ms} /><b className={(flow?.p95 ?? 0) > level.requirements.p95Ms ? 'bad' : ''}>{flow?.p95 ?? 0} ms</b></div>
             <div className="play-chart">{t.rt.errors}<Spark values={game.history.map(h => h.errors)} max={0.5} color="#f87171" limit={level.requirements.maxErrorRate} /><b className={(flow?.errors ?? 0) > level.requirements.maxErrorRate ? 'bad' : ''}>{((flow?.errors ?? 0) * 100).toFixed(1)}%</b></div>
           </div>

@@ -459,7 +459,7 @@ export const en = {
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
     mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
-    replicationLag: 'Replication Lag',
+    replicationLag: 'Replication Lag', lagShort: 'Lag',
     lagOf: (lag: number, max: number | undefined) => (max === undefined ? `${lag.toFixed(1)} s` : `${lag.toFixed(1)} s / max ${max} s`),
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
