@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "verify": "npm run check && npm run e2e",
+    "level-report": "vitest run src/levels/level-report.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@xyflow/react": "12.8.6",
