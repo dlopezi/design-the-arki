@@ -1,5 +1,12 @@
 import type { Catalog } from '../engine/types';
 
+/**
+ * Request Types: the kinds of request a level's wave can mix (ADR-0006). A wave without a mix carries one implicit
+ * type, `watch`, so chapter 1 plays as it always did. Each building lists the types it `accepts` (all, when it does not say).
+ */
+export const DEFAULT_REQUEST_TYPE = 'watch';
+export const requestTypes = ['watch', 'job'];
+
 // Every component type is a combination of engine primitives plus its numbers (ADR-0004).
 export const catalog: Catalog = {
   // Capacity (~10 000 req/s) is deliberately far above early-access traffic and not shown to players.
@@ -20,6 +27,8 @@ export const catalog: Catalog = {
   cache: {
     primitive: 'station', workers: 50, meanServiceMs: 2, monthlyCost: 30, endsRequests: false, buildS: 6,
     shortcut: { param: 'ttlS', defaultValue: 10, halfAt: 30, max: 0.95 },
+    // Only reads are worth caching: a processing job is not.
+    accepts: ['watch'],
     presentation: { zone: 'data', technology: 'Redis' },
   },
   database: {

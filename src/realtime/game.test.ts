@@ -121,4 +121,22 @@ describe('real-time play', () => {
     expect(resized.buildings[0]!.instances.every(i => !i.down && i.buildLeftS === 5)).toBe(true);
     expect(resized.money).toBe(300 - (80 - 20) * 3);
   });
+
+  it('a wave with a mix of Request Types: a type with no path counts as errors and costs reputation', () => {
+    const mixed: GameLevel = { ...level, play: { ...level.play, wave: { rps: 100, lengthS: 40, mix: { watch: 0.7, job: 0.3 } } } };
+    const design = (connections: [string, string][]): Design => ({
+      components: [{ id: 'api', type: 'appServer' }, { id: 'cache', type: 'cache' }, { id: 'db', type: 'database' }], connections });
+    const play = (d: Design, l: GameLevel) => run(callNow(createGame(l, d)), 10, l);
+    const plain: GameLevel = { ...level, play: { ...level.play, wave: { rps: 100, lengthS: 40 } } };
+    // The cache takes watches only, so the jobs have nowhere to go (30% errors: over the 1% maximum).
+    const cacheOnly = play(design([['client', 'api'], ['api', 'cache'], ['cache', 'db']]), mixed);
+    expect(cacheOnly.flow!.errors).toBeCloseTo(0.3);
+    expect(cacheOnly.reputation).toBeLessThan(100);
+    // Connected to the database too, the jobs have a path and everything is answered.
+    const both = play(design([['client', 'api'], ['api', 'cache'], ['cache', 'db'], ['api', 'db']]), mixed);
+    expect(both.flow!.errors).toBe(0);
+    expect(both.reputation).toBe(100);
+    // The same base without a mix (chapter 1) answers everything, as before.
+    expect(play(design([['client', 'api'], ['api', 'cache'], ['cache', 'db']]), plain).flow!.errors).toBe(0);
+  });
 });

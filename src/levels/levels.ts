@@ -1,11 +1,18 @@
 import { z } from 'zod';
-import { catalog } from '../catalog/catalog';
+import { catalog, requestTypes } from '../catalog/catalog';
 import type { Design, Level } from '../engine/types';
 import type { Play } from '../realtime/game';
 import { lang, type Lang } from '../i18n';
 import { chaptersEs, levelTextEs } from './text.es';
 
 const componentType = z.string().refine(t => t in catalog, { error: issue => `Unknown component type: ${String(issue.input)}` });
+
+const unknownTypes = (mix: object) => Object.keys(mix).filter(t => !requestTypes.includes(t));
+/** The share of each Request Type in a wave: every share above 0, and all of them adding up to 1. */
+const waveMix = z.record(z.string(), z.number().positive().max(1))
+  .refine(mix => Object.keys(mix).length > 0, 'The mix needs at least one Request Type')
+  .refine(mix => unknownTypes(mix).length === 0, { error: issue => `Unknown Request Type: ${unknownTypes(issue.input as object).join(', ')}` })
+  .refine(mix => Math.abs(Object.values(mix).reduce((a, v) => a + v, 0) - 1) < 1e-6, 'The shares of the mix must add up to 1');
 
 const designSchema = z.object({
   components: z.array(z.object({ id: z.string().min(1), type: componentType, params: z.record(z.string(), z.unknown()).optional() })),
@@ -34,7 +41,7 @@ const levelSchema = z.object({
   /** Real-time play (ADR-0005): starting money, the one wave of users, an optional incident and the money for each extra star. */
   play: z.object({
     startMoney: z.number().positive(),
-    wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive() }),
+    wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive(), mix: waveMix.optional() }),
     incident: z.object({ atS: z.number().min(0), componentType }).optional(),
     starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
   }),
