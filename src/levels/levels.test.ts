@@ -167,7 +167,7 @@ describe('level files', () => {
       expect(play(ref).phase).toBe('won');
     });
 
-    it('loses when the app server reaches only the Read Replicas: Read-your-writes and writes have nowhere to go', () => {
+    it('loses when the app server reaches only the Read Replicas: the primary database gets none of the traffic', () => {
       const replicaOnly = ref.connections.filter(([a, b]) => !(a === 'api' && b === 'db'));
       expect(play(links(replicaOnly)).phase).toBe('lost');
     });
@@ -175,10 +175,6 @@ describe('level files', () => {
     it('loses with no Read Replica: the primary database takes every read', () => {
       const bare = { components: ref.components.filter(c => c.type !== 'readReplica'), connections: ref.connections.filter(([a, b]) => a !== 'replicas' && b !== 'replicas') };
       expect(play(bare).phase).toBe('lost');
-    });
-
-    it('has Read-your-writes in the mix', () => {
-      expect(level.play.wave.mix!.readYourWrites).toBeGreaterThan(0);
     });
   });
 

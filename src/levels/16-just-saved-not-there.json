@@ -2,7 +2,7 @@
   "id": "16-just-saved-not-there",
   "chapter": "Data scale",
   "title": "Just saved, not there",
-  "brief": "A user posts a comment, the page reloads, and the comment is gone. A Read Replica is always a little behind the primary database, so a read that lands on it may not show what the user just saved. Some reads must be fresh: Read-your-writes. They go to the primary database, never to a Read Replica; on a replica they count as errors. Plain reads can still use the Read Replicas, but the primary now has more to do, so keep the app server connected to it.",
+  "brief": "A user posts a comment, the page reloads, and the comment is gone. A Read Replica is always a little behind the primary database, so a read that lands on it may not show what the user just saved. Some reads must be fresh: Read-your-writes. They go to the primary database, never to a Read Replica; on a Read Replica they count as errors. Plain reads can still use the Read Replicas, but the primary now has more to do, so keep the app server connected to it.",
   "durationS": 30,
   "traffic": [
     {
