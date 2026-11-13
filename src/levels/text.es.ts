@@ -66,4 +66,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Tu app de vídeo deja subir vídeos, y cada subida hay que procesarla: cerca de un segundo de trabajo. Llegan seis subidas por segundo. Procesar dentro de la petición hace esperar a todos los usuarios. Pon una cola de mensajes entre el app server y un Worker: la cola responde al instante y el Worker hace el trabajo en segundo plano.',
     guidedHint: 'Procesar un vídeo dentro de la petición es lento. Conecta la cola de mensajes al Worker: la cola responde al instante y el Worker toma los trabajos en segundo plano.',
   },
+  '10-watch-and-upload': {
+    title: 'Ver y subir',
+    brief: 'Ahora la gente ve vídeos y los sube a la vez: 40 visionados y 10 subidas por segundo. Un visionado debe responderse al instante, así que sigue siendo síncrono: lo responde la caché o la base de datos. Solo el trabajo lento, procesar una subida, va a la cola. Tu app server manda cada tipo de petición por su camino.',
+    guidedHint: 'Solo el trabajo lento va a la cola: los visionados siguen siendo síncronos. El app server manda cada tipo de petición por su camino. Añade un Worker para que las subidas no se acumulen.',
+  },
 };

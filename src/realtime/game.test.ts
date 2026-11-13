@@ -137,6 +137,9 @@ describe('real-time play', () => {
     const both = play(design([['client', 'api'], ['api', 'cache'], ['cache', 'db'], ['api', 'q'], ['q', 'w'], ['w', 'db']]), mixed);
     expect(both.flow!.edge['api>cache']).toBeCloseTo(70);
     expect(both.flow!.edge['api>q']).toBeCloseTo(30);
+    expect(both.flow!.edge['cache>db']).toBeGreaterThan(0); // the watches reach the database through the cache
+    expect(both.flow!.edge['q>w']).toBeGreaterThan(0); // the jobs reach the Workers through the queue
+    expect(both.flow!.edge['api>db']).toBeUndefined();
     expect(both.flow!.errors).toBe(0);
     expect(both.reputation).toBe(100);
     // The same base without a mix (chapter 1) answers everything, as before.
