@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { maxStars } from './helpers';
 
 const levelNode = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
 
@@ -9,7 +10,7 @@ test('the campaign map shows the mode each level was passed in, the star total, 
   })));
   await page.goto('/#levels');
 
-  await expect(page.getByRole('img', { name: '6 of 48 stars collected' })).toBeVisible();
+  await expect(page.getByRole('img', { name: `6 of ${maxStars} stars collected` })).toBeVisible();
   await expect(levelNode(page, 'Hello world').getByLabel('Hardest mode passed: God')).toBeVisible();
   await expect(levelNode(page, 'First spike').getByLabel('Hardest mode passed: Hard')).toBeVisible();
   await expect(levelNode(page, 'Bigger or more?').getByLabel('Hardest mode passed: Normal')).toBeVisible();
