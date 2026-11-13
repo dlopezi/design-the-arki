@@ -52,4 +52,4 @@ npm run dev
 
 ## License
 
-[MIT](LICENSE)
+All rights reserved. See [LICENSE](LICENSE).

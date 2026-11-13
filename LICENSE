@@ -1,16 +1,20 @@
-MIT License
+Copyright (c) 2026 Jorge Daniel Lopez Irusta. All rights reserved.
 
-Copyright (c) 2026 Daniel Lopez
+This repository and everything in it (source code, art, text, levels and
+game design) is the property of the copyright holder. It is NOT open source.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+You MAY:
+- view the source code on GitHub;
+- play the game at https://design.thearki.com.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+You MAY NOT, without prior written permission from the copyright holder:
+- copy, modify, merge or create derivative works from any part of it;
+- publish, distribute, host, sublicense or sell it or any part of it;
+- use it, or any part of it, for commercial purposes.
+
+Viewing this repository grants no license or other rights, except where
+required by GitHub's Terms of Service. To ask for permission, contact the
+copyright holder through GitHub.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
