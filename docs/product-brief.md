@@ -23,6 +23,79 @@ Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototyp
 - **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
 
+## Chapter roadmap (planned 2026-11-13)
+
+A learning order: each chapter builds on the ones before it, so no concept appears before its base. Not final; each chapter gets its own grilling session.
+
+| # | Chapter | What the player learns | Why here |
+|---|---|---|---|
+| 1 | Core (done) | Capacity, load balancer, cache, database | The base of everything |
+| 2 | Async | Message Queue, Worker, Backlog, Queue Age, idempotency | Slow work, the first interview topic after scaling |
+| 3 | Data scale | Read replicas and replication lag, sharding and hot shards, object storage | The database is the next limit; object storage finishes the video story |
+| 4 | Edge | CDN, API gateway, rate limiter, DNS and multi-region failover | A CDN is a cache in front of object storage (1 + 3); multi-region needs replicas (3) |
+| 5 | Events and pub/sub | Fan-out, topics, partitions, consumer groups, news feed (fan-out on write or on read) | Builds on the queue (2); partitions are sharding (3) |
+| 6 | Resilience | Timeouts, retries with backoff and retry storms, circuit breaker, graceful degradation | Needs a base with many parts that can fail (2–5) |
+| 7 | Observability | Metrics, logs, tracing, SLOs, error budgets, alerts; as a mechanic, the map is in fog until the player builds monitoring | Watching a system only makes sense once it is big |
+| 8 | Consistency and payments | Transactions, double booking, Saga, outbox, idempotency keys | The hardest topic; uses replication lag (3), events (5) and idempotency (2) |
+| 9 | Interview classics | URL shortener, chat, news feed, ticket sale, rate limiter | The final exam: everything together, as in a real interview |
+
+Rules for every chapter:
+- One new concept per mission.
+- The last mission of each chapter also uses buildings from earlier chapters, as a review.
+- Stories continue: the video app grows in chapters 2–4, a social network in 5–6, a ticket app in 7–8.
+
+## Chapter 2: Async (planned 2026-11-13)
+
+Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: the game shows a real problem with the real solution and the real names, so players can use them in an interview.
+
+- **Story**: a new product, a video app. Watching a video is synchronous (cache or database); processing an uploaded video is an async job. The file itself goes to object storage, which the Manual explains and the Data scale chapter adds.
+- **New buildings**: **Message Queue** (no settings, fixed price, like a managed queue) and **Worker** (instances and sizes; several Workers share one queue without a load balancer: competing consumers). Workers write the result to the database, so the queue protects it from spikes (load leveling). Users reach the queue only through an app server. Pub/sub waits for a later chapter.
+- **Rules**: a job is answered when it enters the queue (like `202 Accepted`). The **Backlog** is kept, also when a Worker goes down (at-least-once delivery). Reputation falls while the **Queue Age** is over the level's maximum. After the wave a **Drain Phase** runs until the Backlog is empty, with maintenance still charged.
+- **Names**: the per-instance "workers" become **Concurrency** and "Queue size" becomes **Waiting line**, so the new Worker and Message Queue are not confused with them.
+- **Unlock**: after the last level of chapter 1.
+- **Six levels**, each with one lesson:
+  1. *Slow processing*: processing a video in the request makes p95 huge; a queue and a Worker answer at once.
+  2. *Watch and upload*: mixed traffic; only the slow work goes async, watches stay synchronous.
+  3. *Upload rush*: a burst of uploads; the queue absorbs the spike and protects the database. The brief also shows the limit: a queue absorbs peaks, not a load that stays above Worker capacity, where the Backlog grows without end.
+  4. *A Worker goes down*: the job goes back to the queue and nothing is lost; the hint explains at-least-once and why Workers must be idempotent (a job may run twice).
+  5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
+  6. *Launch day*: everything together, with a burst and a Worker outage. As the chapter's review, it also needs chapter 1 buildings: a load balancer in front of several app servers and a cache for watches.
+- **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
+- **Backlog and Queue Age look (decided 2026-11-13, without a prototype session)**: the owner asked for chapter 2 to be finished without human intervention, so the choice was made by real practice: queue dashboards graph the age of the oldest message against an alert line. Options weighed: a count on the queue, a bar that turns red near the maximum, Messages piling up on the map, a Backlog chart. Chosen: the bar and the chart together, because they answer "are my Workers keeping up?" at a glance (map) and over time (console).
+  ```
+  top bar:   $287 +0.5/s   ⏱ Drain · 47 left  [⏸ 1× 2× 4×]   ⏳ 12 s / max 30 s   ❤ 100%
+  map:       [Message queue]  Backlog: 47      gauge ▓▓▓░░░░░░  (fills to the maximum Queue Age; amber at 70%, red at 90%)
+  console:   Queue Age  ~~~~~ line with a red dashed limit ~~~~~  12 s   (replaces the RPS chart in levels with a queue)
+             P95 / Errors as before; "Backlog: 47 Messages" under the money rows; the inspector of the queue shows both numbers
+  ```
+  If the owner prefers another look (for example Messages piling up on the map), change `PlayScreen.tsx` only: the game keeps `backlog`, `queueAge` and their per-second history.
+- **Status (2026-11-13)**: the six missions (`09`–`14`), the Message Queue and Worker, the Drain Phase and the Manual entries are built, in English and Spanish.
+
+## Chapter 3: Data scale (planned 2026-11-13, built as levels 15 to 20)
+
+Settled in a grilling session; engine rules in ADR-0007. Same rule as chapter 2: a real problem with the real solution and the real names, so players can use them in an interview. Built after chapter 2 was merged (it uses Request Types and the stateful rules from ADR-0006). What was built, and where it differs from the plan, is in ADR-0007.
+
+- **Story**: the video app is a hit. Many people watch (reads), the data grows (writes and size), and uploads are big files. This also closes the open point of ADR-0006: the file goes to object storage and only the job goes to the queue.
+- **New buildings**: **Read Replica** (own building, connected to the database; answers reads only) and **Object Storage** (fixed price, no settings, like the Message Queue). **Sharding** is not a building: the database gets two settings, number of **Shards** and the **Shard Key**; each Shard is drawn as its own building with its own load.
+- **Rules**:
+  - Reads and writes are separate Request Types. An app server sends reads to Read Replicas and writes to the primary database.
+  - **Read-your-writes** is a Request Type that must go to the primary database; if it reaches a Read Replica it counts as an error (a stale read).
+  - **Replication Lag** is a number that grows when writes are high; a level may set a maximum, and reputation falls while it is over (same idea as Queue Age). Used in the review mission only.
+  - Each level says how traffic spreads over Shard Key values (for example user id: even; country: one country has most users; date: all writes hit the newest shard). A poor key makes a **Hot Shard**.
+  - The Shard Key can be changed only in the Build Phase; during the wave it is locked (re-sharding needs downtime in real life).
+  - An **upload** Request Type keeps an app server busy for a long time. If users connect straight to Object Storage (the pre-signed URL pattern) the app servers stay free.
+- **Unlock**: after the last level of chapter 2.
+- **Six levels**, each with one lesson:
+  1. *Too many reads*: the cache cannot help (data must be fresh), the primary database is full of reads; Read Replicas scale reads, not writes.
+  2. *Just saved, not there*: replicas are behind, so a user may not see their own change; read-your-writes goes to the primary.
+  3. *Too much to write*: one database cannot take the writes or the data; add Shards and choose the Shard Key.
+  4. *Hot shard*: a skewed key sends most traffic to one Shard; pick a better key in the Build Phase.
+  5. *Big uploads*: files through the app server block it; connect users to Object Storage.
+  6. *Release day*: the review. Everything together, plus a maximum Replication Lag, and chapter 1 and 2 buildings (load balancer, cache, queue and Workers; the processing job points to the stored file).
+- **Manual**: Buildings entries for Read Replica and Object Storage with *In real life* (PostgreSQL or MySQL read replicas, Amazon RDS, Amazon S3, Google Cloud Storage); Concepts for replication lag, read-your-writes, sharding, shard key, hot shard, pre-signed URL, and failover (explained, not simulated).
+- **Look (decided with a prototype, `prototypes/shard-lag-look.prototype.html`, 2026-11-13)**: three variants were compared: bars under each building (A), heat tiles with a ghost copy for the lag (B), and a console with per-Shard bars and a lag chart (C). Chosen: **A on the map plus the lag chart of C in the console**, the same grammar as the Queue Age (a gauge on the building, a chart in the console). Each Shard has its own load bar, the Hot Shard gets a "Hot Shard" mark on the map and a row in the inspector, and the Replication Lag shows next to its maximum in the top bar, the Read Replica inspector and a chart with the maximum as a red line. B was left out: it replaces the building art and the idea of an instance, which is too big a change for one value.
+- **Out of scope**: failover and promotion of a replica (Manual only; chapter 4 multi-region uses replicas), resharding during the wave, consistent hashing, cross-shard transactions (chapter 8), CDN (chapter 4), object storage settings and cost per GB.
+
 ## Game screen
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:

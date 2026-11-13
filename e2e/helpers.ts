@@ -35,6 +35,9 @@ export async function playWave(page: Page) {
 
 const levelIds = readdirSync('src/levels').filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
 
+/** The most stars a player can collect: three per level. */
+export const maxStars = levelIds.length * 3;
+
 /** Opens a level in a mode (God, the empty map, by default) with every level unlocked, for tests not about progress. */
 export async function openLevel(page: Page, id: string, mode: 'guided' | 'normal' | 'hard' | 'god' = 'god') {
   await page.addInitScript(ids => {

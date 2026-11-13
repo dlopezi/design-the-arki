@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { catalog } from '../../catalog/catalog';
+import { catalog, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
-import { CLIENT, capacityOf, hitRateOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
+import { CLIENT, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
-  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setTtl, starsOf, toDesign, upkeepPerS, waveEnd, type GameEvent, type GameState,
+  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -41,6 +41,8 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
+/** The order buildings stand in a zone: the way a request travels. */
+const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database', 'objectStorage'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -57,6 +59,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'building': return ev.building(name);
     case 'ready': return ev.ready(name);
     case 'wave': return ev.wave(rps);
+    case 'drain': return ev.drain;
     case 'early': return ev.early(e.amount ?? 0);
     case 'incident': return ev.incident(name);
     case 'removed': return ev.removed(name, e.amount ?? 0);
@@ -68,7 +71,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'lost': return ev.lost[e.reason ?? 'reputation'] ?? '';
   }
 }
-const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' ? 'ok' : '');
+const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' ? 'ok' : '');
 
 function Spark({ values, max, color, limit }: { values: number[]; max: number; color: string; limit?: number }) {
   const n = 60, v = values.slice(-n), w = 200, h = 34;
@@ -123,6 +126,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   }, [overlay]);
   const closeManual = useCallback(() => setOverlay(null), []);
   const over = game.phase === 'won' || game.phase === 'lost';
+  /** Whether a type can have several instances in this level: scaled out, or split into Shards when the level offers Shard Keys. */
+  const hasInstances = (type: string) => !!catalog[type]?.scalesOut || (!!catalog[type]?.shardable && !!level.play.shardKeys);
 
   // ───────── Time: 10 updates a second, faster with the speed buttons ─────────
   useEffect(() => {
@@ -288,6 +293,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
 
   // ───────── Numbers for the screen ─────────
   const flow = game.flow;
+  const hasQueue = level.allowedComponents.some(type => catalog[type]?.queue);
+  const oldest = Math.max(0, ...Object.values(game.queueAge));
+  const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
+  const maxLag = level.requirements.maxReplicationLagS, lagNow = Math.max(0, ...Object.values(game.lag));
+  const lagTooHigh = maxLag !== undefined && lagNow > maxLag;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
   const net = PASSIVE_INCOME + ((flow?.answered ?? 0) / 100) * PER_100_VISITS - upkeepPerS(game);
   const building = game.phase === 'build';
@@ -296,11 +306,30 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const selectedBuilding = selection?.kind === 'building' ? game.buildings.find(b => b.id === selection.id) ?? null : null;
   const hint = useMemo(() => {
     if (game.phase !== 'lost' || !hintAllowed(mode, true)) return null;
+    // Async levels: jobs with no queue, a Worker called straight from the app server, or Messages that waited too long.
+    const jobs = (level.play.wave.mix?.job ?? 0) > 0;
+    if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
+    if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
+    // Data levels: Read-your-writes that cannot reach the primary database are stale reads on a Read Replica.
+    const hasReadYourWrites = (level.play.wave.mix?.[READ_YOUR_WRITES] ?? 0) > 0;
+    const hasReadReplica = game.buildings.some(b => b.type === 'readReplica');
+    if (hasReadYourWrites && hasReadReplica && !game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'database')) return t.staleReadHint;
+    // Reads that no Read Replica receives all land on the primary database.
+    const reads = (level.play.wave.mix?.read ?? 0) > 0;
+    if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
+    if (lagTooHigh) return t.lagHint;
+    if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
     if (!type) return null;
+    // Uploads that do not go straight to Object Storage keep the app servers busy.
+    const hasUploads = (level.play.wave.mix?.[UPLOAD] ?? 0) > 0;
+    if (hasUploads && level.allowedComponents.includes('objectStorage') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'objectStorage')) return t.uploadHint;
+    // A level that offers Shard Keys: a Hot Shard needs a better key; a database full on every Shard needs more Shards, not a cache.
+    if (Object.values(flow?.shards ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotShardHint;
+    if (type === 'database' && level.play.shardKeys) return t.shardHint;
     // A size the level does not let the player change must not be the advice.
     const fixed = (level.componentOptions[type]?.sizes?.length ?? 2) < 2;
     return (fixed && t.fixedHints[type]) || (t.hints[type] ?? t.genericHint(buildingName(type)));
@@ -309,18 +338,27 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     ...notes.map(n => ({ ...n, tone: 'warn' }))].sort((a, b) => b.t - a.t).slice(0, 6);
 
   // ───────── Map contents ─────────
-  const loadClass = (load: number) => (load >= 0.9 ? 'high' : load >= 0.7 ? 'medium' : '');
+  const loadClass = (load: number) => (load >= FULL_LOAD ? 'high' : load >= ROOMY_LOAD ? 'medium' : '');
   const noEntry = (b: Bld) => !game.links.some(l => l.to === b.id);
   const deadEnd = (b: Bld) => !catalog[b.type]!.endsRequests && !game.links.some(l => l.from === b.id);
   function piece(b: Bld, k: number, size: number) {
-    const inst = b.instances[k]!, scaled = !!catalog[b.type]!.scalesOut;
+    const inst = b.instances[k]!, scaled = hasInstances(b.type), hotShard = hotShardOf(flow?.shards[b.id]);
     const active = isServing(inst);
     const servingIndex = b.instances.slice(0, k + 1).filter(isServing).length;
-    const idle = active && game.phase === 'wave' && servingIndex > (flow?.usable[b.id] ?? 0);
-    const load = active && !idle ? flow?.load[b.id] ?? 0 : 0;
+    const idle = active && (game.phase === 'wave' || game.phase === 'drain') && servingIndex > (flow?.usable[b.id] ?? 0);
+    // A building split into Shards shows each Shard's own load.
+    const load = active && !idle ? flow?.shards[b.id]?.[k] ?? flow?.load[b.id] ?? 0 : 0;
     const warn = noEntry(b) ? t.rt.inspector.noEntry : deadEnd(b) ? t.rt.inspector.deadEnd : '';
     const label = scaled ? instanceNames.get(b.id)?.[k] ?? b.type : buildingName(b.type);
-    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : '';
+    const waiting = Math.round(game.backlog[b.id] ?? 0);
+    // A queue shows its Backlog on the map, so the player sees whether the Workers keep up.
+    const backlogNote = catalog[b.type]!.queue ? `${t.rt.backlog}: ${waiting}` : '';
+    // A queue shows its Queue Age as a gauge that fills towards the level's maximum, instead of a load bar.
+    const isQueue = !!catalog[b.type]!.queue, maxAge = level.requirements.maxQueueAgeS, age = game.queueAge[b.id] ?? 0;
+    const ageShare = isQueue && maxAge ? Math.min(1, age / maxAge) : 0;
+    // The Shard that gets most of the traffic while the others have room says so on the map.
+    const hotNote = hotShard === k ? `⚠ ${t.rt.inspector.hotShard}` : '';
+    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
     const selected = selectedBuilding?.id === b.id;
     return (
       <button key={`${b.id}-${k}`} className={`play-unit ${inst.buildLeftS > 0 ? 'building' : ''} ${inst.down ? 'down' : ''} ${selected ? 'selected' : ''} ${warn ? 'warn' : ''} ${tutorialType === b.type ? 'tutorial-target' : ''}`}
@@ -329,13 +367,15 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {inst.buildLeftS > 0 && <span className="play-progress"><span style={{ width: `${100 - (inst.buildLeftS / Math.max(1, inst.buildTotalS)) * 100}%` }} /></span>}
         <span className="name">{label}</span>
         {sub && <span className="sub">{sub}</span>}
-        {active && !inst.down && <span className={`play-load ${loadClass(load)}`}><span style={{ width: `${Math.round(load * 100)}%` }} /></span>}
+        {active && !inst.down && (isQueue && maxAge
+          ? <span className={`play-load play-age-gauge ${loadClass(ageShare)}`} role="meter" aria-label={`${t.rt.queueAge}: ${t.rt.queueAgeOf(age, maxAge)}`} aria-valuemin={0} aria-valuemax={maxAge} aria-valuenow={Math.round(age)}><span style={{ width: `${Math.round(ageShare * 100)}%` }} /></span>
+          : <span className={`play-load ${loadClass(load)}`}><span style={{ width: `${Math.round(load * 100)}%` }} /></span>)}
       </button>
     );
   }
   function zoneContent(zone: string) {
     const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone)
-      .sort((a, b) => ['loadBalancer', 'appServer', 'cache', 'database'].indexOf(a.type) - ['loadBalancer', 'appServer', 'cache', 'database'].indexOf(b.type));
+      .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
     if (layer === 2) {
       return here.map(b => {
         const serving = b.instances.filter(isServing).length, load = flow?.load[b.id] ?? 0;
@@ -349,9 +389,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         );
       });
     }
-    return here.map(b => (catalog[b.type]!.scalesOut
+    return here.map(b => (hasInstances(b.type)
       ? <div key={b.id} className="play-container" data-container={b.id}>
-          <span className="name">{buildingName(b.type)} · {t.instanceCount(b.instances.length)}</span>
+          <span className="name">{buildingName(b.type)} · {catalog[b.type]!.shardable && level.play.shardKeys ? t.shardCount(b.instances.length) : t.instanceCount(b.instances.length)}</span>
           {b.instances.map((_, k) => piece(b, k, 52))}
         </div>
       : piece(b, 0, 64)));
@@ -360,7 +400,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const instanceNames = useMemo(() => {
     const counters = new Map<string, number>(), names = new Map<string, string[]>();
     for (const b of game.buildings) {
-      if (!catalog[b.type]!.scalesOut) continue;
+      if (!hasInstances(b.type)) continue;
       const prefix = catalog[b.type]!.presentation?.instancePrefix ?? b.type;
       names.set(b.id, b.instances.map(() => { const n = (counters.get(prefix) ?? 0) + 1; counters.set(prefix, n); return `${prefix}-${n}`; }));
     }
@@ -391,6 +431,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const outs = game.links.filter(l => l.from === b.id).map(l => nameOf(game, l.to)).join(', ') || '—';
     const ttlMax = level.componentOptions[b.type]?.limits?.ttlS ?? 600;
     const problem = buildProblem(game, b.type, level);
+    // A database is split into Shards in a level that offers Shard Keys; the key is picked in the build phase only.
+    const sharded = !!spec.shardable && !!level.play.shardKeys;
+    const shardKeys = Object.keys(level.play.shardKeys ?? {});
+    const shardKey = b.params.shardKey ?? shardKeys[0];
+    const hotShard = hotShardOf(flow?.shards[b.id]);
     return <>
       <div className="play-ins-head">
         <span className="play-portrait" style={{ ['--c' as string]: componentColor(b.type) }}><Building type={b.type} size={56} /></span>
@@ -398,9 +443,13 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       </div>
       <dl className="play-rows">
         <dt>{i.state}</dt><dd>{b.instances.some(x => x.down) ? i.down : serving === b.instances.length ? i.serving : i.building(Math.ceil(Math.max(...b.instances.map(x => x.buildLeftS))))}</dd>
-        {spec.scalesOut && <><dt>{i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
+        {hasInstances(b.type) && <><dt>{sharded ? i.shards : i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
+        {sharded && b.instances.length > 1 && flow?.shards[b.id] && <><dt>{i.load}</dt><dd>{i.shardLoad(flow.shards[b.id]!)}</dd></>}
+        {hotShard !== null && <><dt>{i.hotShard}</dt><dd className="bad">{instanceNames.get(b.id)?.[hotShard]}</dd></>}
         <dt>{i.sendsTo}</dt><dd>{spec.endsRequests && !spec.shortcut ? i.answers : outs}</dd>
         <dt>{i.receives}</dt><dd>{i.perSecond(Math.round(flow?.inflow[b.id] ?? 0))}</dd>
+        {spec.follows && maxLag !== undefined && <><dt>{t.rt.replicationLag}</dt><dd className={(game.lag[b.id] ?? 0) > maxLag ? 'bad' : ''}>{t.rt.lagOf(game.lag[b.id] ?? 0, maxLag)}</dd></>}
+        {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
         {!spec.presentation?.hideCapacity && <><dt>{i.capacity}</dt><dd>{i.perSecond(Math.round(capacityOf(b) * Math.max(1, serving)))}</dd></>}
         {spec.shortcut && <><dt>{i.hitRate}</dt><dd>{Math.round(hitRateOf(b) * 100)}%</dd></>}
         <dt>{i.upkeep}</dt><dd>{i.money((price * b.instances.length) / UPKEEP_DIVISOR)}</dd>
@@ -416,6 +465,15 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           })}
         </fieldset>
       )}
+      {sharded && shardKeys.length > 0 && (
+        <fieldset className="play-sizes" aria-label={i.shardKey}>
+          <legend className="muted">{i.shardKey}{!building && <> · {i.shardKeyLocked}</>}</legend>
+          {shardKeys.map(key => (
+            <button key={key} className={`btn ${key === shardKey ? 'on' : ''}`} aria-pressed={key === shardKey} disabled={key === shardKey}
+              onClick={() => setGame(g => setShardKey(g, b.id, key, level))}>{t.shardKeyNames[key] ?? key}</button>
+          ))}
+        </fieldset>
+      )}
       {spec.shortcut && (
         <div className="play-ttl"><span className="muted">{i.ttl}</span>
           <span className="stepper">
@@ -426,9 +484,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         </div>
       )}
       <div className="play-controls">
-        {spec.scalesOut && <button className="btn" disabled={!!problem} title={problem ? t.rt.build.reasons[problem] : ''} onClick={() => doBuild(b.type)}>{i.addInstance(price)}</button>}
-        {spec.scalesOut && b.instances.length > 1
-          ? <button className="btn" onClick={() => setGame(g => demolish(g, b.id))}>{i.removeInstance(Math.round(price * REFUND))}</button>
+        {hasInstances(b.type) && <button className="btn" disabled={!!problem} title={problem ? t.rt.build.reasons[problem] : ''} onClick={() => doBuild(b.type)}>{sharded ? i.addShard(price) : i.addInstance(price)}</button>}
+        {hasInstances(b.type) && b.instances.length > 1
+          ? <button className="btn" onClick={() => setGame(g => demolish(g, b.id))}>{sharded ? i.removeShard(Math.round(price * REFUND)) : i.removeInstance(Math.round(price * REFUND))}</button>
           : <button className="btn" onClick={() => { setGame(g => demolish(g, b.id)); setSelection(null); }}>{i.remove(Math.round(price * REFUND))}</button>}
       </div>
     </>;
@@ -442,9 +500,16 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <a className="back" href={levelsHref}>← {t.rt.back}</a>
         <h1>{level.title}</h1>
         <span className="play-res" role="status" aria-label={t.rt.money}>💰 <b className="play-money">${Math.floor(game.money)}</b><span className={net >= 0 ? 'up' : 'down'}>{t.rt.rate(net)}</span></span>
-        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : t.rt.phase.end}</b>
+        <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
+        {(maxLag !== undefined || hasQueue) && (
+          // Queue Age and Replication Lag share one capsule, one line each, so the top bar does not outgrow a tablet.
+          <span className="play-res play-gauges">
+            {maxLag !== undefined && <span className="play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
+            {hasQueue && <span className="play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
+          </span>
+        )}
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>
@@ -504,7 +569,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <section className="play-frame" aria-label={t.rt.live}>
           <span className="label">{t.rt.live}</span>
           <div className="play-charts">
-            <div className="play-chart">RPS<Spark values={game.history.map(h => h.rps)} max={Math.max(100, level.play.wave.rps * 1.2)} color="#3ee0c8" /><b>{rps}</b></div>
+            {hasQueue
+              ? <div className="play-chart">{t.rt.queueAge}<Spark values={game.history.map(h => h.age)} max={Math.max(10, (level.requirements.maxQueueAgeS ?? 5) * 2)} color={componentColor('messageQueue')} limit={level.requirements.maxQueueAgeS} /><b className={tooOld ? 'bad' : ''}>{Math.round(oldest)} s</b></div>
+              : <div className="play-chart">RPS<Spark values={game.history.map(h => h.rps)} max={Math.max(100, level.play.wave.rps * 1.2)} color="#3ee0c8" /><b>{rps}</b></div>}
+            {maxLag !== undefined && <div className="play-chart" title={t.rt.replicationLag}>{t.rt.lagShort}<Spark values={game.history.map(h => h.lag)} max={Math.max(4, maxLag * 3)} color={componentColor('readReplica')} limit={maxLag} /><b className={lagTooHigh ? 'bad' : ''}>{lagNow.toFixed(1)} s</b></div>}
             <div className="play-chart">P95<Spark values={game.history.map(h => h.p95)} max={Math.max(400, level.requirements.p95Ms * 3)} color="#fbbf24" limit={level.requirements.p95Ms} /><b className={(flow?.p95 ?? 0) > level.requirements.p95Ms ? 'bad' : ''}>{flow?.p95 ?? 0} ms</b></div>
             <div className="play-chart">{t.rt.errors}<Spark values={game.history.map(h => h.errors)} max={0.5} color="#f87171" limit={level.requirements.maxErrorRate} /><b className={(flow?.errors ?? 0) > level.requirements.maxErrorRate ? 'bad' : ''}>{((flow?.errors ?? 0) * 100).toFixed(1)}%</b></div>
           </div>
@@ -512,6 +580,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <dt>{t.rt.fixedIncome}</dt><dd>+${PASSIVE_INCOME.toFixed(1)}/s</dd>
             <dt>{t.rt.visitsIncome}</dt><dd>+${(((flow?.answered ?? 0) / 100) * PER_100_VISITS).toFixed(1)}/s</dd>
             <dt>{t.rt.upkeep}</dt><dd>−${upkeepPerS(game).toFixed(1)}/s</dd>
+            {hasQueue && <>
+              <dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(totalBacklog(game)))}</dd>
+            </>}
           </dl>
         </section>
         <section className="play-frame play-inspector" aria-label={t.inspector.title}>
@@ -551,7 +622,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <ul className="play-brief-goals" aria-label={t.objectives}>
               <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)}</li>
               <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
-              <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}</li>
+              {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
+              {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
+              <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
               {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
             </ul>
             {newTypes.length > 0 && (

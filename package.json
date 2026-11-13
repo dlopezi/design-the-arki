@@ -1,7 +1,8 @@
 {
   "name": "design-the-arki",
   "private": true,
-  "version": "1.2.0",
+  "license": "UNLICENSED",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "verify": "npm run check && npm run e2e",
+    "level-report": "vitest run src/levels/level-report.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@xyflow/react": "12.8.6",

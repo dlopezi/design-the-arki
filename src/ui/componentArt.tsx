@@ -11,6 +11,10 @@ export const componentArt: Record<string, { color: string }> = {
   appServer: { color: '#34b97a' },
   cache: { color: '#f59e0b' },
   database: { color: '#9b6bff' },
+  messageQueue: { color: '#ec6ba0' },
+  worker: { color: '#22b8cf' },
+  readReplica: { color: '#7c8cff' },
+  objectStorage: { color: '#e0794a' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -105,12 +109,50 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <polygon points={pts([[32, 6], [41, 22], [32, 38]])} fill={p.base} />
     <polygon points={pts([[32, 11], [36, 22], [32, 30], [28, 22]])} fill={p.glow} opacity={0.85} />
   </>,
+  // Conveyor belt with envelopes: jobs wait here, in line, until a Worker takes them.
+  messageQueue: p => <>
+    <IsoBox cx={32} cy={52} w={21} h={6} p={p} />
+    <polygon points={faceQuad('right', 32, 52, 21, 0.1, 0.9, 1.5, 4.5)} fill={p.dark} />
+    <IsoBox cx={22} cy={46} w={5.5} h={9} p={p} />
+    <polygon points={faceQuad('right', 22, 46, 5.5, 0.2, 0.8, 3, 7)} fill={p.window} />
+    <IsoBox cx={32} cy={42} w={5.5} h={9} p={p} />
+    <polygon points={faceQuad('right', 32, 42, 5.5, 0.2, 0.8, 3, 7)} fill={p.window} />
+    <IsoBox cx={42} cy={46} w={5.5} h={9} p={p} />
+    <polygon points={faceQuad('right', 42, 46, 5.5, 0.2, 0.8, 3, 7)} fill={p.window} />
+    <path d="M10 28 L22 28 M17 23 L22 28 L17 33" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </>,
+  // Machine with a turning gear: does the slow work in the background.
+  worker: p => <>
+    <IsoBox cx={32} cy={52} w={16} h={9} p={p} />
+    <IsoBox cx={32} cy={43} w={9} h={14} p={p} />
+    <polygon points={faceQuad('right', 32, 43, 9, 0.25, 0.75, 4, 9)} fill={p.window} />
+    <g transform="translate(32 22)" stroke={p.dark} strokeWidth={0.6}>
+      {[0, 45, 90, 135].map(a => <rect key={a} x={-2} y={-11} width={4} height={22} rx={1} fill={p.light} transform={`rotate(${a})`} />)}
+      <circle r={8} fill={p.base} />
+      <circle r={3.2} fill={p.glow} />
+    </g>
+  </>,
   // Silos: store what every request needs.
   database: p => <>
     <Cylinder cx={41} cy={45} r={8} h={20} p={p} />
     <Cylinder cx={26} cy={52} r={11} h={27} p={p} />
     <path d="M34 34 L37 32" stroke={p.light} strokeWidth={2} />
     <circle cx={26} cy={25} r={2} fill={p.glow} />
+  </>,
+  // Warehouse of crates: stores the big files, and users can drop files straight into it.
+  objectStorage: p => <>
+    <IsoBox cx={32} cy={52} w={21} h={7} p={p} />
+    <IsoBox cx={23} cy={44} w={9} h={11} p={p} />
+    <IsoBox cx={41} cy={44} w={9} h={11} p={p} />
+    <IsoBox cx={32} cy={35} w={9} h={11} p={p} />
+    <path d="M32 12 L32 22 M27 17 L32 12 L37 17" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </>,
+  // A copy of the database: two small silos side by side, with an arrow that carries the copy to the new one.
+  readReplica: p => <>
+    <Cylinder cx={20} cy={50} r={8} h={18} p={p} />
+    <Cylinder cx={44} cy={50} r={8} h={18} p={p} />
+    <path d="M28 25 L38 25 M34 21 L38 25 L34 29" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx={44} cy={25} r={2} fill={p.glow} />
   </>,
 };
 

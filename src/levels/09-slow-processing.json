@@ -1,0 +1,231 @@
+{
+  "id": "09-slow-processing",
+  "chapter": "Async",
+  "title": "Slow processing",
+  "brief": "Your video app lets people upload videos, and every upload must be processed: about one second of work. Six uploads arrive each second. Processing inside the request makes every user wait. Put a Message Queue between the app server and a Worker: the queue answers at once, and the Worker does the job in the background.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 6
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxQueueAgeS": 30
+  },
+  "budget": 300,
+  "starCostThresholds": [
+    200,
+    160
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database",
+    "messageQueue",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "maxInstances": 3
+    }
+  },
+  "guidedHint": "Processing a video inside the request is slow. Connect the Message Queue to the Worker: the queue answers at once, and the Worker takes the jobs in the background.",
+  "play": {
+    "startMoney": 300,
+    "wave": {
+      "rps": 6,
+      "lengthS": 30,
+      "mix": {
+        "job": 1
+      }
+    },
+    "starMoney": [
+      100,
+      200
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "worker",
+          "type": "worker"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "size": "small"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "api",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "api",
+        "type": "appServer"
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "queue",
+        "type": "messageQueue"
+      },
+      {
+        "id": "worker",
+        "type": "worker"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "api",
+        "queue"
+      ],
+      [
+        "queue",
+        "worker"
+      ],
+      [
+        "worker",
+        "db"
+      ]
+    ]
+  }
+}

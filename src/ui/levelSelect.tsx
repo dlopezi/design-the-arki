@@ -43,7 +43,9 @@ function Briefing({ level, number, state, newTypes, progress }: { level: LevelDe
       <ul className="campaign-objectives">
         <li><span aria-hidden="true">⏱</span> {t.objectiveP95(level.requirements.p95Ms)} <a className="campaign-why" href={`${manualHref('concepts')}`} title={l.p95Tip}>{l.whatIsP95}</a></li>
         <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
-        <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}</li>
+        {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
+        {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
+        <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
       </ul>
       {state !== 'locked' && (
         <div className="campaign-stars">
@@ -156,6 +158,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks }: Props) {
                     <span style={{ width: `${(chapterStars / chapterMax) * 100}%` }} />
                   </div>
                   <span className="campaign-stars-count">★ {chapterStars}/{chapterMax}</span>
+                  {inChapter.every(l => starsOf(l.id) > 0) && <span className="campaign-complete">✔ {t.levelSelect.chapterDone}</span>}
                 </div>
                 <div className="campaign-map" style={{ aspectRatio: `${MAP.w} / ${height}` }}>
                   <svg viewBox={`0 0 ${MAP.w} ${height}`} aria-hidden="true" className="campaign-terrain">

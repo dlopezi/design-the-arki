@@ -6,7 +6,8 @@ export type TrafficSegment = { fromS: number; toS: number; rps: number };
 export type Level = {
   durationS: number;
   traffic: TrafficSegment[];
-  requirements: { p95Ms: number; maxErrorRate: number };
+  requirements: { p95Ms: number; maxErrorRate: number; /** Real-time play only: the longest the oldest Message may wait in a queue. */ maxQueueAgeS?: number;
+    /** Real-time play only: the longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number };
   /** Maximum monthly cost in dollars. */
   budget: number;
   /** Monthly costs at or below which the 2nd, 3rd… star is earned. */
@@ -36,6 +37,39 @@ export type StationPrimitive = {
   acceptsClients?: boolean;
   /** Whether it can spread requests over the instances of the next component. */
   distributes?: boolean;
+  /**
+   * The Request Types it accepts (real-time play, ADR-0006). Left out, it accepts every type: it just passes them on
+   * (a load balancer or an app server). A building that lists its types takes only those.
+   */
+  accepts?: string[];
+  /** The Request Type it passes on, when it turns what it takes into something else (a Worker saves the result of a job). */
+  emits?: string;
+  /**
+   * Request Types it gets before any other building that also accepts them: a caller that is connected to it sends
+   * those types here, and to the others only when it is not (a Read Replica takes the reads, the primary database the rest).
+   */
+  prefers?: string[];
+  /**
+   * Its instances can be Shards, in a level that offers Shard Keys (ADR-0007): each Shard holds one slice of the data,
+   * chosen by the Shard Key, and serves only that slice.
+   */
+  shardable?: boolean;
+  /**
+   * Request Types that keep the building busy longer than a normal request: the capacity one request of the type
+   * uses, in normal requests (an upload on an app server).
+   */
+  effort?: Record<string, number>;
+  /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
+  balanced?: boolean;
+  /** Share of one instance's capacity that goes to applying the writes copied from the building it follows (Replication Lag). */
+  applyShare?: number;
+  /** The type of building whose data it keeps a copy of: it may be connected to it without ending in a dead end (replication). */
+  follows?: string;
+  /**
+   * Queue primitive (real-time play): it answers at once and holds what reaches it as a Backlog that lasts from one
+   * tick to the next, then releases it to the buildings behind it at their total capacity. Never drops the Backlog.
+   */
+  queue?: boolean;
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
   sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
   defaultSize?: string;

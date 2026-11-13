@@ -1,11 +1,22 @@
 import { z } from 'zod';
-import { catalog } from '../catalog/catalog';
+import { catalog, requestTypes } from '../catalog/catalog';
 import type { Design, Level } from '../engine/types';
 import type { Play } from '../realtime/game';
 import { lang, type Lang } from '../i18n';
 import { chaptersEs, levelTextEs } from './text.es';
 
 const componentType = z.string().refine(t => t in catalog, { error: issue => `Unknown component type: ${String(issue.input)}` });
+
+const unknownTypes = (mix: object) => Object.keys(mix).filter(t => !requestTypes.includes(t));
+/** The share of each Request Type in a wave: every share above 0, and all of them adding up to 1. */
+const waveMix = z.record(z.string(), z.number().positive().max(1))
+  .refine(mix => Object.keys(mix).length > 0, 'The mix needs at least one Request Type')
+  .refine(mix => unknownTypes(mix).length === 0, { error: issue => `Unknown Request Type: ${unknownTypes(issue.input as object).join(', ')}` })
+  .refine(mix => Math.abs(Object.values(mix).reduce((a, v) => a + v, 0) - 1) < 1e-6, 'The shares of the mix must add up to 1');
+
+/** How traffic spreads over the values of one Shard Key: a share for each value, every share above 0, adding up to 1. */
+const shardKey = z.array(z.number().positive('Every share of a Shard Key must be above 0').max(1)).min(2, 'A Shard Key needs at least two values')
+  .refine(shares => Math.abs(shares.reduce((a, v) => a + v, 0) - 1) < 1e-6, 'The shares of a Shard Key must add up to 1');
 
 const designSchema = z.object({
   components: z.array(z.object({ id: z.string().min(1), type: componentType, params: z.record(z.string(), z.unknown()).optional() })),
@@ -19,7 +30,11 @@ const levelSchema = z.object({
   brief: z.string().min(1),
   durationS: z.number().positive(),
   traffic: z.array(z.object({ fromS: z.number().min(0), toS: z.number().positive(), rps: z.number().positive() })).min(1),
-  requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1) }),
+  requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1),
+    /** Async levels: the longest the oldest Message may wait in a queue (seconds). */
+    maxQueueAgeS: z.number().positive().optional(),
+    /** Data levels: the longest a Read Replica may be behind the primary database (seconds). */
+    maxReplicationLagS: z.number().positive().optional() }),
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
@@ -34,9 +49,11 @@ const levelSchema = z.object({
   /** Real-time play (ADR-0005): starting money, the one wave of users, an optional incident and the money for each extra star. */
   play: z.object({
     startMoney: z.number().positive(),
-    wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive() }),
+    wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive(), mix: waveMix.optional() }),
     incident: z.object({ atS: z.number().min(0), componentType }).optional(),
     starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
+    /** Levels that teach Sharding: the Shard Keys on offer (the first is the default) and how traffic spreads over each one's values. */
+    shardKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Shard Keys needs at least one key').optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
@@ -55,6 +72,40 @@ const levelSchema = z.object({
       z.object({ event: z.enum(['run', 'pass']) }),
     ]),
   })).optional(),
+}).superRefine((level, ctx) => {
+  // A level with a mix of Request Types, or with a queue, needs the buildings that finish the work (ADR-0006).
+  const allowed = new Set(level.allowedComponents);
+  const mix = level.play.wave.mix;
+  if (mix && (mix.job ?? 0) > 0 && !(allowed.has('messageQueue') && allowed.has('worker'))) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has jobs must allow a messageQueue and a worker' });
+  }
+  // A Read Replica is a copy of the primary database: without one there is nothing to copy (ADR-0007).
+  if (allowed.has('readReplica') && !allowed.has('database')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that allows a readReplica must allow a database' });
+  }
+  // Replication Lag is how far a Read Replica is behind: without one there is nothing to measure.
+  if (level.requirements.maxReplicationLagS !== undefined && !allowed.has('readReplica')) {
+    ctx.addIssue({ code: 'custom', path: ['requirements', 'maxReplicationLagS'], message: 'A level with a maximum Replication Lag must allow a readReplica' });
+  }
+  // Shards are instances of the database: without one there is nothing to split (ADR-0007).
+  if (level.play.shardKeys && !allowed.has('database')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that offers Shard Keys must allow a database' });
+  }
+  // A design can only pick a Shard Key the level offers.
+  const offered = Object.keys(level.play.shardKeys ?? {});
+  const designs: [string, z.infer<typeof designSchema>][] = [['referenceDesign', level.referenceDesign], ...Object.entries(level.startingDesigns).map(([mode, d]) => [`startingDesigns.${mode}`, d] as [string, z.infer<typeof designSchema>])];
+  for (const [path, design] of designs) {
+    for (const c of design.components) {
+      const key = c.params?.shardKey;
+      if (key !== undefined && !offered.includes(String(key))) {
+        ctx.addIssue({ code: 'custom', path: path.split('.'), message: `Shard Key "${String(key)}" is not on offer in this level` });
+      }
+    }
+  }
+  // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
+  if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['requirements', 'maxQueueAgeS'], message: 'A level that allows a messageQueue must set a maximum Queue Age' });
+  }
 });
 
 export type TutorialStep = {

@@ -1,0 +1,238 @@
+{
+  "id": "17-too-much-to-write",
+  "chapter": "Data scale",
+  "title": "Too much to write",
+  "brief": "Your video app keeps growing: 900 requests arrive every second and seven in ten are writes (new videos, comments, likes). A Read Replica cannot help with writes, and one primary database serves about 400 requests a second. The answer is Sharding: split the data over several Shards, each a database that holds one slice and serves only that slice. The Shard Key decides which Shard holds a piece of data: here user id and video id both spread the traffic evenly. Add Shards until none of them is full. Each Shard costs money, so do not add more than you need.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 900
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 700,
+  "starCostThresholds": [
+    500,
+    440
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "database"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 6
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "guidedHint": "One database cannot take 630 writes a second. Add Shards: each one is another database that holds a slice of the data. With three Shards each serves about 300 requests a second. The Shard Key decides how the traffic spreads: user id spreads it evenly.",
+  "play": {
+    "startMoney": 600,
+    "wave": {
+      "rps": 900,
+      "lengthS": 30,
+      "mix": {
+        "read": 0.3,
+        "write": 0.7
+      }
+    },
+    "starMoney": [
+      100,
+      400
+    ],
+    "shardKeys": {
+      "userId": [
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333
+      ],
+      "videoId": [
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333
+      ]
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 6
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 2,
+            "shardKey": "userId"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 6
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 1,
+            "shardKey": "userId"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 3,
+            "shardKey": "userId"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 6
+        }
+      },
+      {
+        "id": "db",
+        "type": "database",
+        "params": {
+          "instances": 3,
+          "shardKey": "userId"
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ]
+    ]
+  }
+}

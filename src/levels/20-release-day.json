@@ -1,0 +1,441 @@
+{
+  "id": "20-release-day",
+  "chapter": "Data scale",
+  "title": "Release day",
+  "brief": "Release day for the video app, and everything has to work together. 440 requests arrive every second: watches, reads and writes, big uploads and processing jobs. You need a load balancer in front of several app servers, a cache for watches, Read Replicas for reads, Object Storage for the files, and a Message Queue with Workers for the processing. Users must see their own changes, so those reads go to the primary database. There is one new limit: the Replication Lag. Heavy writes make a Read Replica fall behind, and the lag may not pass 2 seconds. A bigger Read Replica applies writes faster. Watch the lag next to the other objectives.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 440
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxQueueAgeS": 20,
+    "maxReplicationLagS": 2
+  },
+  "budget": 700,
+  "starCostThresholds": [
+    550,
+    500
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database",
+    "readReplica",
+    "objectStorage",
+    "messageQueue",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    },
+    "cache": {
+      "limits": {
+        "ttlS": 60
+      }
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "readReplica": {
+      "sizes": [
+        "small",
+        "medium"
+      ],
+      "maxInstances": 2
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "guidedHint": "The Replication Lag may not pass 2 seconds. A small Read Replica applies 100 writes a second, but 167 arrive: it falls further behind every second. Use a medium Read Replica. Every part has its job: uploads straight to Object Storage, Read-your-writes to the primary database, jobs through the queue.",
+  "play": {
+    "startMoney": 700,
+    "wave": {
+      "rps": 440,
+      "lengthS": 30,
+      "mix": {
+        "watch": 0.36,
+        "read": 0.12,
+        "readYourWrites": 0.08,
+        "write": 0.38,
+        "upload": 0.04,
+        "job": 0.02
+      }
+    },
+    "starMoney": [
+      100,
+      250
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "replicas",
+          "type": "readReplica",
+          "params": {
+            "size": "small"
+          }
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "client",
+          "files"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "replicas"
+        ],
+        [
+          "replicas",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 1
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "replicas",
+          "type": "readReplica",
+          "params": {
+            "size": "small"
+          }
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "instances": 1
+          }
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "replicas"
+        ],
+        [
+          "replicas",
+          "db"
+        ],
+        [
+          "api",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 30
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "replicas",
+        "type": "readReplica",
+        "params": {
+          "size": "medium"
+        }
+      },
+      {
+        "id": "queue",
+        "type": "messageQueue"
+      },
+      {
+        "id": "worker",
+        "type": "worker",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "files",
+        "type": "objectStorage"
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "client",
+        "files"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "api",
+        "replicas"
+      ],
+      [
+        "replicas",
+        "db"
+      ],
+      [
+        "api",
+        "queue"
+      ],
+      [
+        "queue",
+        "worker"
+      ],
+      [
+        "worker",
+        "db"
+      ],
+      [
+        "api",
+        "files"
+      ]
+    ]
+  }
+}

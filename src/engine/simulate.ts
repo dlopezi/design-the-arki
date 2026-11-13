@@ -73,7 +73,7 @@ function queueSizeOf(component: Design['components'][number]): number {
 function instanceCount(component: Design['components'][number], catalog: Catalog): number {
   const value = component.params?.instances ?? 1;
   if (!Number.isInteger(value) || (value as number) < 1) throw new Error(`Invalid instances for ${component.id}: ${String(value)}`);
-  if ((value as number) > 1 && !catalog[component.type]!.scalesOut) throw new Error(`${component.type} cannot run several instances`);
+  if ((value as number) > 1 && !catalog[component.type]!.scalesOut && !catalog[component.type]!.shardable) throw new Error(`${component.type} cannot run several instances`);
   return value as number;
 }
 
