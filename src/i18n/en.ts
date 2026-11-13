@@ -123,7 +123,7 @@ export const en = {
   /** Lost with reads in the wave while no Read Replica receives them: the primary database takes them all. */
   replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost with Read-your-writes in the wave and no connection from the app server to the primary database. */
-  staleReadHint: 'A Read Replica is always a little behind, so a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
+  staleReadHint: 'A Read Replica copies each write from the primary a moment later, so it is always a little behind and a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
   /** Lost while Messages were waiting too long. */
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',

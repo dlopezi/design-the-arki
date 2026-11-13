@@ -122,7 +122,7 @@ export const es: Strings = {
   } as Record<string, string>,
   queueHint: 'Un trabajo enviado directo del app server al Worker se ejecuta dentro de la petición, y todos esperan por él. Pon una cola de mensajes en medio: responde al instante y el Worker toma el trabajo en segundo plano.',
   replicaHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas y conecta el app server a ellas: responden las lecturas y la primaria se queda con las escrituras. Las Read Replicas escalan las lecturas, no las escrituras.',
-  staleReadHint: 'Una Read Replica siempre va un poco por detrás, así que un usuario puede no ver su propio cambio en ella. Las lecturas Read-your-writes deben ir a la base de datos primaria: conecta el app server a ella.',
+  staleReadHint: 'Una Read Replica copia cada escritura de la primaria un momento después, así que siempre va un poco por detrás y un usuario puede no ver su propio cambio en ella. Las lecturas Read-your-writes deben ir a la base de datos primaria: conecta el app server a ella.',
   backlogHint: 'El Backlog siguió creciendo y los mensajes esperaron demasiado: los Workers tomaron los trabajos más despacio de lo que llegaban. Añade Workers, o usa otros más grandes.',
   redundancyHint: 'Una instancia se cayó y las demás no pudieron con su tráfico: ten una instancia más de las que necesitas (N+1).',
   incidents: 'Incidentes',
