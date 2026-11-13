@@ -1,0 +1,60 @@
+import { expect, test, type Page } from '@playwright/test';
+import { buildKeys, internet, openLevel, unit } from './helpers';
+
+const MISSION = '09-slow-processing';
+const chapterOne = ['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday'];
+const levelCard = (page: Page, title: string) => page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: title }) });
+
+async function progressWith(page: Page, passed: string[]) {
+  await page.addInitScript(ids => {
+    localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, mode: 'god', levels: Object.fromEntries(ids.map(i => [i, { bestStars: 1 }])) }));
+  }, passed);
+}
+
+test('chapter 2 is a new sector of the campaign map, locked until chapter 1 is finished', async ({ page }) => {
+  await progressWith(page, chapterOne.slice(0, 7));
+  await page.goto('/#levels');
+  await expect(page.getByRole('heading', { name: 'Chapter 2 · Async' })).toBeVisible();
+  await expect(levelCard(page, 'Slow processing')).toContainText('Locked');
+  await expect(levelCard(page, 'Black Friday').getByRole('button', { name: /Play/ })).toBeVisible();
+});
+
+test('the last mission of chapter 1 opens mission 1 of chapter 2, which names its new buildings', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await page.goto('/#levels');
+  await expect(levelCard(page, 'Slow processing').getByRole('button', { name: /Play/ })).toBeVisible();
+  // The next mission to play is already selected, so its briefing is shown.
+  await expect(page.getByRole('complementary')).toContainText('Slow processing');
+  await expect(page.getByRole('complementary')).toContainText('Message queue');
+  await expect(page.getByRole('complementary')).toContainText('Worker');
+});
+
+test('mission 1: a queue answers at once, the Drain Phase empties the Backlog, and the mission is won', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await openLevel(page, MISSION);
+  // The cards follow the level's order: app server, database, message queue, Worker. They connect themselves.
+  await buildKeys(page, '1234');
+  for (const name of ['app-1', 'Database', 'Message queue', 'worker-1']) await expect(unit(page, name)).toBeVisible();
+  await expect(unit(page, 'Message queue')).toContainText('Backlog: 0');
+
+  await expect(internet(page)).toBeVisible();
+
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  // The wave brings more jobs than one Worker takes: the Backlog grows, and after the wave the Drain Phase starts.
+  await expect(page.locator('.play-phase')).toContainText('Drain', { timeout: 20_000 });
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 25_000 });
+  await expect(end).toContainText('Base defended');
+});
+
+test('mission 1: a Worker called straight from the app server is slow, and the hint says to put a queue in between', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await openLevel(page, MISSION, 'normal');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 30_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Put a Message Queue in between');
+});

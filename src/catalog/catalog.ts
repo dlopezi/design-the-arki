@@ -6,6 +6,8 @@ import type { Catalog } from '../engine/types';
  */
 export const DEFAULT_REQUEST_TYPE = 'watch';
 export const requestTypes = ['watch', 'job'];
+/** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
+export const RESULT_TYPE = 'result';
 
 // Every component type is a combination of engine primitives plus its numbers (ADR-0004).
 export const catalog: Catalog = {
@@ -36,6 +38,25 @@ export const catalog: Catalog = {
     // Tiers: connections the database serves at once.
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
+    // It serves reads and takes the results Workers write; processing a job is not its work.
+    accepts: ['watch', RESULT_TYPE],
     presentation: { zone: 'data', technology: 'PostgreSQL' },
+  },
+  // Chapter 2 (Async). A managed queue: no settings, a fixed price, and a capacity that never fills in these levels.
+  messageQueue: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, queue: true, distributes: true, accepts: ['job'], buildS: 4,
+    presentation: { zone: 'application', technology: 'Amazon SQS', hideCapacity: true },
+  },
+  // Takes Messages from the queue and processes each job (about a second), then writes the result to the database.
+  // Concurrency is how many jobs one instance processes at once.
+  worker: {
+    primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: ['job'], emits: RESULT_TYPE, buildS: 5,
+    sizes: {
+      small: { workers: 2, monthlyCost: 20, vcpu: 1 },
+      medium: { workers: 4, monthlyCost: 40, vcpu: 2 },
+      large: { workers: 8, monthlyCost: 80, vcpu: 4 },
+    },
+    defaultSize: 'medium',
+    presentation: { zone: 'application', technology: 'Celery', instancePrefix: 'worker' },
   },
 };

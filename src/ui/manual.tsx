@@ -84,7 +84,8 @@ function HowTo() {
 
 function Buildings({ levels, progress, briefing }: { levels: LevelDefinition[]; progress: Progress; briefing: boolean }) {
   const a = t.archive, m = t.manual;
-  const entries = useMemo(() => archiveEntries(levels, progress), [levels, progress]);
+  // The briefing before level 1 shows the buildings of the first chapter only: the later ones would spoil what comes next.
+  const entries = useMemo(() => archiveEntries(levels, progress).filter(e => !briefing || levels.find(l => l.id === e.level.id)?.chapter === levels[0]?.chapter), [levels, progress, briefing]);
   // In the briefing every building is open to read: they are what the player is about to meet.
   const isOpen = (unlocked: boolean) => briefing || unlocked;
   const [selected, setSelected] = useState(entries[0]?.type ?? '');
