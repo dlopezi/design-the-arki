@@ -330,11 +330,11 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   const maxAge = level.requirements.maxQueueAgeS;
   const tooOld = maxAge !== undefined && Object.values(s.queueAge).some(age => age > maxAge);
   const maxLag = level.requirements.maxReplicationLagS;
-  const tooStale = maxLag !== undefined && Object.values(s.lag).some(l => l > maxLag);
+  const lagTooHigh = maxLag !== undefined && Object.values(s.lag).some(l => l > maxLag);
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
   if (rps || s.phase === 'drain') {
-    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || tooStale ? REPUTATION.slow : REPUTATION.fine;
+    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || lagTooHigh ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
   if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s), lag: Math.max(0, ...Object.values(s.lag)) }];

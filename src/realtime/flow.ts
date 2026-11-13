@@ -249,8 +249,10 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (!spec?.follows) continue;
     const source = links.find(l => l.from === b.id && byId.get(l.to)?.type === spec.follows)?.to;
     if (!source) continue;
+    // A replica that is not serving yet (still being built, or down) is not copying anything: the pile stays as it was.
     const applies = serving(b.id) > 0 ? (spec.applyShare ?? 0) * capacityOf(b, catalog) : 0;
-    unapplied[b.id] = Math.max(0, (queues.unapplied?.[b.id] ?? 0) + ((writesServed[source] ?? 0) - applies) * (queues.dt || 1));
+    const before = queues.unapplied?.[b.id] ?? 0;
+    unapplied[b.id] = applies > 0 ? Math.max(0, before + ((writesServed[source] ?? 0) - applies) * (queues.dt || 1)) : before;
     lag[b.id] = applies > 0 ? unapplied[b.id]! / applies : 0;
   }
 

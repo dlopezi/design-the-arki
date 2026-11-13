@@ -297,7 +297,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const oldest = Math.max(0, ...Object.values(game.queueAge));
   const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
   const maxLag = level.requirements.maxReplicationLagS, lagNow = Math.max(0, ...Object.values(game.lag));
-  const tooStale = maxLag !== undefined && lagNow > maxLag;
+  const lagTooHigh = maxLag !== undefined && lagNow > maxLag;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
   const net = PASSIVE_INCOME + ((flow?.answered ?? 0) / 100) * PER_100_VISITS - upkeepPerS(game);
   const building = game.phase === 'build';
@@ -317,7 +317,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     // Reads that no Read Replica receives all land on the primary database.
     const reads = (level.play.wave.mix?.read ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
-    if (tooStale) return t.lagHint;
+    if (lagTooHigh) return t.lagHint;
     if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
@@ -503,7 +503,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
-        {maxLag !== undefined && <span className="play-res play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={tooStale ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
+        {maxLag !== undefined && <span className="play-res play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
         {hasQueue && <span className="play-res play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%

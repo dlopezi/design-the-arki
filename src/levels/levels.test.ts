@@ -288,6 +288,8 @@ describe('level files', () => {
 
     it('loses when the Read Replica is too small to apply the writes: the Replication Lag passes its maximum', () => {
       expect(play(replicaSize('small'))).toBe('lost');
+      const behind = run(callNow(createGame(level, replicaSize('small'))), 15, level);
+      expect(Math.max(...Object.values(behind.lag))).toBeGreaterThan(level.requirements.maxReplicationLagS!);
     });
 
     it('loses when any one part of the review is missing', () => {

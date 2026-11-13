@@ -635,6 +635,15 @@ describe('data scale: Replication Lag grows while writes are higher than a Read 
     expect(lagOf(play(none, 20))).toBe(0);
   });
 
+  it('does not pile up writes while the Read Replica is still being built, so the lag does not jump when it is ready', () => {
+    const none: Design = { components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { size: 'large', instances: 2 } }, { id: 'db', type: 'database' }], connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']] };
+    const building = run(callNow(build(createGame(lagLevel, none), 'readReplica', lagLevel)), 4, lagLevel); // a Read Replica takes 7 s to build
+    const replica = building.buildings.find(b => b.type === 'readReplica')!;
+    expect(replica.instances[0]!.buildLeftS).toBeGreaterThan(0);
+    expect(building.unapplied[replica.id] ?? 0).toBe(0);
+    expect(lagOf(building)).toBe(0);
+  });
+
   it('costs reputation while it is over the level maximum, as a slow base does', () => {
     expect(play(withReplica('medium'), 25).reputation).toBe(100);
     expect(play(withReplica('small'), 25).reputation).toBeLessThan(100);
@@ -642,8 +651,7 @@ describe('data scale: Replication Lag grows while writes are higher than a Read 
 
   it('shrinks again when the writes slow down', () => {
     const behind = play(withReplica('small'), 15);
-    const quiet = { ...behind, buildings: behind.buildings };
     const calmer: GameLevel = { ...lagLevel, play: { ...lagLevel.play, wave: { ...lagLevel.play.wave, mix: { read: 0.95, write: 0.05 } } } };
-    expect(lagOf(run(quiet, 15, calmer))).toBeLessThan(lagOf(behind));
+    expect(lagOf(run(behind, 15, calmer))).toBeLessThan(lagOf(behind));
   });
 });
