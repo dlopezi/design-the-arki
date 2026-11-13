@@ -453,7 +453,7 @@ export const es: Strings = {
       size: 'Tamaño', tier: 'Tier', fixed: 'fijo en este nivel', resizeCost: (cost: number) => (cost > 0 ? `$${cost}` : 'gratis'),
       ttl: 'TTL (segundos)',
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
-      shardLoad: (loads: number[]) => loads.map(l => `${Math.round(l * 100)} %`).join(' · '),
+      shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')} %`,
       shardKeyLocked: 'Bloqueada durante la oleada: resharding significa mover datos.',
       link: 'Conexión', from: 'De', to: 'A', traffic: 'Tráfico ahora', removeLink: 'Quitar conexión (Supr)',
     },

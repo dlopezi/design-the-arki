@@ -458,7 +458,7 @@ export const en = {
       size: 'Size', tier: 'Tier', fixed: 'fixed in this level', resizeCost: (cost: number) => (cost > 0 ? `$${cost}` : 'free'),
       ttl: 'TTL (seconds)',
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
-      shardLoad: (loads: number[]) => loads.map(l => `${Math.round(l * 100)}%`).join(' · '),
+      shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')}%`,
       shardKeyLocked: 'Locked during the wave: re-sharding means moving data.',
       link: 'Connection', from: 'From', to: 'To', traffic: 'Traffic now', removeLink: 'Remove connection (Delete)',
     },
