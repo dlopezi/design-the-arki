@@ -825,7 +825,8 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .campaign .home-topbar { position: static; padding: 10px 0; }
 .campaign-tools { display: flex; gap: 12px; align-items: center; font-size: 12.5px; }
 .campaign-grid { min-height: 0; height: 100%; align-items: stretch; }
-.campaign-sectors { min-height: 0; align-content: start; }
+/* The page is one screen tall, so the chapter list scrolls inside itself (more chapters than fit). */
+.campaign-sectors { min-height: 0; align-content: start; overflow-y: auto; overscroll-behavior: contain; }
 .campaign-sector { gap: 8px; padding: 10px 12px; }
 .campaign-head { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 14px; }
 .campaign-head .home-eyebrow { margin: 0; }
@@ -1101,13 +1102,12 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
   .campaign { height: auto; min-height: 100dvh; overflow: visible; grid-template-rows: none; }
   .campaign > .campaign-grid { grid-row: auto; height: auto; }
   .campaign-sectors, .campaign-sector { height: auto; }
+  .campaign-sectors { overflow: visible; }
   .campaign-briefing { max-height: none; overflow: visible; }
   .campaign-help { display: none; }
 }
-/* Tablet portrait: the briefing sits under the map, so its Play button stays pinned to the bottom of the screen. */
-@media (max-width: 900px) {
-  .campaign-go { position: sticky; bottom: 0; z-index: 2; margin: 6px -16px -14px; padding: 10px 16px 12px; background: linear-gradient(180deg, rgba(9, 16, 18, .85), #091012 40%); border-top: 1px solid var(--line); }
-}
+/* The Play button stays pinned to the bottom of the briefing (which scrolls inside itself on a short screen) or of the screen (tablet portrait, where the page scrolls). */
+.campaign-go { position: sticky; bottom: 0; z-index: 2; margin: 6px -16px -14px; padding: 10px 16px 12px; background: linear-gradient(180deg, rgba(9, 16, 18, .85), #091012 40%); border-top: 1px solid var(--line); }
 .play-bar h1 { min-width: 0; }
 .play-screen { grid-template-columns: minmax(0, 1fr); }
 .play-bar h1 { flex: 1 1 0; }

@@ -98,13 +98,32 @@ export function LevelSelect({ levels, progress, notice, storageWorks }: Props) {
   const [fresh] = useState(() => { const seen = readSeen(); return seen !== null && openCount > seen ? openCount - 1 : -1; });
   useEffect(() => { writeSeen(openCount); }, [openCount]);
   const markers = useRef<(HTMLButtonElement | null)[]>([]);
+  const sectors = useRef<HTMLDivElement>(null);
+  const placed = useRef(false);
+
+  // The chapter list scrolls inside itself: keep the selected level on screen (at load and when the selection moves).
+  useEffect(() => {
+    const list = sectors.current;
+    const sector = markers.current[selectedIndex]?.closest<HTMLElement>('.campaign-sector');
+    const marker = markers.current[selectedIndex];
+    if (!list || !sector || !marker) return;
+    const view = list.getBoundingClientRect();
+    const at = marker.getBoundingClientRect();
+    const visible = at.top >= view.top && at.bottom <= view.bottom;
+    const first = !placed.current;
+    placed.current = true;
+    if (visible) return;
+    const top = sector.getBoundingClientRect().top - view.top + list.scrollTop;
+    const calm = first || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    list.scrollTo({ top, behavior: calm ? 'auto' : 'smooth' });
+  }, [selectedIndex]);
 
   const select = (index: number) => {
     const level = levels[index];
     if (!level) return;
     setSelectedId(level.id);
     blip('select');
-    markers.current[index]?.focus();
+    markers.current[index]?.focus({ preventScroll: true });
   };
   const play = (level: LevelDefinition) => { blip('play'); location.hash = playHref(level.id, progress).slice(1); };
   // Game-style map: arrow keys move between missions, Enter plays the selected one.
@@ -142,7 +161,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks }: Props) {
       {!storageWorks && <p className="notice">{t.levelSelect.noStorage}</p>}
 
       <div className="campaign-grid">
-        <div className="campaign-sectors">
+        <div className="campaign-sectors" ref={sectors}>
           {chapters.map((chapter, c) => {
             const inChapter = levels.filter(l => l.chapter === chapter);
             const chapterStars = inChapter.reduce((s, l) => s + starsOf(l.id), 0);
