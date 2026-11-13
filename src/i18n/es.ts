@@ -454,7 +454,7 @@ export const es: Strings = {
       ttl: 'TTL (segundos)',
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
       shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')} %`,
-      shardKeyLocked: 'Bloqueada durante la oleada: resharding significa mover datos.',
+      shardKeyLocked: 'Bloqueada durante la oleada: re-sharding significa mover datos.',
       link: 'Conexión', from: 'De', to: 'A', traffic: 'Tráfico ahora', removeLink: 'Quitar conexión (Supr)',
     },
     build: {
@@ -482,7 +482,7 @@ export const es: Strings = {
       self: 'un edificio no se conecta consigo mismo', intoUsers: 'las peticiones no vuelven a los usuarios por una línea',
       queueHoldsMessages: 'la cola aún guarda mensajes: espera a que los Workers los tomen',
       queueNotPublic: 'los trabajos llegan a una cola a través de un app server, no directo desde los usuarios',
-      shardKeyLocked: 'la Shard Key está bloqueada durante la oleada: en la vida real, resharding significa mover datos y tener tiempo de inactividad',
+      shardKeyLocked: 'la Shard Key está bloqueada durante la oleada: en la vida real, re-sharding significa mover datos y tener tiempo de inactividad',
       endsRequests: 'la base de datos no envía peticiones', exists: 'ya están conectados', circle: 'eso haría un círculo', missing: 'ese edificio ya no existe',
     } as Record<string, string>,
     layer3ToConnect: 'Cambia a la capa 3 (Componentes) para conectar edificios.',

@@ -21,6 +21,18 @@ export function shardShares(weights: number[], shards: number): number[] {
   weights.forEach((w, value) => { shares[value % shards]! += w; });
   return shares;
 }
+/**
+ * A building split into Shards (ADR-0007): the Shard Key sends each Shard its slice of `rps`, and a Shard serves only
+ * its own slice, up to its capacity. A Shard that is down or still being built serves nothing, so a slice that reaches
+ * it is lost (it counts as full). Returns each Shard's load (0–1) and the requests per second served in all.
+ */
+function serveShards(b: Building, rps: number, keys: ShardKeys, capacityPerShard: number): { loads: number[]; served: number } {
+  const weights = keys[b.params.shardKey ?? ''] ?? Object.values(keys)[0]!; // the first key on offer is the default
+  const slices = shardShares(weights, b.instances.length).map(share => rps * share);
+  const loads = slices.map((slice, k) => (!slice ? 0 : isServing(b.instances[k]!) ? Math.min(1, slice / capacityPerShard) : 1));
+  const served = slices.reduce((sum, slice, k) => sum + (isServing(b.instances[k]!) ? Math.min(slice, capacityPerShard) : 0), 0);
+  return { loads, served };
+}
 /** A connection; `client` is the users on the Internet. */
 export type Link = { from: string; to: string };
 
@@ -94,6 +106,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const backlog: Record<string, number> = {}, release: Record<string, number> = {}, releaseCapacity: Record<string, number> = {};
   const shards: Record<string, number[]> = {};
   const add = (map: Record<string, number>, key: string, v: number) => { map[key] = (map[key] ?? 0) + v; };
+  /** Whether a building is split into several Shards: a shardable one, with more than one instance, in a level that offers Shard Keys. */
+  const isSharded = (b: Building) => !!catalog[b.type]?.shardable && !!keys && Object.keys(keys).length > 0 && b.instances.length > 1;
   let answered = 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
   let lostInBackground = 0;
@@ -103,8 +117,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   for (const b of buildings) {
     const spread = catalog[b.type]?.balanced || links.some(l => l.to === b.id && l.from !== CLIENT && catalog[byId.get(l.from)?.type ?? '']?.distributes);
     // Shards each serve their own slice, so every serving one works.
-    const split = catalog[b.type]?.shardable && keys && b.instances.length > 1;
-    usable[b.id] = spread || split ? serving(b.id) : Math.min(1, serving(b.id));
+    usable[b.id] = spread || isSharded(b) ? serving(b.id) : Math.min(1, serving(b.id));
   }
   // Links never make a circle (the game refuses them), so a depth-first order from the users is a valid order.
   const order: string[] = [], seen = new Set<string>();
@@ -157,14 +170,11 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (id === CLIENT) { for (const t of types) send(id, t, rps * mix[t]!); continue; }
     const b = byId.get(id)!, spec = catalog[b.type]!;
     const capacity = usable[id]! * capacityOf(b, catalog);
-    // A building split into Shards: each Shard gets its slice of the traffic from the Shard Key and serves only that;
-    // a Shard that is down or still being built drops its slice. The busiest Shard sets the building's load and latency.
-    const slices = spec.shardable && keys && b.instances.length > 1
-      ? shardShares(keys[b.params.shardKey ?? ''] ?? keys[Object.keys(keys)[0]!] ?? [1], b.instances.length).map((share, k) => f * share / (isServing(b.instances[k]!) ? capacityOf(b, catalog) : 0))
-      : null;
-    if (slices) shards[id] = slices.map(x => Math.min(1, x));
-    const ok = slices ? slices.reduce((sum, x, k) => sum + (isServing(b.instances[k]!) ? Math.min(x, 1) : 0) * capacityOf(b, catalog), 0) : Math.min(f, capacity);
-    load[id] = slices ? Math.max(...shards[id]!) : capacity ? ok / capacity : 1;
+    // The busiest Shard sets the load and latency of a building split into Shards.
+    const split = isSharded(b) ? serveShards(b, f, keys!, capacityOf(b, catalog)) : null;
+    if (split) shards[id] = split.loads;
+    const ok = split ? split.served : Math.min(f, capacity);
+    load[id] = split ? Math.max(...split.loads) : capacity ? ok / capacity : 1;
     add(drop, id, f - ok);
     // What gets in is a share of each channel, the same share for all.
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };

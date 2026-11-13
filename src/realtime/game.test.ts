@@ -500,6 +500,16 @@ describe('data scale: Shards hold more writes, and the Shard Key decides how tra
     expect(design.components.find(c => c.id === 'db')!.params).toMatchObject({ instances: 3, shardKey: 'country' });
   });
 
+  it('a Shard that holds no data because the key has fewer values than Shards, and is down, does not break the latency', () => {
+    const l = shardLevel({ userId: [0.5, 0.5] }, 400);
+    const live = callNow(createGame(l, sharded(4, 'userId')));
+    const down = { ...live, buildings: live.buildings.map(b => (b.id === 'db' ? { ...b, instances: b.instances.map((i, k) => (k === 3 ? { ...i, down: true } : i)) } : b)) };
+    const s = run(down, 5, l);
+    expect(Number.isFinite(s.flow!.p95)).toBe(true);
+    expect(s.flow!.errors).toBe(0); // the two Shards that hold data are fine
+    expect(s.flow!.shards.db![3]).toBe(0);
+  });
+
   it('a Shard that is down loses its slice of the data', () => {
     const l = shardLevel(keys, 400);
     const live = callNow(createGame(l, sharded(2, 'userId')));
