@@ -438,6 +438,7 @@ export const es: Strings = {
     },
     refusal: {
       self: 'un edificio no se conecta consigo mismo', intoUsers: 'las peticiones no vuelven a los usuarios por una línea',
+      queueHoldsMessages: 'la cola aún guarda mensajes: espera a que los Workers los tomen',
       queueNotPublic: 'los trabajos llegan a una cola a través de un app server, no directo desde los usuarios',
       endsRequests: 'la base de datos no envía peticiones', exists: 'ya están conectados', circle: 'eso haría un círculo', missing: 'ese edificio ya no existe',
     } as Record<string, string>,

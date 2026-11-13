@@ -205,6 +205,8 @@ export function build(s: GameState, type: string, level: GameLevel, catalog: Cat
 /** Removes one instance (the last one removes the building and its connections), giving part of the price back. */
 export function demolish(s: GameState, id: string, catalog: Catalog = defaultCatalog): GameState {
   const b = s.buildings.find(x => x.id === id); if (!b) return s;
+  // The Backlog is never dropped: a queue that still holds Messages stays until the Workers have taken them.
+  if (catalog[b.type]?.queue && (s.backlog[id] ?? 0) >= EMPTY_BACKLOG) return { ...s, events: log(s, { kind: 'refused', reason: 'queueHoldsMessages' }) };
   const back = Math.round(instancePrice(b, catalog) * REFUND);
   // The instance that goes is the least useful one: a fallen one, then one still being built, then the last.
   const order = [b.instances.findIndex(i => i.down), b.instances.findIndex(i => i.buildLeftS > 0), b.instances.length - 1];

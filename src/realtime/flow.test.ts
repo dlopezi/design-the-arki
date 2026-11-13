@@ -147,6 +147,13 @@ describe('traffic in real time follows the connections', () => {
       expect(flow.errors).toBe(0);
     });
 
+    it('Messages a Worker cannot take go back to the queue: none is ever lost', () => {
+      // Half the jobs come straight from the app server, so the Worker (4 jobs/s) is shared and cannot take everything released.
+      const flow = solve(parts(), [...wired, link('api', 'w')], 10, undefined, jobs, { backlog: {}, dt: 1 });
+      // 5 jobs/s reach the queue, 4 are released, and the Worker takes 4/9 of the 9 jobs/s it receives: the rest return.
+      expect(flow.backlog.q).toBeCloseTo(1 + 4 * (5 / 9), 2);
+    });
+
     it('what the database drops after the queue is not the users error: the job was already answered', () => {
       const slowDb = [...parts(8)];
       slowDb[3] = b('db', 'database'); // 8 connections serve 400 req/s

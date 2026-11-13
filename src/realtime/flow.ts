@@ -171,6 +171,15 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   // A queue that no traffic reached still keeps its Messages.
   for (const b of buildings) if (specOf(b.id)?.queue && backlog[b.id] === undefined) backlog[b.id] = queues.backlog[b.id] ?? 0;
+  // A Message a Worker or the database could not take goes back to its queue to be delivered again: none is ever lost.
+  const queueIds = Object.keys(backlog);
+  if (lostInBackground > 0 && queueIds.length) {
+    for (const id of queueIds) {
+      const back = lostInBackground / queueIds.length;
+      backlog[id]! += back * (queues.dt || 1);
+      if (release[id] !== undefined) release[id] = Math.max(0, release[id]! - back);
+    }
+  }
 
   // Latency: each component adds its service time, longer as it fills; the tail follows the slowest busy path.
   // A queue answers at once, so the time its Workers take is not the users' wait.

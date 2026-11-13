@@ -266,6 +266,17 @@ describe('async work: a queue answers at once and Workers take the jobs in the b
     expect(b).toBeGreaterThan(a + 2.5);
   });
 
+  it('a queue that still holds Messages cannot be removed: the Backlog is never dropped', () => {
+    let s = play(live(base(1)), asyncLevel.play.wave.lengthS + 1);
+    expect(s.phase).toBe('drain');
+    const kept = demolish(s, 'q');
+    expect(kept.buildings.some(b => b.id === 'q')).toBe(true);
+    expect(kept.money).toBe(s.money);
+    expect(kept.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'queueHoldsMessages' });
+    s = play(s, 60); // won: the queue is empty now and can go
+    expect(demolish({ ...s, phase: 'build' }, 'q').buildings.some(b => b.id === 'q')).toBe(false);
+  });
+
   it('the users cannot connect to a Message Queue: jobs come through an app server', () => {
     let s = createGame(asyncLevel, empty);
     s = build(build(s, 'appServer', asyncLevel), 'messageQueue', asyncLevel);

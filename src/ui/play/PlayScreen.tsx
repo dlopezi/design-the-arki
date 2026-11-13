@@ -302,10 +302,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const selectedBuilding = selection?.kind === 'building' ? game.buildings.find(b => b.id === selection.id) ?? null : null;
   const hint = useMemo(() => {
     if (game.phase !== 'lost' || !hintAllowed(mode, true)) return null;
-    if (incidentHappened && !Object.keys(game.backlog).length) return t.redundancyHint;
-    // Async levels: a Worker called straight from the app server, or Messages that waited too long.
+    // Async levels: jobs with no queue, a Worker called straight from the app server, or Messages that waited too long.
+    const jobs = (level.play.wave.mix?.job ?? 0) > 0;
+    if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
     if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
-    if (totalBacklog(game) > 0) return t.backlogHint;
+    if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];

@@ -439,6 +439,7 @@ export const en = {
     },
     refusal: {
       self: 'a building does not connect to itself', intoUsers: 'requests do not go back to the users along a line',
+      queueHoldsMessages: 'the queue still holds Messages: wait until the Workers have taken them',
       queueNotPublic: 'jobs reach a queue through an app server, not straight from the users',
       endsRequests: 'the database does not send requests', exists: 'they are already connected', circle: 'that would make a circle', missing: 'that building is gone',
     } as Record<string, string>,
