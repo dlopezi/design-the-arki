@@ -193,6 +193,15 @@ describe('async work: a queue answers at once and Workers take the jobs in the b
     expect(s.flow!.errors).toBe(0);
   });
 
+  it('records the Backlog and the Queue Age every second, for the charts', () => {
+    const s = play(live(base(1)), 10);
+    const last = s.history.at(-1)!;
+    expect(last.backlog).toBeCloseTo(s.backlog['q']!, 0);
+    expect(last.age).toBeCloseTo(s.queueAge['q']!, 0);
+    expect(s.history.map(h => h.backlog)).toEqual([...s.history.map(h => h.backlog)].sort((a, b) => a - b)); // it only grows while the Workers fall behind
+    expect(play(live(base(2)), 10).history.every(h => h.age === 0 && h.backlog === 0)).toBe(true);
+  });
+
   it('a Backlog of zero has a Queue Age of zero; the age is the Backlog over the rate the Workers take it', () => {
     expect(play(live(base(2)), 10).queueAge['q'] ?? 0).toBe(0); // 8 jobs/s in, 8 jobs/s out
     const s = play(live(base(1)), 10);

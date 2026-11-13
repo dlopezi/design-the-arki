@@ -898,6 +898,7 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
   filter: drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 9px var(--c)); }
 .play-load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
 .play-load span { display: block; height: 100%; background: var(--ok); }
+.play-age-gauge { width: 96px; }
 .play-load.medium span { background: var(--warn); } .play-load.high span { background: var(--bad); }
 .play-progress { position: absolute; left: 10px; right: 10px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
 .play-progress span { display: block; height: 100%; background: var(--warn); }

@@ -39,6 +39,10 @@ test('mission 1: a queue answers at once, the Drain Phase empties the Backlog, a
 
   await expect(internet(page)).toBeVisible();
 
+  // The queue shows its Queue Age as a gauge towards the maximum, and the console charts it against the maximum.
+  await expect(page.getByRole('meter', { name: /Queue Age: 0 s \/ max 30 s/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Live results' })).toContainText('Queue Age');
+  await expect(page.getByRole('region', { name: 'Live results' })).not.toContainText('RPS');
   await page.getByRole('button', { name: /Release to production/ }).click();
   await page.getByRole('button', { name: '4×' }).click();
   // The wave brings more jobs than one Worker takes: the Backlog grows, and after the wave the Drain Phase starts.
