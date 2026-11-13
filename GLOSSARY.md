@@ -78,11 +78,39 @@ _Avoid_: Broker, queue (alone)
 A component that takes Messages from a Message Queue and processes them in the background; several Workers share one queue without a load balancer.
 _Avoid_: Consumer, job runner
 
+**Read Replica**:
+A copy of the database that answers reads only and is always a little behind the primary database.
+_Avoid_: Replica (alone), slave, follower
+
+**Replication Lag**:
+How far behind the primary database a Read Replica is, in seconds; a level may set a maximum.
+_Avoid_: Delay, staleness
+
+**Shard**:
+One database that holds a slice of the data, chosen by the Shard Key; each Shard serves only its own slice.
+_Avoid_: Partition (reserved for message streams), segment
+
+**Shard Key**:
+The field that decides which Shard holds a piece of data (for example user id, country or date).
+_Avoid_: Partition key, split key
+
+**Hot Shard**:
+A Shard that gets far more traffic than the others, usually because of a poor Shard Key.
+_Avoid_: Hotspot, overloaded node
+
+**Object Storage**:
+A component that stores large files and lets users upload and download them directly, so the app servers never carry the files.
+_Avoid_: File server, bucket (alone), blob store
+
 ### Requests
 
 **Request Type**:
 A kind of request in a level's traffic (for example watching a video or processing an uploaded one); it decides which component the request needs.
 _Avoid_: Work class, request kind
+
+**Read-your-writes**:
+A read that must show the user's own latest change, so it goes to the primary database and not to a Read Replica.
+_Avoid_: Fresh read, strong read
 
 **Message**:
 An async request while it sits in a Message Queue or is processed by a Worker; it is not lost when a Worker goes down.
