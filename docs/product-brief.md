@@ -59,7 +59,7 @@ Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: 
   3. *Upload rush*: a burst of uploads; the queue absorbs the spike and protects the database. The brief also shows the limit: a queue absorbs peaks, not a load that stays above Worker capacity, where the Backlog grows without end.
   4. *A Worker goes down*: the job goes back to the queue and nothing is lost; the hint explains at-least-once and why Workers must be idempotent (a job may run twice).
   5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
-  6. *Launch day*: everything together, with a burst and a Worker outage.
+  6. *Launch day*: everything together, with a burst and a Worker outage. As the chapter's review, it also needs chapter 1 buildings: a load balancer in front of several app servers and a cache for watches.
 - **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
 - **To decide with a prototype**: how the map and console show the Backlog and the Queue Age.
 
