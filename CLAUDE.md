@@ -7,7 +7,9 @@ A browser puzzle game about software architecture for developers preparing for s
 - `npm run dev`: start the game locally
 - `npm run check`: typecheck + unit tests (engine and level files)
 - `npm run e2e`: browser tests (builds and serves the game)
-- `prototypes/` holds throwaway prototypes; they are not part of the build
+- `npm run verify`: `check` + `e2e`, what CI runs; run it before a Pull Request
+- `LEVEL=<id> npm run level-report`: the numbers for tuning a level (stars, starting designs)
+- `prototypes/` holds throwaway prototypes, not part of the build; view one with `npm run dev` at `/prototypes/<file>`
 - Deployment: see `docs/deployment.md` (Firebase Hosting; optional build settings in `.env.example`)
 
 ## Git Flow (simple)
@@ -31,3 +33,7 @@ The five default triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, 
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Review
+
+Reviewers read `CODING_STANDARDS.md`. Glossary words are checked by `src/glossary.test.ts`.
