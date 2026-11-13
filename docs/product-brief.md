@@ -23,6 +23,46 @@ Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototyp
 - **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
 
+## Chapter roadmap (planned 2026-11-13)
+
+A learning order: each chapter builds on the ones before it, so no concept appears before its base. Not final; each chapter gets its own grilling session.
+
+| # | Chapter | What the player learns | Why here |
+|---|---|---|---|
+| 1 | Core (done) | Capacity, load balancer, cache, database | The base of everything |
+| 2 | Async | Message Queue, Worker, Backlog, Queue Age, idempotency | Slow work, the first interview topic after scaling |
+| 3 | Data scale | Read replicas and replication lag, sharding and hot shards, object storage | The database is the next limit; object storage finishes the video story |
+| 4 | Edge | CDN, API gateway, rate limiter, DNS and multi-region failover | A CDN is a cache in front of object storage (1 + 3); multi-region needs replicas (3) |
+| 5 | Events and pub/sub | Fan-out, topics, partitions, consumer groups, news feed (fan-out on write or on read) | Builds on the queue (2); partitions are sharding (3) |
+| 6 | Resilience | Timeouts, retries with backoff and retry storms, circuit breaker, graceful degradation | Needs a base with many parts that can fail (2–5) |
+| 7 | Observability | Metrics, logs, tracing, SLOs, error budgets, alerts; as a mechanic, the map is in fog until the player builds monitoring | Watching a system only makes sense once it is big |
+| 8 | Consistency and payments | Transactions, double booking, Saga, outbox, idempotency keys | The hardest topic; uses replication lag (3), events (5) and idempotency (2) |
+| 9 | Interview classics | URL shortener, chat, news feed, ticket sale, rate limiter | The final exam: everything together, as in a real interview |
+
+Rules for every chapter:
+- One new concept per mission.
+- The last mission of each chapter also uses buildings from earlier chapters, as a review.
+- Stories continue: the video app grows in chapters 2–4, a social network in 5–6, a ticket app in 7–8.
+
+## Chapter 2: Async (planned 2026-11-13)
+
+Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: the game shows a real problem with the real solution and the real names, so players can use them in an interview.
+
+- **Story**: a new product, a video app. Watching a video is synchronous (cache or database); processing an uploaded video is an async job. The file itself goes to object storage, which the Manual explains and the Data scale chapter adds.
+- **New buildings**: **Message Queue** (no settings, fixed price, like a managed queue) and **Worker** (instances and sizes; several Workers share one queue without a load balancer: competing consumers). Workers write the result to the database, so the queue protects it from spikes (load leveling). Users reach the queue only through an app server. Pub/sub waits for a later chapter.
+- **Rules**: a job is answered when it enters the queue (like `202 Accepted`). The **Backlog** is kept, also when a Worker goes down (at-least-once delivery). Reputation falls while the **Queue Age** is over the level's maximum. After the wave a **Drain Phase** runs until the Backlog is empty, with maintenance still charged.
+- **Names**: the per-instance "workers" become **Concurrency** and "Queue size" becomes **Waiting line**, so the new Worker and Message Queue are not confused with them.
+- **Unlock**: after the last level of chapter 1.
+- **Six levels**, each with one lesson:
+  1. *Slow processing*: processing a video in the request makes p95 huge; a queue and a Worker answer at once.
+  2. *Watch and upload*: mixed traffic; only the slow work goes async, watches stay synchronous.
+  3. *Upload rush*: a burst of uploads; the queue absorbs the spike and protects the database. The brief also shows the limit: a queue absorbs peaks, not a load that stays above Worker capacity, where the Backlog grows without end.
+  4. *A Worker goes down*: the job goes back to the queue and nothing is lost; the hint explains at-least-once and why Workers must be idempotent (a job may run twice).
+  5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
+  6. *Launch day*: everything together, with a burst and a Worker outage. As the chapter's review, it also needs chapter 1 buildings: a load balancer in front of several app servers and a cache for watches.
+- **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
+- **To decide with a prototype**: how the map and console show the Backlog and the Queue Age.
+
 ## Game screen
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
