@@ -7,6 +7,7 @@ export const en = {
     title: 'Design the Arki',
     subtitle: 'Design systems that survive real traffic. Pass a level to unlock the next.',
     chapter: (n: number, name: string) => `Chapter ${n} · ${name}`,
+    chapterDone: 'Chapter complete',
     play: 'Play',
     playBubble: 'Play!',
     chapterComplete: 'Chapter complete! Replay levels in harder modes for new badges.',

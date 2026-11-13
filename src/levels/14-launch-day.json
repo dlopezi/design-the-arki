@@ -1,0 +1,305 @@
+{
+  "id": "14-launch-day",
+  "chapter": "Async",
+  "title": "Launch day",
+  "brief": "The video app launches. Almost everyone watches, 480 requests per second, and one in twenty is an upload to process. Halfway through the first wave a Worker crashes. Use everything you have learned: a load balancer in front of several app servers, a cache so the small database is not asked for the same videos again and again, a queue and Workers that keep the Queue Age under 20 seconds even without one of them.",
+  "durationS": 40,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 40,
+      "rps": 480
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxQueueAgeS": 20
+  },
+  "budget": 600,
+  "starCostThresholds": [
+    520,
+    480
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "cache",
+    "database",
+    "messageQueue",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    },
+    "cache": {
+      "limits": {
+        "ttlS": 60
+      }
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "maxInstances": 3
+    }
+  },
+  "guidedHint": "Watches go through the load balancer and the app servers to the cache and the database. Uploads go to the queue and the Workers. A Worker will go down, so keep a spare: the Queue Age must stay low even with one Worker less.",
+  "play": {
+    "startMoney": 650,
+    "wave": {
+      "rps": 480,
+      "lengthS": 40,
+      "mix": {
+        "watch": 0.95,
+        "job": 0.05
+      }
+    },
+    "incident": {
+      "atS": 15,
+      "componentType": "worker"
+    },
+    "starMoney": [
+      60,
+      160
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "size": "large",
+            "instances": 2
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "cache",
+          "type": "cache",
+          "params": {
+            "ttlS": 60
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "cache"
+        ],
+        [
+          "cache",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "queue",
+          "type": "messageQueue"
+        },
+        {
+          "id": "worker",
+          "type": "worker",
+          "params": {
+            "size": "medium"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "worker"
+        ],
+        [
+          "worker",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "cache",
+        "type": "cache",
+        "params": {
+          "ttlS": 60
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "queue",
+        "type": "messageQueue"
+      },
+      {
+        "id": "worker",
+        "type": "worker",
+        "params": {
+          "size": "large",
+          "instances": 3
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "cache"
+      ],
+      [
+        "cache",
+        "db"
+      ],
+      [
+        "api",
+        "queue"
+      ],
+      [
+        "queue",
+        "worker"
+      ],
+      [
+        "worker",
+        "db"
+      ]
+    ]
+  }
+}

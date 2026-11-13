@@ -58,3 +58,13 @@ test('mission 1: a Worker called straight from the app server is slow, and the h
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Put a Message Queue in between');
 });
+
+test('finishing the last mission shows chapter 2 as complete on the campaign map', async ({ page }) => {
+  const all = [...chapterOne, '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day'];
+  await progressWith(page, all);
+  await page.goto('/#levels');
+  await expect(page.getByText('Chapter complete')).toHaveCount(2);
+  await progressWith(page, all.slice(0, -1));
+  await page.reload();
+  await expect(page.getByText('Chapter complete')).toHaveCount(1);
+});

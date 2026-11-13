@@ -157,6 +157,7 @@ export function LevelSelect({ levels, progress, notice, storageWorks }: Props) {
                     <span style={{ width: `${(chapterStars / chapterMax) * 100}%` }} />
                   </div>
                   <span className="campaign-stars-count">★ {chapterStars}/{chapterMax}</span>
+                  {inChapter.every(l => starsOf(l.id) > 0) && <span className="campaign-complete">✔ {t.levelSelect.chapterDone}</span>}
                 </div>
                 <div className="campaign-map" style={{ aspectRatio: `${MAP.w} / ${height}` }}>
                   <svg viewBox={`0 0 ${MAP.w} ${height}`} aria-hidden="true" className="campaign-terrain">

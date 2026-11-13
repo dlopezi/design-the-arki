@@ -949,6 +949,7 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .campaign-sectors { height: 100%; }
 .campaign-sector { height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; align-content: stretch; }
 .campaign-map { align-self: center; }
+.campaign-complete { color: var(--ok); font: 800 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .campaign-stars-count { font: 800 12px var(--mono); color: var(--star); }
 .campaign-help { margin: 0; text-align: center; color: var(--muted); font-size: 12.5px; }
 .home-links .home-mode { border-color: var(--accent); color: var(--accent); }

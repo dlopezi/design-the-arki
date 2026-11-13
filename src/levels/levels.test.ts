@@ -33,7 +33,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1 and then the Async chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day']);
   });
 
   for (const level of allLevels()) {
@@ -108,6 +108,23 @@ describe('level files', () => {
       expect(() => parseLevel({ ...base, requirements })).toThrow(/maximum Queue Age/);
       expect(parseLevel({ ...base, requirements: { ...requirements, maxQueueAgeS: 12 } }).requirements.maxQueueAgeS).toBe(12);
     });
+  });
+
+  it('14-launch-day: the chapter review needs a load balancer in front of several app servers and a cache for watches', () => {
+    const level = allLevels('en').find(l => l.id === '14-launch-day')!;
+    const ref = level.referenceDesign;
+    expect(ref.components.find(c => c.type === 'loadBalancer')).toBeDefined();
+    expect(Number(ref.components.find(c => c.type === 'appServer')!.params?.instances)).toBeGreaterThan(1);
+    expect(ref.components.find(c => c.type === 'cache')).toBeDefined();
+    const without = (type: string, bypass: [string, string]) => ({
+      components: ref.components.filter(c => c.type !== type),
+      connections: [...ref.connections.filter(([a, b]) => ![a, b].some(id => ref.components.find(c => c.id === id)?.type === type)), bypass] as [string, string][],
+    });
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
+    expect(play(ref)).toBe('won');
+    expect(play(without('loadBalancer', ['client', 'api']))).toBe('lost');
+    expect(play(without('cache', ['api', 'db']))).toBe('lost');
+    expect(play({ ...ref, components: ref.components.map(c => (c.type === 'appServer' ? { ...c, params: {} } : c)) })).toBe('lost'); // one app server
   });
 
   it('13-fresh-videos: fewer Workers are cheaper but let the Queue Age pass its maximum, which costs reputation', () => {
