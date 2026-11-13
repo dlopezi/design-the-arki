@@ -313,7 +313,7 @@ export const en = {
         when: 'When work is slow and the user does not need the result right now: processing a video, sending an email, making a report. Fast work, like watching a video, stays synchronous.',
         tools: ['Amazon SQS', 'RabbitMQ', 'Apache Kafka', 'Google Cloud Pub/Sub'],
         same: 'A job is answered when it enters the queue, so the user waits only for that. Messages stay in the queue until a Worker takes them, even when a Worker goes down.',
-        diff: 'The video file does not go in the queue. The client uploads it straight to object storage, and the queue only carries a small job that points to it (object storage comes in a later chapter). Real queues also have size limits, retention, retries and dead-letter queues, and they can deliver a Message more than once.',
+        diff: 'The video file does not go in the queue. The client uploads it straight to object storage, and the queue only carries a small job that points to it (that is Object Storage, from chapter 3). Real queues also have size limits, retention, retries and dead-letter queues, and they can deliver a Message more than once.',
         read: { label: 'AWS · What is a message queue?', url: 'https://aws.amazon.com/message-queue/' },
       },
       worker: {
@@ -502,6 +502,7 @@ export const en = {
       self: 'a building does not connect to itself', intoUsers: 'requests do not go back to the users along a line',
       queueHoldsMessages: 'the queue still holds Messages: wait until the Workers have taken them',
       queueNotPublic: 'jobs reach a queue through an app server, not straight from the users',
+      uploadsOnly: 'the users reach Object Storage straight for uploads only, and this level has no uploads',
       shardKeyLocked: 'the Shard Key is locked during the wave: in real life re-sharding means moving data and downtime',
       endsRequests: 'the database does not send requests', exists: 'they are already connected', circle: 'that would make a circle', missing: 'that building is gone',
     } as Record<string, string>,

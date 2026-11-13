@@ -557,11 +557,30 @@ describe('data scale: big uploads go straight to Object Storage, not through the
     expect(withLb).not.toContain('client>appServer');
   });
 
-  it('Object Storage takes uploads only: a watch is never sent to it', () => {
-    const l = uploadLevel({ watch: 1 }, 100);
+  it('the users connecting to a building that is not an entrance for some types (a cache) still replace the way in, as before', () => {
+    const l = { ...uploadLevel({ watch: 1 }, 10), allowedComponents: ['appServer', 'cache', 'database', 'objectStorage'] };
+    const s = build(createGame(l, design([])), 'cache', l);
+    const cache = s.buildings.find(b => b.type === 'cache')!.id;
+    expect(named(connect(s, 'client', cache))).toEqual(expect.arrayContaining(['client>cache']));
+    expect(named(connect(s, 'client', cache))).not.toContain('client>appServer');
+  });
+
+  it('Object Storage takes uploads only: a watch is never sent to it, even from a connected user', () => {
+    const l = uploadLevel({ watch: 0.5, upload: 0.5 }, 100);
     const s = play(l, design([['api', 'files'], ['client', 'files']]));
-    expect(s.flow!.inflow.files ?? 0).toBe(0);
+    expect(s.flow!.inflow.files).toBeCloseTo(50); // the uploads only
     expect(s.flow!.errors).toBe(0);
+  });
+
+  it('the users cannot connect to Object Storage in a level with no uploads: it takes uploads only', () => {
+    const l = uploadLevel({ watch: 1 }, 10);
+    const s = createGame(l, design([]));
+    const files = s.buildings.find(b => b.type === 'objectStorage')!.id;
+    const refused = connect(s, 'client', files);
+    expect(refused.links).toBe(s.links);
+    expect(refused.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'uploadsOnly' });
+    const withUploads = uploadLevel({ watch: 0.5, upload: 0.5 }, 10);
+    expect(named(connect(createGame(withUploads, design([])), 'client', 'files'))).toContain('client>objectStorage');
   });
 
   it('with no way to store a file, an upload is an error', () => {
@@ -580,7 +599,7 @@ describe('data scale: big uploads go straight to Object Storage, not through the
   it('Object Storage has a fixed price and no instances to add', () => {
     const l = uploadLevel({ upload: 1 }, 10);
     const s = build(createGame(l, empty), 'objectStorage', l);
-    expect(s.money).toBeLessThan(500);
-    expect(build(s, 'objectStorage', l)).toBe(s);
+    expect(s.money).toBe(500 - 30);
+    expect(build(s, 'objectStorage', l).buildings.find(b => b.type === 'objectStorage')!.instances).toHaveLength(1);
   });
 });

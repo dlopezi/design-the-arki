@@ -1,4 +1,4 @@
-import { catalog as defaultCatalog } from '../catalog/catalog';
+import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
 import type { Catalog, Design } from '../engine/types';
 import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
@@ -57,6 +57,8 @@ export type GameState = {
   links: Link[];
   /** Whether new buildings are connected automatically. */
   autoLink: boolean;
+  /** The Request Types the wave carries: a building the users reach for only some types is useless without them. */
+  waveTypes: string[];
   /** Requests answered so far. */
   visits: number;
   incidentDone: boolean;
@@ -87,6 +89,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
+    waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
     visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
@@ -109,6 +112,9 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (to === CLIENT) return 'intoUsers';
   // Jobs reach a queue through an API, never straight from the users.
   if (from === CLIENT && catalog[typeOf(s, to) ?? '']?.queue) return 'queueNotPublic';
+  // The users reach Object Storage straight, for uploads only: with no uploads in the wave there is nothing to send it.
+  const direct = catalog[typeOf(s, to) ?? ''];
+  if (from === CLIENT && direct?.acceptsClients && direct.accepts && !direct.accepts.some(type => s.waveTypes.includes(type))) return 'uploadsOnly';
   if (from !== CLIENT && !typeOf(s, from)) return 'missing';
   if (!typeOf(s, to)) return 'missing';
   const spec = catalog[typeOf(s, from) ?? ''];
@@ -118,9 +124,12 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (reaches(s.links, to, from)) return 'circle';
   return null;
 }
-/** Whether the users connect to this building only for the Request Types it takes (Object Storage), not as the way in. */
-const isDirectEntrance = (s: GameState, id: string) => !!defaultCatalog[typeOf(s, id) ?? '']?.accepts;
-const hasEntrance = (s: GameState) => s.links.some(l => l.from === CLIENT && !isDirectEntrance(s, l.to));
+/** Whether the users may connect to this building for only some Request Types (Object Storage, for uploads), not as the way in. */
+const isDirectEntrance = (s: GameState, id: string) => {
+  const spec = defaultCatalog[typeOf(s, id) ?? ''];
+  return !!spec?.acceptsClients && !!spec.accepts;
+};
+const hasGeneralEntrance = (s: GameState) => s.links.some(l => l.from === CLIENT && !isDirectEntrance(s, l.to));
 function addLink(s: GameState, from: string, to: string): GameState {
   if (linkProblem(s, from, to)) return s;
   // The users reach the system through one general entrance (a new one replaces the old), and may also have a direct one
@@ -152,7 +161,7 @@ function autoLink(s: GameState, b: Building): GameState {
     for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'appServer') {
     if (lb) next = addLink(next, lb.id, b.id);
-    else if (!hasEntrance(next)) next = addLink(next, CLIENT, b.id);
+    else if (!hasGeneralEntrance(next)) next = addLink(next, CLIENT, b.id);
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);

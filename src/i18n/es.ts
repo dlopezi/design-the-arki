@@ -307,7 +307,7 @@ export const es: Strings = {
         when: 'Cuando el trabajo es lento y el usuario no necesita el resultado ya: procesar un vídeo, enviar un correo, generar un informe. El trabajo rápido, como ver un vídeo, sigue siendo síncrono.',
         tools: ['Amazon SQS', 'RabbitMQ', 'Apache Kafka', 'Google Cloud Pub/Sub'],
         same: 'Un trabajo se responde cuando entra en la cola, así que el usuario solo espera eso. Los mensajes siguen en la cola hasta que un Worker los toma, incluso si un Worker se cae.',
-        diff: 'El archivo de vídeo no va en la cola. El cliente lo sube directo a un almacenamiento de objetos, y la cola solo lleva un trabajo pequeño que apunta a él (el almacenamiento de objetos llega en un capítulo posterior). Las colas reales también tienen límites de tamaño, retención, reintentos y colas de mensajes fallidos, y pueden entregar un mensaje más de una vez.',
+        diff: 'El archivo de vídeo no va en la cola. El cliente lo sube directo a un almacenamiento de objetos, y la cola solo lleva un trabajo pequeño que apunta a él (eso es Object Storage, del capítulo 3). Las colas reales también tienen límites de tamaño, retención, reintentos y colas de mensajes fallidos, y pueden entregar un mensaje más de una vez.',
         read: { label: 'AWS · What is a message queue?', url: 'https://aws.amazon.com/message-queue/' },
       },
       worker: {
@@ -495,6 +495,7 @@ export const es: Strings = {
       self: 'un edificio no se conecta consigo mismo', intoUsers: 'las peticiones no vuelven a los usuarios por una línea',
       queueHoldsMessages: 'la cola aún guarda mensajes: espera a que los Workers los tomen',
       queueNotPublic: 'los trabajos llegan a una cola a través de un app server, no directo desde los usuarios',
+      uploadsOnly: 'los usuarios llegan directo a Object Storage solo para subidas, y este nivel no tiene subidas',
       shardKeyLocked: 'la Shard Key está bloqueada durante la oleada: en la vida real, re-sharding significa mover datos y tener tiempo de inactividad',
       endsRequests: 'la base de datos no envía peticiones', exists: 'ya están conectados', circle: 'eso haría un círculo', missing: 'ese edificio ya no existe',
     } as Record<string, string>,
