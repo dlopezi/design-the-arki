@@ -14,7 +14,7 @@ A browser puzzle game about software architecture for developers preparing for s
 
 - `main` is production: every push to `main` deploys to design.thearki.com. Never push or merge to `main` directly.
 - `develop` is integration. Start each change on `feature/<name>` from `develop`, in its own worktree (other sessions share the main checkout). Never run git commands that switch the branch of the main checkout without asking.
-- A feature goes back by Pull Request: `gh pr create --base develop`.
+- A feature goes back by Pull Request: `gh pr create --base develop`. Its body says `Fixes #N` for each Issue it finishes; a workflow closes them on merge into `develop`.
 - To publish, open a Pull Request from `develop` to `main` and merge it on GitHub, only when the user asks. Bump `version` in package.json, then tag `vX.Y.Z` and create a GitHub Release.
 - A local `pre-push` hook blocks pushes to `main` (`scripts/pre-push`; install with `cp scripts/pre-push .git/hooks/pre-push`).
 
