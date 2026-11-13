@@ -102,6 +102,30 @@ _Avoid_: Hotspot, overloaded node
 A component that stores large files and lets users upload and download them directly, so the app servers never carry the files.
 _Avoid_: File server, bucket (alone), blob store
 
+**CDN**:
+A component in front of an origin that answers a share of requests close to the user with very low latency; the rest go on to the origin.
+_Avoid_: Edge cache, mirror
+
+**API Gateway**:
+The single entry to the system: it checks and routes every request and applies the Client Limit.
+_Avoid_: Proxy, rate limiter (the limit is one of its functions)
+
+**Client Limit**:
+The most requests per second one client may send through the API Gateway; the rest are rejected.
+_Avoid_: Throttle, quota
+
+**DNS**:
+A component that decides which Region users reach, and switches them to the standby Region when the main one fails.
+_Avoid_: Name server, global load balancer
+
+**Region**:
+A complete copy of the base in another part of the world. A design has a main Region and may have a standby Region. Not the same as a map zone (edge, application, data).
+_Avoid_: Datacenter, zone, availability zone
+
+**Failover**:
+The switch to the standby Region when the main Region fails: the DNS sends users there and its Read Replica becomes the primary database.
+_Avoid_: Switchover, disaster recovery
+
 ### Requests
 
 **Request Type**:
