@@ -68,3 +68,15 @@ test('the campaign top bar opens the difficulty, the field manual and the option
   await page.getByRole('link', { name: 'Options' }).click();
   await expect(page.getByRole('heading', { name: 'Options' })).toBeVisible();
 });
+
+test('the campaign map scrolls with the mouse wheel, so the last chapter can be reached', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: {} })));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/#levels');
+
+  const lastChapter = page.getByRole('heading', { name: /^Chapter 3/ });
+  await expect(lastChapter).not.toBeInViewport();
+  await page.mouse.move(400, 400);
+  await page.mouse.wheel(0, 3000);
+  await expect(lastChapter).toBeInViewport();
+});
