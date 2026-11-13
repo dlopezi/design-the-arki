@@ -81,4 +81,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Llegan ocho subidas por segundo y, a los 10 segundos de la oleada, se cae uno de tus Workers. No se pierde nada: los mensajes siguen en la cola y los demás Workers siguen tomándolos. Es la entrega at-least-once (al menos una vez). El precio es que un trabajo que el Worker estaba procesando al caerse se entregará otra vez, así que un trabajo puede ejecutarse dos veces, y los Workers reales deben ser idempotentes: ejecutar un trabajo dos veces debe dar el mismo resultado que ejecutarlo una vez. ¿Tienes Workers suficientes para un mal día?',
     guidedHint: 'Cuando se cae un Worker, los mensajes siguen en la cola y los demás Workers deben tomarlos. Ten un Worker más de los que necesitas. Un trabajo puede ejecutarse dos veces, así que los Workers deben ser idempotentes.',
   },
+  '13-fresh-videos': {
+    title: 'Vídeos frescos',
+    brief: 'La gente espera que un vídeo nuevo esté listo a los pocos segundos de subirlo. Eso es la edad de la cola (Queue Age): cuánto lleva esperando el mensaje más antiguo. Aquí debe quedar por debajo de 5 segundos, y llegan 10 subidas por segundo. Un Backlog lento no es un error, pero mientras la edad de la cola supera su máximo tu reputación baja. Añade Workers hasta que se mantenga baja, pero cada Worker cuesta dinero. Los sistemas reales añaden y quitan Workers solos según la edad de la cola (autoscaling); aquí lo eliges tú.',
+    guidedHint: 'La edad de la cola crece cuando los Workers toman los trabajos más despacio de lo que llegan. Llegan diez trabajos por segundo y un Worker mediano toma cuatro: añade Workers hasta que puedan con todos.',
+  },
 };

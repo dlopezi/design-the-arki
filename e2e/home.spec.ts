@@ -9,7 +9,7 @@ test('the campaign map shows the mode each level was passed in, the star total, 
   })));
   await page.goto('/#levels');
 
-  await expect(page.getByRole('img', { name: '6 of 36 stars collected' })).toBeVisible();
+  await expect(page.getByRole('img', { name: '6 of 39 stars collected' })).toBeVisible();
   await expect(levelNode(page, 'Hello world').getByLabel('Hardest mode passed: God')).toBeVisible();
   await expect(levelNode(page, 'First spike').getByLabel('Hardest mode passed: Hard')).toBeVisible();
   await expect(levelNode(page, 'Bigger or more?').getByLabel('Hardest mode passed: Normal')).toBeVisible();
