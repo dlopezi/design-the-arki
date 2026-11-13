@@ -27,7 +27,36 @@ describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, 
     for (const id of ['async', 'backlog', 'queueAge', 'loadLeveling', 'competing', 'atLeastOnce', 'deadLetter', 'autoscaling']) expect(ids).toContain(id);
     expect(strings.manual.concepts.every(c => c.title && c.text && c.game)).toBe(true);
   });
+
+  it('explains the concepts of chapter 3', () => {
+    const ids = strings.manual.concepts.map(c => c.id);
+    for (const id of ['replicationLag', 'readYourWrites', 'sharding', 'shardKey', 'hotShard', 'presignedUrl', 'failover']) expect(ids).toContain(id);
+  });
+
+  it('names the real tools of the Read Replica and Object Storage', () => {
+    const replica = strings.archive.buildings.readReplica!.tools.join(' '), storage = strings.archive.buildings.objectStorage!.tools.join(' ');
+    expect(replica).toMatch(/PostgreSQL/);
+    expect(replica).toMatch(/RDS/);
+    expect(storage).toMatch(/S3/);
+    expect(storage).toMatch(/Google Cloud Storage/);
+  });
 });
+
+describe.each([['English', en, /consistent hashing/, /cross-shard/, /not simulated/], ['Spanish', es, /hashing consistente/, /entre shards/, /no se simula/]] as const)(
+  '%s Manual: what the game does not simulate',
+  (_name, strings, hashing, crossShard, notSimulated) => {
+    const concept = (id: string) => strings.manual.concepts.find(c => c.id === id)!;
+
+    it('says sharding in real life also has consistent hashing and cross-shard transactions', () => {
+      expect(concept('sharding').text).toMatch(hashing);
+      expect(concept('sharding').text).toMatch(crossShard);
+    });
+
+    it('says failover is explained, not simulated', () => {
+      expect(`${concept('failover').text} ${concept('failover').game}`).toMatch(notSimulated);
+    });
+  },
+);
 
 it('has the same concepts, in the same order, in English and Spanish', () => {
   expect(es.manual.concepts.map(c => c.id)).toEqual(en.manual.concepts.map(c => c.id));
