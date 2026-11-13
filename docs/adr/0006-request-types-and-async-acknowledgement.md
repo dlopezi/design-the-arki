@@ -11,4 +11,7 @@ The async request is the processing job, not the video file. In real systems the
 - Chapter 1 levels have one implicit request type and no queue, so they keep working unchanged.
 - Users cannot connect to a Message Queue directly; jobs reach it through an app server.
 - The game does not simulate duplicate deliveries, but the Worker-failure level and the Manual explain that at-least-once means a job can run twice, so Workers must be idempotent.
+- A Worker takes a `job` and passes on a `result` (a Request Type of its own, never in a level's mix): the database accepts watches and results, not jobs. So a job with no Worker has nowhere to go, and a job sent straight from the app server to a Worker is processed inside the request, slow and limited by that Worker.
+- Work released by a queue is not the users' any more: it does not count in p95, errors or money (the job was answered when it entered the queue). A Message a Worker or the database cannot take goes back to its queue, so the Backlog is never lost. A queue that still holds Messages cannot be removed.
+- A level that allows a Message Queue must set a maximum Queue Age; without one, a Backlog nobody empties would keep the Drain Phase going for ever.
 - Pub/sub (one message to many destinations) is left for a later chapter; it needs a fan-out rule.

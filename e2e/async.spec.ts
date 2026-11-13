@@ -68,3 +68,24 @@ test('finishing the last mission shows chapter 2 as complete on the campaign map
   await page.reload();
   await expect(page.getByText('Chapter complete')).toHaveCount(1);
 });
+
+test('the Manual: the Message queue and Worker entries are locked until their mission, and the Concepts tab explains async', async ({ page }) => {
+  await progressWith(page, chapterOne.slice(0, 3));
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /Message queue/ }).click();
+  await expect(page.getByRole('region', { name: /Message queue/ })).toContainText('Reach level 9 to unlock this building.');
+  await page.goto('/#manual/concepts');
+  for (const title of ['Async processing', 'Backlog and consumer lag', 'Queue Age', 'Load leveling', 'Competing consumers', 'At-least-once delivery and idempotency', 'Dead-letter queue', 'Autoscaling Workers']) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+});
+
+test('the Manual: once the mission is reached, the Message queue and Worker entries say what they are in real life', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /Message queue/ }).click();
+  await expect(page.getByText('Amazon SQS · RabbitMQ · Apache Kafka')).toBeVisible();
+  await expect(page.getByText(/video file does not go in the queue/)).toBeVisible();
+  await page.getByRole('button', { name: /Worker/ }).click();
+  await expect(page.getByText('Celery · Sidekiq')).toBeVisible();
+});
