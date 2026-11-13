@@ -22,7 +22,7 @@ test('a returning player continues at the next open level', async ({ page }) => 
     localStorage.setItem('design-the-arki:progress', JSON.stringify({ version: 1, tutorialDone: true, levels: { '01-hello-world': { bestStars: 3 }, '02-first-spike': { bestStars: 2 } } }));
   });
   await page.goto('/');
-  await expect(page.getByRole('img', { name: '5 of 33 stars collected' })).toBeVisible();
+  await expect(page.getByRole('img', { name: '5 of 36 stars collected' })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Chapter 1 · Core: 2 of 8 levels passed' })).toBeVisible();
   await page.getByRole('link', { name: 'Continue: level 3' }).click();
   await expect(page).toHaveURL(/#03-bigger-or-more$/);
