@@ -23,6 +23,27 @@ Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototyp
 - **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
 
+## Chapter roadmap (planned 2026-11-13)
+
+A learning order: each chapter builds on the ones before it, so no concept appears before its base. Not final; each chapter gets its own grilling session.
+
+| # | Chapter | What the player learns | Why here |
+|---|---|---|---|
+| 1 | Core (done) | Capacity, load balancer, cache, database | The base of everything |
+| 2 | Async | Message Queue, Worker, Backlog, Queue Age, idempotency | Slow work, the first interview topic after scaling |
+| 3 | Data scale | Read replicas and replication lag, sharding and hot shards, object storage | The database is the next limit; object storage finishes the video story |
+| 4 | Edge | CDN, API gateway, rate limiter, DNS and multi-region failover | A CDN is a cache in front of object storage (1 + 3); multi-region needs replicas (3) |
+| 5 | Events and pub/sub | Fan-out, topics, partitions, consumer groups, news feed (fan-out on write or on read) | Builds on the queue (2); partitions are sharding (3) |
+| 6 | Resilience | Timeouts, retries with backoff and retry storms, circuit breaker, graceful degradation | Needs a base with many parts that can fail (2–5) |
+| 7 | Observability | Metrics, logs, tracing, SLOs, error budgets, alerts; as a mechanic, the map is in fog until the player builds monitoring | Watching a system only makes sense once it is big |
+| 8 | Consistency and payments | Transactions, double booking, Saga, outbox, idempotency keys | The hardest topic; uses replication lag (3), events (5) and idempotency (2) |
+| 9 | Interview classics | URL shortener, chat, news feed, ticket sale, rate limiter | The final exam: everything together, as in a real interview |
+
+Rules for every chapter:
+- One new concept per mission.
+- The last mission of each chapter also uses buildings from earlier chapters, as a review.
+- Stories continue: the video app grows in chapters 2–4, a social network in 5–6, a ticket app in 7–8.
+
 ## Chapter 2: Async (planned 2026-11-13)
 
 Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: the game shows a real problem with the real solution and the real names, so players can use them in an interview.
