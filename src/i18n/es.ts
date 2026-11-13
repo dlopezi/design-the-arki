@@ -9,6 +9,7 @@ export const es: Strings = {
   levelSelect: {
     title: 'Design the Arki',
     subtitle: 'Diseña sistemas que aguanten tráfico real. Supera un nivel para desbloquear el siguiente.',
+    chapterDone: 'Capítulo completado',
     chapter: (n: number, name: string) => `Capítulo ${n} · ${name}`,
     play: 'Jugar',
     playBubble: '¡Juega!',

@@ -86,4 +86,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'La gente espera que un vídeo nuevo esté listo a los pocos segundos de subirlo. Eso es la edad de la cola (Queue Age): cuánto lleva esperando el mensaje más antiguo. Aquí debe quedar por debajo de 5 segundos, y llegan 10 subidas por segundo. Un Backlog lento no es un error, pero mientras la edad de la cola supera su máximo tu reputación baja. Añade Workers hasta que se mantenga baja, pero cada Worker cuesta dinero. Los sistemas reales añaden y quitan Workers solos según la edad de la cola (autoscaling); aquí lo eliges tú.',
     guidedHint: 'La edad de la cola crece cuando los Workers toman los trabajos más despacio de lo que llegan. Llegan diez trabajos por segundo y un Worker mediano toma cuatro: añade Workers hasta que puedan con todos.',
   },
+  '14-launch-day': {
+    title: 'Día de lanzamiento',
+    brief: 'La app de vídeo sale al público. Casi todos ven vídeos, 480 peticiones por segundo, y una de cada veinte es una subida que procesar. A mitad de la primera oleada se cae un Worker. Usa todo lo que has aprendido: un load balancer delante de varios app servers, una caché para que la base de datos pequeña no reciba una y otra vez la misma pregunta, y una cola con Workers que mantengan la edad de la cola por debajo de 20 segundos incluso sin uno de ellos.',
+    guidedHint: 'Los visionados van por el load balancer y los app servers hasta la caché y la base de datos. Las subidas van a la cola y a los Workers. Un Worker se caerá, así que ten uno de repuesto: la edad de la cola debe seguir baja incluso con un Worker menos.',
+  },
 };
