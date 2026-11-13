@@ -118,10 +118,14 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (reaches(s.links, to, from)) return 'circle';
   return null;
 }
+/** Whether the users connect to this building only for the Request Types it takes (Object Storage), not as the way in. */
+const isDirectEntrance = (s: GameState, id: string) => !!defaultCatalog[typeOf(s, id) ?? '']?.accepts;
+const hasEntrance = (s: GameState) => s.links.some(l => l.from === CLIENT && !isDirectEntrance(s, l.to));
 function addLink(s: GameState, from: string, to: string): GameState {
   if (linkProblem(s, from, to)) return s;
-  // The users reach the system through one entrance: a new one replaces the old.
-  const links = from === CLIENT ? s.links.filter(l => l.from !== CLIENT) : s.links;
+  // The users reach the system through one general entrance (a new one replaces the old), and may also have a direct one
+  // to a building that takes only some Request Types (Object Storage, for uploads).
+  const links = from === CLIENT ? s.links.filter(l => l.from !== CLIENT || isDirectEntrance(s, l.to) !== isDirectEntrance(s, to)) : s.links;
   return { ...s, links: [...links, { from, to }] };
 }
 /** The player connects two buildings (or the users to one). */
@@ -139,20 +143,21 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica');
+  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0];
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
-  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica'].includes(typeOf(st, l.to) ?? ''));
+  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
   if (b.type === 'loadBalancer') {
     next = addLink(next, CLIENT, b.id);
     for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'appServer') {
     if (lb) next = addLink(next, lb.id, b.id);
-    else if (!outOf(CLIENT)) next = addLink(next, CLIENT, b.id);
+    else if (!hasEntrance(next)) next = addLink(next, CLIENT, b.id);
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);
     for (const r of readReplicas) next = addLink(next, b.id, r.id);
+    if (storage) next = addLink(next, b.id, storage.id);
   } else if (b.type === 'cache') {
     // The cache goes in front of the database: app servers that went straight to it now go through the cache.
     if (db) next = { ...next, links: next.links.filter(l => !(l.to === db.id && typeOf(next, l.from) === 'appServer')) };
@@ -167,6 +172,9 @@ function autoLink(s: GameState, b: Building): GameState {
     // Reads come from the app servers; the link to the database is the replication.
     for (const a of apps) next = addLink(next, a.id, b.id);
     if (db) next = addLink(next, b.id, db.id);
+  } else if (b.type === 'objectStorage') {
+    // Files reach it through the app servers by default; connecting the users straight to it is the player's move.
+    for (const a of apps) next = addLink(next, a.id, b.id);
   } else if (b.type === 'messageQueue') {
     for (const a of apps) next = addLink(next, a.id, b.id);
     for (const w of workers) next = addLink(next, b.id, w.id);

@@ -74,3 +74,15 @@ test('level 18: a poor Shard Key makes a Hot Shard that is shown, the key cannot
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Hot Shard');
 });
+
+test('level 19: files sent through the app server lose, and the hint names Object Storage and the pre-signed URL pattern', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard']);
+  await openLevel(page, '19-big-uploads', 'guided');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 30_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Object Storage');
+  await expect(end).toContainText('pre-signed URL');
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { build, BUILD_PHASE_S, createGame, demolish, resize, rewire, runToEnd, setShardKey, setTtl, starsOf, type GameState } from '../realtime/game';
+import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setShardKey, setTtl, starsOf, type GameState } from '../realtime/game';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
 
@@ -37,6 +37,9 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
     if (c.params?.shardKey !== undefined) s = setShardKey(s, b()!.id, String(c.params.shardKey), level);
   }
   s = rewire(s);
+  // A player also draws the connections the default wiring does not make (the users straight to Object Storage).
+  const idOf = (refId: string) => (refId === 'client' ? 'client' : s.buildings.find(b => b.type === want.find(c => c.id === refId)!.type)!.id);
+  for (const [from, to] of level.referenceDesign.connections) if (!s.links.some(l => l.from === idOf(from) && l.to === idOf(to))) s = connect(s, idOf(from), idOf(to));
   log.push(`money left after building: $${Math.floor(s.money)}`);
   return { state: runToEnd(s, level), log };
 }

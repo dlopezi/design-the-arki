@@ -185,8 +185,10 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     // The busiest Shard sets the load and latency of a building split into Shards.
     const split = isSharded(b) ? serveShards(b, f, keys!, capacityOf(b, catalog)) : null;
     if (split) shards[id] = split.loads;
-    const ok = split ? split.served : Math.min(f, capacity);
-    load[id] = split ? Math.max(...split.loads) : capacity ? ok / capacity : 1;
+    // Some Request Types keep a building busy longer than a normal request (an upload on an app server): they weigh by their effort.
+    const demand = Object.entries(inflowBy[id] ?? {}).reduce((sum, [c, x]) => sum + x * (spec.effort?.[typeOfChannel(c)] ?? 1), 0) || f;
+    const ok = split ? split.served : demand > capacity ? (f * capacity) / demand : f;
+    load[id] = split ? Math.max(...split.loads) : capacity ? Math.min(1, demand / capacity) : 1;
     add(drop, id, f - ok);
     // What gets in is a share of each channel, the same share for all.
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };

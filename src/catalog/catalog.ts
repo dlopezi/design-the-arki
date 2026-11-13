@@ -5,9 +5,11 @@ import type { Catalog } from '../engine/types';
  * type, `watch`, so chapter 1 plays as it always did. Each building lists the types it `accepts` (all, when it does not say).
  */
 export const DEFAULT_REQUEST_TYPE = 'watch';
+/** A big file sent by a user: it keeps an app server busy for a long time (ADR-0007). */
+export const UPLOAD = 'upload';
 /** A read that must show the user's own latest change: only the primary database can answer it (ADR-0007). */
 export const READ_YOUR_WRITES = 'readYourWrites';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES];
+export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -20,6 +22,8 @@ export const catalog: Catalog = {
   },
   appServer: {
     primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false, scalesOut: true, acceptsClients: true, buildS: 5,
+    // Carrying a big file keeps an app server busy as long as ten normal requests.
+    effort: { [UPLOAD]: 10 },
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
       medium: { workers: 4, monthlyCost: 40, vcpu: 2 },
@@ -75,5 +79,12 @@ export const catalog: Catalog = {
     },
     defaultSize: 'medium',
     presentation: { zone: 'application', technology: 'Celery', instancePrefix: 'worker' },
+  },
+  // Chapter 3 (Data scale). Managed object storage: a fixed price, no settings, and a capacity that never fills in these
+  // levels. Users may connect to it straight to upload files (the pre-signed URL pattern); it takes uploads only.
+  objectStorage: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: true, acceptsClients: true,
+    accepts: [UPLOAD], prefers: [UPLOAD], buildS: 4,
+    presentation: { zone: 'data', technology: 'Amazon S3', hideCapacity: true },
   },
 };

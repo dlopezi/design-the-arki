@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { catalog, READ_YOUR_WRITES } from '../../catalog/catalog';
+import { catalog, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
@@ -42,7 +42,7 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
 /** The order buildings stand in a zone: the way a request travels. */
-const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database'];
+const ORDER = ['loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database', 'objectStorage'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -321,6 +321,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
     if (!type) return null;
+    // Uploads that do not go straight to Object Storage keep the app servers busy.
+    const hasUploads = (level.play.wave.mix?.[UPLOAD] ?? 0) > 0;
+    if (hasUploads && level.allowedComponents.includes('objectStorage') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'objectStorage')) return t.uploadHint;
     // A level that offers Shard Keys: a Hot Shard needs a better key; a database full on every Shard needs more Shards, not a cache.
     if (Object.values(flow?.shards ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotShardHint;
     if (type === 'database' && level.play.shardKeys) return t.shardHint;

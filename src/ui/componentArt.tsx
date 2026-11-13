@@ -14,6 +14,7 @@ export const componentArt: Record<string, { color: string }> = {
   messageQueue: { color: '#ec6ba0' },
   worker: { color: '#22b8cf' },
   readReplica: { color: '#7c8cff' },
+  objectStorage: { color: '#e0794a' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -137,6 +138,14 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <Cylinder cx={26} cy={52} r={11} h={27} p={p} />
     <path d="M34 34 L37 32" stroke={p.light} strokeWidth={2} />
     <circle cx={26} cy={25} r={2} fill={p.glow} />
+  </>,
+  // Warehouse of crates: stores the big files, and users can drop files straight into it.
+  objectStorage: p => <>
+    <IsoBox cx={32} cy={52} w={21} h={7} p={p} />
+    <IsoBox cx={23} cy={44} w={9} h={11} p={p} />
+    <IsoBox cx={41} cy={44} w={9} h={11} p={p} />
+    <IsoBox cx={32} cy={35} w={9} h={11} p={p} />
+    <path d="M32 12 L32 22 M27 17 L32 12 L37 17" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
   </>,
   // A copy of the database: two small silos side by side, with an arrow that carries the copy to the new one.
   readReplica: p => <>

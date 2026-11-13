@@ -124,6 +124,8 @@ export const en = {
   replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost with Read-your-writes in the wave and no connection from the app server to the primary database. */
   staleReadHint: 'A Read Replica copies each write from the primary a moment later, so it is always a little behind and a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
+  /** Lost with uploads in the wave while the users do not upload straight to Object Storage. */
+  uploadHint: 'A file sent through the app server keeps it busy as long as ten normal requests. Connect the users straight to Object Storage (the pre-signed URL pattern): the app server only hands out the signed address, and the file goes to Object Storage.',
   /** Lost with one Shard full while the others had room: a poor Shard Key. */
   hotShardHint: 'One Shard got most of the traffic while the others had room: a Hot Shard. Your Shard Key spreads the traffic badly, and more Shards would not fix it. Pick a better Shard Key in the Build Phase, one with many values that are used evenly, such as user id.',
   /** Lost with a full database in a level that offers Shard Keys. */
@@ -142,6 +144,7 @@ export const en = {
     messageQueue: 'answers the app server at once and keeps each job as a Message until a Worker takes it.',
     worker: 'takes Messages from the queue and processes them in the background; its size and instances set how many jobs it takes each second.',
     readReplica: 'a copy of the primary database that answers reads only; add instances to answer more reads each second.',
+    objectStorage: 'stores big files, with a fixed price and no settings. Users upload to it straight (the pre-signed URL pattern), so the app servers stay free.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
@@ -204,7 +207,7 @@ export const en = {
   clients: 'Clients',
   /** The fields a level can offer as a Shard Key. */
   shardKeyNames: { userId: 'User id', videoId: 'Video id', country: 'Country', date: 'Date' } as Record<string, string>,
-  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica' } as Record<string, string>,
+  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage' } as Record<string, string>,
   person: 'Person',
   systemName: 'Your system',
   softwareSystem: 'Software system',
@@ -329,6 +332,14 @@ export const en = {
         diff: 'Real Read Replicas are always a little behind the primary database (replication lag), so a user may not see their own change at once. A later mission covers this.',
         read: { label: 'AWS · Amazon RDS read replicas', url: 'https://aws.amazon.com/rds/features/read-replicas/' },
       },
+      objectStorage: {
+        role: 'Stores big files (videos, images, backups) and lets users upload and download them straight. The app server only hands out a signed address (a pre-signed URL), and the browser sends the file to Object Storage.',
+        when: 'As soon as users send big files. A file sent through the app server keeps it busy for a long time; Object Storage takes the load and costs little.',
+        tools: ['Amazon S3', 'Google Cloud Storage', 'Azure Blob Storage', 'MinIO'],
+        same: 'Users connect to it straight for uploads, and the app servers stay free. It has a fixed price and no settings, and it takes uploads only.',
+        diff: 'Real object storage also has buckets, access rules, storage classes, versioning, and a price per gigabyte stored and transferred. A CDN in front of it comes in a later chapter.',
+        read: { label: 'AWS · Amazon S3 pre-signed URLs', url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html' },
+      },
     } as Record<string, { role: string; when: string; tools: string[]; same: string; diff: string; read: { label: string; url: string } }>,
     pick: 'Choose a building in the list to read its card.',
   },
@@ -436,7 +447,7 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
