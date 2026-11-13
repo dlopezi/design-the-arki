@@ -1,0 +1,241 @@
+{
+  "id": "18-hot-shard",
+  "chapter": "Data scale",
+  "title": "Hot Shard",
+  "brief": "The video app is sharded, but something is wrong: one Shard is full while the others sit idle. Your Shard Key spreads the traffic badly. With country, most of your users live in one country, so one Shard gets most of the traffic. That is a Hot Shard. Adding more Shards will not fix it, because the same Shard still gets the same slice. A good Shard Key spreads the traffic evenly: user id does, country and date do not (all of today's writes land on the newest date). Change the Shard Key in the Build Phase. During the wave it is locked: in real life, changing it means moving data and downtime.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 900
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 700,
+  "starCostThresholds": [
+    500,
+    440
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "database"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 6
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "guidedHint": "One Shard is full while the others have room: country is a poor Shard Key, because most users live in one country. More Shards would not help. Pick user id as the Shard Key in the Build Phase: it spreads the traffic evenly.",
+  "play": {
+    "startMoney": 600,
+    "wave": {
+      "rps": 900,
+      "lengthS": 30,
+      "mix": {
+        "read": 0.3,
+        "write": 0.7
+      }
+    },
+    "starMoney": [
+      100,
+      400
+    ],
+    "shardKeys": {
+      "country": [
+        0.55,
+        0.15,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "date": [
+        0.7,
+        0.1,
+        0.05,
+        0.05,
+        0.04,
+        0.03,
+        0.03
+      ],
+      "userId": [
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.08333333333333333
+      ]
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 6
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 3,
+            "shardKey": "country"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 6
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 3,
+            "shardKey": "date"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 6
+          }
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "instances": 2,
+            "shardKey": "country"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 6
+        }
+      },
+      {
+        "id": "db",
+        "type": "database",
+        "params": {
+          "instances": 3,
+          "shardKey": "userId"
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ]
+    ]
+  }
+}

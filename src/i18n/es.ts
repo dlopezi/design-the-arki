@@ -123,6 +123,7 @@ export const es: Strings = {
   queueHint: 'Un trabajo enviado directo del app server al Worker se ejecuta dentro de la petición, y todos esperan por él. Pon una cola de mensajes en medio: responde al instante y el Worker toma el trabajo en segundo plano.',
   replicaHint: 'La base de datos primaria está llena de lecturas. Añade Read Replicas y conecta el app server a ellas: responden las lecturas y la primaria se queda con las escrituras. Las Read Replicas escalan las lecturas, no las escrituras.',
   staleReadHint: 'Una Read Replica copia cada escritura de la primaria un momento después, así que siempre va un poco por detrás y un usuario puede no ver su propio cambio en ella. Las lecturas Read-your-writes deben ir a la base de datos primaria: conecta el app server a ella.',
+  hotShardHint: 'Una Shard recibió casi todo el tráfico mientras las demás tenían hueco: una Hot Shard. Tu Shard Key reparte mal el tráfico y más Shards no lo arreglarían. Elige una mejor Shard Key en la fase de construcción, con muchos valores usados por igual, como el id de usuario.',
   shardHint: 'La base de datos está llena de escrituras, y una Read Replica no puede con las escrituras. Añade Shards: cada una es otra base de datos que guarda un trozo de los datos y atiende solo ese trozo. La Shard Key decide cómo se reparte el tráfico entre ellas.',
   backlogHint: 'El Backlog siguió creciendo y los mensajes esperaron demasiado: los Workers tomaron los trabajos más despacio de lo que llegaban. Añade Workers, o usa otros más grandes.',
   redundancyHint: 'Una instancia se cayó y las demás no pudieron con su tráfico: ten una instancia más de las que necesitas (N+1).',
@@ -456,6 +457,7 @@ export const es: Strings = {
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
       shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')} %`,
       shardKeyLocked: 'Bloqueada durante la oleada: re-sharding significa mover datos.',
+      hotShard: 'Hot Shard',
       link: 'Conexión', from: 'De', to: 'A', traffic: 'Tráfico ahora', removeLink: 'Quitar conexión (Supr)',
     },
     build: {

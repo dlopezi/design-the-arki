@@ -124,6 +124,8 @@ export const en = {
   replicaHint: 'The primary database is full of reads. Add Read Replicas and connect the app server to them: they answer the reads, and the primary keeps the writes. Read Replicas scale reads, not writes.',
   /** Lost with Read-your-writes in the wave and no connection from the app server to the primary database. */
   staleReadHint: 'A Read Replica copies each write from the primary a moment later, so it is always a little behind and a user may not see their own change there. Read-your-writes requests must go to the primary database: connect the app server to it.',
+  /** Lost with one Shard full while the others had room: a poor Shard Key. */
+  hotShardHint: 'One Shard got most of the traffic while the others had room: a Hot Shard. Your Shard Key spreads the traffic badly, and more Shards would not fix it. Pick a better Shard Key in the Build Phase, one with many values that are used evenly, such as user id.',
   /** Lost with a full database in a level that offers Shard Keys. */
   shardHint: 'The database is full of writes, and a Read Replica cannot take writes. Add Shards: each one is another database that holds a slice of the data and serves only that slice. The Shard Key decides how the traffic spreads over them.',
   /** Lost while Messages were waiting too long. */
@@ -461,6 +463,7 @@ export const en = {
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
       shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')}%`,
       shardKeyLocked: 'Locked during the wave: re-sharding means moving data.',
+      hotShard: 'Hot Shard',
       link: 'Connection', from: 'From', to: 'To', traffic: 'Traffic now', removeLink: 'Remove connection (Delete)',
     },
     build: {
