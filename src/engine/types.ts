@@ -44,6 +44,15 @@ export type StationPrimitive = {
   /** The Request Type it passes on, when it turns what it takes into something else (a Worker saves the result of a job). */
   emits?: string;
   /**
+   * Request Types it gets before any other building that also accepts them: a caller that is connected to it sends
+   * those types here, and to the others only when it is not (a Read Replica takes the reads, the primary database the rest).
+   */
+  prefers?: string[];
+  /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
+  balanced?: boolean;
+  /** The type of building whose data it keeps a copy of: it may be connected to it without ending in a dead end (replication). */
+  follows?: string;
+  /**
    * Queue primitive (real-time play): it answers at once and holds what reaches it as a Backlog that lasts from one
    * tick to the next, then releases it to the buildings behind it at their total capacity. Never drops the Backlog.
    */

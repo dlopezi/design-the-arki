@@ -88,8 +88,9 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   let lostInBackground = 0;
 
   // Behind a component that spreads requests (a load balancer, a queue) every serving instance works; otherwise only the first.
+  // A building marked `balanced` (a Read Replica) is spread over by whoever calls it.
   for (const b of buildings) {
-    const spread = links.some(l => l.to === b.id && l.from !== CLIENT && catalog[byId.get(l.from)?.type ?? '']?.distributes);
+    const spread = catalog[b.type]?.balanced || links.some(l => l.to === b.id && l.from !== CLIENT && catalog[byId.get(l.from)?.type ?? '']?.distributes);
     usable[b.id] = spread ? serving(b.id) : Math.min(1, serving(b.id));
   }
   // Links never make a circle (the game refuses them), so a depth-first order from the users is a valid order.
@@ -126,6 +127,9 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     // so the error shows at the building that has nowhere to send it (as a dead end does today).
     let targets = open.filter(l => canFinish(l.to, type)).map(l => l.to);
     if (!targets.length) targets = open.filter(l => accepts(l.to, type)).map(l => l.to);
+    // A building that prefers this type (a Read Replica for reads) gets it before the others that also accept it.
+    const preferred = targets.filter(to => specOf(to)?.prefers?.includes(type));
+    if (preferred.length) targets = preferred;
     if (!targets.length) { add(drop, from, amount); if (isBackground(channel)) lostInBackground += amount; return; }
     for (const to of targets) {
       add(edge, `${from}>${to}`, amount / targets.length); add(inflow, to, amount / targets.length);

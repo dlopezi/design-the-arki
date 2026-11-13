@@ -32,8 +32,9 @@ describe('Spanish level texts', () => {
 });
 
 describe('level files', () => {
-  it('ships the 8 levels of chapter 1 and then the Async chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day']);
+  it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads']);
+    expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
   for (const level of allLevels()) {
@@ -98,6 +99,15 @@ describe('level files', () => {
       expect(allLevels('en').filter(l => l.chapter === 'Core').every(l => l.play.wave.mix === undefined)).toBe(true);
     });
 
+    it('accepts reads and writes as Request Types', () => {
+      expect(parseLevel(withMix({ read: 0.9, write: 0.1 })).play.wave.mix).toEqual({ read: 0.9, write: 0.1 });
+    });
+
+    it('needs the primary database in a level that allows a Read Replica', () => {
+      const data = allLevels('en').find(l => l.id === '15-too-many-reads')!;
+      expect(() => parseLevel({ ...data, allowedComponents: ['loadBalancer', 'appServer', 'readReplica'] })).toThrow(/readReplica must allow a database/);
+    });
+
     it('needs a message queue and a worker in a level whose wave has jobs', () => {
       expect(() => parseLevel({ ...base, allowedComponents: ['appServer', 'database'] })).toThrow(/must allow a messageQueue and a worker/);
       expect(() => parseLevel({ ...base, allowedComponents: ['appServer', 'database', 'messageQueue'] })).toThrow(/messageQueue and a worker/);
@@ -125,6 +135,31 @@ describe('level files', () => {
     expect(play(without('loadBalancer', ['client', 'api']))).toBe('lost');
     expect(play(without('cache', ['api', 'db']))).toBe('lost');
     expect(play({ ...ref, components: ref.components.map(c => (c.type === 'appServer' ? { ...c, params: {} } : c)) })).toBe('lost'); // one app server
+  });
+
+  describe('15-too-many-reads: Read Replicas scale reads, not writes', () => {
+    const level = allLevels('en').find(l => l.id === '15-too-many-reads')!;
+    const ref = level.referenceDesign;
+    const isReplica = (id: string) => ref.components.find(c => c.id === id)?.type === 'readReplica';
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level);
+    const replicas = (n: number) => ({ ...ref, components: ref.components.map(c => (c.type === 'readReplica' ? { ...c, params: { ...c.params, instances: n } } : c)) });
+
+    it('wins with Read Replicas and loses with the primary database alone, which is full of reads', () => {
+      expect(play(ref).phase).toBe('won');
+      const alone = { components: ref.components.filter(c => c.type !== 'readReplica'), connections: ref.connections.filter(([a, b]) => !isReplica(a) && !isReplica(b)) };
+      expect(play(alone).phase).toBe('lost');
+    });
+
+    it('needs enough replica instances: one is too few for the reads', () => {
+      expect(play(replicas(1)).phase).toBe('lost');
+      expect(play(replicas(2)).phase).toBe('won');
+    });
+
+    it('is a mix of reads and writes with no cache on offer: the data must be fresh', () => {
+      expect(Object.keys(level.play.wave.mix!).sort()).toEqual(['read', 'write']);
+      expect(level.allowedComponents).toContain('readReplica');
+      expect(level.allowedComponents).not.toContain('cache');
+    });
   });
 
   it('13-fresh-videos: fewer Workers are cheaper but let the Queue Age pass its maximum, which costs reputation', () => {

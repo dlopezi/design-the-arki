@@ -1,0 +1,240 @@
+{
+  "id": "15-too-many-reads",
+  "chapter": "Data scale",
+  "title": "Too many reads",
+  "brief": "Your video app is a hit: 480 requests arrive every second, and nine in ten only read data (video lists, comments, view counts). One primary database serves about 400 requests a second, so it is full. The data must be fresh, so a cache does not help here. A Read Replica is a copy of the database that answers reads only. Add Read Replicas: the app server sends the reads to them and keeps the writes for the primary database. Replicas scale reads, not writes.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 480
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 600,
+  "starCostThresholds": [
+    400,
+    340
+  ],
+  "allowedComponents": [
+    "loadBalancer",
+    "appServer",
+    "database",
+    "readReplica"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "readReplica": {
+      "sizes": [
+        "small",
+        "medium"
+      ],
+      "maxInstances": 4
+    }
+  },
+  "guidedHint": "The primary database is full of reads. Add Read Replicas: the app server sends the reads to them, and the primary keeps the writes. Reads are 9 in 10 requests, so one replica is not enough.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 480,
+      "lengthS": 30,
+      "mix": {
+        "read": 0.9,
+        "write": 0.1
+      }
+    },
+    "starMoney": [
+      100,
+      250
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "replicas",
+          "type": "readReplica",
+          "params": {
+            "instances": 1
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "replicas"
+        ],
+        [
+          "replicas",
+          "db"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 3
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "replicas",
+          "type": "readReplica",
+          "params": {
+            "instances": 2
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "replicas",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 3
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "replicas",
+        "type": "readReplica",
+        "params": {
+          "instances": 2
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "api",
+        "replicas"
+      ],
+      [
+        "replicas",
+        "db"
+      ]
+    ]
+  }
+}

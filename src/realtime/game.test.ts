@@ -332,3 +332,83 @@ describe('async work: a queue answers at once and Workers take the jobs in the b
     expect(build(s, 'messageQueue', asyncLevel)).toBe(s);
   });
 });
+
+describe('data scale: Read Replicas answer the reads and the primary database keeps the writes', () => {
+  // A small database and a small Read Replica instance each serve 400 requests per second.
+  const dataLevel = (mix: Record<string, number>, rps = 100): GameLevel => ({
+    allowedComponents: ['appServer', 'database', 'readReplica'],
+    componentOptions: { readReplica: { maxInstances: 4 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 500, wave: { rps, lengthS: 30, mix }, starMoney: [100, 200] },
+  });
+  const design = (replicas: number, links: [string, string][]): Design => ({
+    components: [{ id: 'api', type: 'appServer', params: { size: 'large' } }, { id: 'db', type: 'database' },
+      ...(replicas ? [{ id: 'rep', type: 'readReplica', params: { instances: replicas } }] : [])],
+    connections: [['client', 'api'], ...links],
+  });
+  const withReplica: [string, string][] = [['api', 'db'], ['api', 'rep'], ['rep', 'db']];
+  const play = (l: GameLevel, d: Design, seconds = 5) => run(callNow(createGame(l, d)), seconds, l);
+
+  it('sends reads to the Read Replica and writes to the primary database', () => {
+    const s = play(dataLevel({ read: 0.9, write: 0.1 }), design(1, withReplica));
+    expect(s.flow!.inflow.rep).toBeCloseTo(90);
+    expect(s.flow!.inflow.db).toBeCloseTo(10);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('a write that reaches only a Read Replica is an error: a replica answers reads only', () => {
+    const s = play(dataLevel({ write: 1 }), design(1, [['api', 'rep'], ['rep', 'db']]));
+    expect(s.flow!.errors).toBe(1);
+  });
+
+  it('reads go to the primary database when no Read Replica is connected', () => {
+    const s = play(dataLevel({ read: 1 }), design(1, [['api', 'db'], ['rep', 'db']]));
+    expect(s.flow!.inflow.db).toBeCloseTo(100);
+    expect(s.flow!.inflow.rep ?? 0).toBe(0);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('Read Replicas scale reads: instances share them without a load balancer, and one is not enough for 600 reads a second', () => {
+    const l = { ...dataLevel({ read: 1 }, 600), allowedComponents: ['loadBalancer', 'appServer', 'database', 'readReplica'] };
+    // Two large app servers behind a load balancer can take the 600; the Read Replicas are what is under test.
+    const wide = (replicas: number): Design => ({
+      components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { size: 'large', instances: 2 } }, { id: 'db', type: 'database' },
+        { id: 'rep', type: 'readReplica', params: { instances: replicas } }],
+      connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db'], ['api', 'rep'], ['rep', 'db']],
+    });
+    expect(play(l, wide(1)).flow!.errors).toBeCloseTo(1 / 3);
+    expect(play(l, wide(2)).flow!.errors).toBe(0);
+  });
+
+  it('a Read Replica cannot take the reads off a database that has to take them as writes: writes stay on the primary however many replicas', () => {
+    const l = dataLevel({ write: 1 }, 600);
+    expect(play(l, design(4, withReplica)).flow!.errors).toBeCloseTo(1 / 3); // the primary serves 400 of 600
+  });
+
+  it('a Read Replica can be connected to the database it copies, but nothing else comes out of it', () => {
+    const l = dataLevel({ read: 1 });
+    const s = createGame(l, design(1, []));
+    expect(connect(s, 'rep', 'db').links.map(x => `${x.from}>${x.to}`)).toContain('rep>db');
+    const refused = connect(connect(s, 'api', 'rep'), 'rep', 'api');
+    expect(refused.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'endsRequests' });
+    expect(connect(s, 'db', 'rep').events.at(-1)).toMatchObject({ kind: 'refused' });
+  });
+
+  it('new buildings connect app server → Read Replica → database by themselves, in any order', () => {
+    const l = dataLevel({ read: 1 });
+    const built = (order: string[]) => named(order.reduce((acc, type) => build(acc, type, l), createGame(l, empty))).sort();
+    const wired = ['appServer>database', 'appServer>readReplica', 'client>appServer', 'readReplica>database'];
+    expect(built(['appServer', 'database', 'readReplica'])).toEqual(wired);
+    expect(built(['readReplica', 'database', 'appServer'])).toEqual(wired);
+    expect(built(['database', 'readReplica', 'appServer'])).toEqual(wired);
+  });
+
+  it('a Read Replica has sizes and instances, and costs by size', () => {
+    const l = dataLevel({ read: 1 });
+    let s = build(createGame(l, empty), 'readReplica', l);
+    expect(s.money).toBe(500 - 50);
+    s = build(s, 'readReplica', l);
+    expect(s.buildings.find(b => b.type === 'readReplica')!.instances).toHaveLength(2);
+    expect(resize(s, s.buildings[0]!.id, 'medium').money).toBeLessThan(s.money);
+  });
+});

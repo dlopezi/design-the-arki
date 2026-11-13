@@ -71,6 +71,10 @@ const levelSchema = z.object({
   if (mix && (mix.job ?? 0) > 0 && !(allowed.has('messageQueue') && allowed.has('worker'))) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has jobs must allow a messageQueue and a worker' });
   }
+  // A Read Replica is a copy of the primary database: without one there is nothing to copy (ADR-0007).
+  if (allowed.has('readReplica') && !allowed.has('database')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that allows a readReplica must allow a database' });
+  }
   // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
   if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
     ctx.addIssue({ code: 'custom', path: ['requirements', 'maxQueueAgeS'], message: 'A level that allows a messageQueue must set a maximum Queue Age' });
