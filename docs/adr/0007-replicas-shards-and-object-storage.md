@@ -13,3 +13,11 @@ For the Data scale chapter the database stops being one building. A **Read Repli
 - Users may connect to Object Storage (unlike the Message Queue); the connection rules must allow it for upload traffic only.
 - Level tests prove each Reference Design wins and each starting design, left unchanged, loses (ADR-0005), including a Hot Shard design.
 - Cross-shard transactions and consistent hashing are not modelled; the Manual mentions them.
+
+## As built (levels 15 to 20)
+
+- **Shards are instances of the database**, only in a level that offers Shard Keys (`play.shardKeys`). Each value of a key lives on shard `value mod shards`, so a key with few values or uneven weights makes a Hot Shard. A Shard that is down or still being built loses its slice. The Shard Key is locked after the build phase.
+- **Replication Lag** is the pile of writes a Read Replica has not applied, divided by its apply rate. A Read Replica applies `applyShare` (a quarter) of one instance's capacity in writes per second, so a bigger size applies faster and more instances do not help. The pile stays as it was while the replica is not serving.
+- **Read-your-writes** and plain reads need no filter: only the primary database accepts Read-your-writes, and a Read Replica gets the reads before the primary does (`prefers`).
+- **Upload** is a Request Type with an `effort` of 10 on an app server. Object Storage takes uploads only and may be a second, direct entrance for the users, but only in a level that has uploads. Connecting the users to it is the player's move; the default wiring sends files through the app servers.
+- **Not done**: the Concepts tab is not locked by progress (as in chapters 1 and 2), and a Read Replica applying writes does not reduce its read capacity.
