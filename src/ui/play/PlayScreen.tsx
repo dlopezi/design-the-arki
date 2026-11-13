@@ -503,8 +503,13 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
-        {maxLag !== undefined && <span className="play-res play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
-        {hasQueue && <span className="play-res play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
+        {(maxLag !== undefined || hasQueue) && (
+          // Queue Age and Replication Lag share one capsule, one line each, so the top bar does not outgrow a tablet.
+          <span className="play-res play-gauges">
+            {maxLag !== undefined && <span className="play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
+            {hasQueue && <span className="play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
+          </span>
+        )}
         <span className="play-res" role="meter" aria-label={t.rt.reputation} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(game.reputation)}>
           ❤ <span className="play-rep"><span style={{ width: `${game.reputation}%`, background: game.reputation < 35 ? 'var(--bad)' : game.reputation < 70 ? 'var(--warn)' : 'var(--ok)' }} /></span>{Math.round(game.reputation)}%
         </span>

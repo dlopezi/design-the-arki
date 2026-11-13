@@ -71,9 +71,9 @@ Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: 
   If the owner prefers another look (for example Messages piling up on the map), change `PlayScreen.tsx` only: the game keeps `backlog`, `queueAge` and their per-second history.
 - **Status (2026-11-13)**: the six missions (`09`–`14`), the Message Queue and Worker, the Drain Phase and the Manual entries are built, in English and Spanish.
 
-## Chapter 3: Data scale (planned 2026-11-13)
+## Chapter 3: Data scale (planned 2026-11-13, built as levels 15 to 20)
 
-Settled in a grilling session; engine rules in ADR-0007. Same rule as chapter 2: a real problem with the real solution and the real names, so players can use them in an interview. Built after chapter 2 is merged (it uses Request Types and the stateful rules from ADR-0006).
+Settled in a grilling session; engine rules in ADR-0007. Same rule as chapter 2: a real problem with the real solution and the real names, so players can use them in an interview. Built after chapter 2 was merged (it uses Request Types and the stateful rules from ADR-0006). What was built, and where it differs from the plan, is in ADR-0007.
 
 - **Story**: the video app is a hit. Many people watch (reads), the data grows (writes and size), and uploads are big files. This also closes the open point of ADR-0006: the file goes to object storage and only the job goes to the queue.
 - **New buildings**: **Read Replica** (own building, connected to the database; answers reads only) and **Object Storage** (fixed price, no settings, like the Message Queue). **Sharding** is not a building: the database gets two settings, number of **Shards** and the **Shard Key**; each Shard is drawn as its own building with its own load.
