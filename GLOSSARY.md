@@ -27,8 +27,12 @@ The mark on a level showing the hardest mode the player has passed it in.
 _Avoid_: Medal, trophy
 
 **Requirements**:
-The SLA a design must meet to pass a level: latency, availability and throughput targets.
+The SLA a design must meet to pass a level: latency, availability and throughput targets, and in async levels a maximum Queue Age.
 _Avoid_: Goals, objectives
+
+**Queue Age**:
+How long the oldest Message in a Message Queue has been waiting; async levels set a maximum.
+_Avoid_: Processing deadline, delay (consumer lag is the Kafka name, usually counted in messages)
 
 **Budget**:
 The maximum monthly cost a design may have in a level.
@@ -57,6 +61,36 @@ _Avoid_: Replica (reserved for database read replicas), node, server
 **Connection**:
 A directed link along which requests flow from one component to another.
 _Avoid_: Edge, wire, link
+
+**Concurrency**:
+How many requests one Instance serves at the same time.
+_Avoid_: Workers (reserved for the Worker component), threads (wrong for Node.js and databases)
+
+**Waiting Line**:
+The requests waiting inside an Instance until its Concurrency has room.
+_Avoid_: Queue (reserved for the Message Queue component)
+
+**Message Queue**:
+A component that accepts async requests, answers the caller at once and holds them as Messages until a Worker takes them.
+_Avoid_: Broker, queue (alone)
+
+**Worker**:
+A component that takes Messages from a Message Queue and processes them in the background; several Workers share one queue without a load balancer.
+_Avoid_: Consumer, job runner
+
+### Requests
+
+**Request Type**:
+A kind of request in a level's traffic (for example watching a video or processing an uploaded one); it decides which component the request needs.
+_Avoid_: Work class, request kind
+
+**Message**:
+An async request while it sits in a Message Queue or is processed by a Worker; it is not lost when a Worker goes down.
+_Avoid_: Job, event, task
+
+**Backlog**:
+The Messages waiting in a Message Queue at a given moment.
+_Avoid_: Queue length, lag
 
 **Building**:
 A component as it stands on the map, always called by its real name (app server, database…). Each of its instances is drawn as its own small isometric building in the type's colour.
@@ -87,6 +121,10 @@ _Avoid_: Module, plugin, DLC
 **Wave**:
 The one burst of users a level sends after the build phase, at a set number of requests per second for a set time (ADR-0005).
 _Avoid_: Run, round, attack
+
+**Drain Phase**:
+The time after the wave, in async levels, while Workers empty the Backlog; the level ends when it is empty.
+_Avoid_: Overtime, cooldown
 
 **Build Phase**:
 The first 30 seconds of a level, before the wave, when the player builds; "Release to production" ends it early for a bonus.

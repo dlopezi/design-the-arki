@@ -23,6 +23,25 @@ Real-time strategy play, chosen 2026-11-11 after a playable prototype (`prototyp
 - **Feedback on failure**: the end dialog names the component that dropped the most requests with a short **Hint** (not in God mode); during play, a red badge marks each building that loses requests.
 - **Progression**: linear **Chapters** by topic; each level unlocks the next and each chapter introduces new components.
 
+## Chapter 2: Async (planned 2026-11-13)
+
+Settled in a grilling session; engine rules in ADR-0006. Rule for every choice: the game shows a real problem with the real solution and the real names, so players can use them in an interview.
+
+- **Story**: a new product, a video app. Watching a video is synchronous (cache or database); processing an uploaded video is an async job. The file itself goes to object storage, which the Manual explains and the Data scale chapter adds.
+- **New buildings**: **Message Queue** (no settings, fixed price, like a managed queue) and **Worker** (instances and sizes; several Workers share one queue without a load balancer: competing consumers). Workers write the result to the database, so the queue protects it from spikes (load leveling). Users reach the queue only through an app server. Pub/sub waits for a later chapter.
+- **Rules**: a job is answered when it enters the queue (like `202 Accepted`). The **Backlog** is kept, also when a Worker goes down (at-least-once delivery). Reputation falls while the **Queue Age** is over the level's maximum. After the wave a **Drain Phase** runs until the Backlog is empty, with maintenance still charged.
+- **Names**: the per-instance "workers" become **Concurrency** and "Queue size" becomes **Waiting line**, so the new Worker and Message Queue are not confused with them.
+- **Unlock**: after the last level of chapter 1.
+- **Six levels**, each with one lesson:
+  1. *Slow processing*: processing a video in the request makes p95 huge; a queue and a Worker answer at once.
+  2. *Watch and upload*: mixed traffic; only the slow work goes async, watches stay synchronous.
+  3. *Upload rush*: a burst of uploads; the queue absorbs the spike and protects the database. The brief also shows the limit: a queue absorbs peaks, not a load that stays above Worker capacity, where the Backlog grows without end.
+  4. *A Worker goes down*: the job goes back to the queue and nothing is lost; the hint explains at-least-once and why Workers must be idempotent (a job may run twice).
+  5. *Fresh videos*: a tight maximum Queue Age; more Workers against cost (the Manual mentions autoscaling Workers on queue age).
+  6. *Launch day*: everything together, with a burst and a Worker outage.
+- **Manual**: Buildings entries for Message Queue and Worker with *In real life* (Amazon SQS, RabbitMQ, Kafka, Celery or Sidekiq workers); Concepts for async processing, backlog, queue age and consumer lag, at-least-once and idempotency, load leveling, dead-letter queue (explained, not simulated).
+- **To decide with a prototype**: how the map and console show the Backlog and the Queue Age.
+
 ## Game screen
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
