@@ -33,7 +33,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 
@@ -218,6 +218,30 @@ describe('level files', () => {
       expect(play(ref)).toBe('won');
       expect(play(shards(1))).toBe('lost');
       expect(play(shards(2))).toBe('lost');
+    });
+  });
+
+  describe('18-hot-shard: a poor Shard Key makes a Hot Shard, and more Shards do not fix it', () => {
+    const level = allLevels('en').find(l => l.id === '18-hot-shard')!;
+    const ref = level.referenceDesign;
+    const play = (design: typeof ref) => runToEnd(callNow(createGame(level, design)), level).phase;
+    const withDatabase = (params: Record<string, unknown>) => ({ ...ref, components: ref.components.map(c => (c.type === 'database' ? { ...c, params } : c)) });
+
+    it('wins with an even Shard Key, and loses with a skewed one: the Hot Shard is full while the others have room', () => {
+      expect(play(ref)).toBe('won');
+      expect(play(withDatabase({ instances: 3, shardKey: 'country' }))).toBe('lost');
+      expect(play(withDatabase({ instances: 3, shardKey: 'date' }))).toBe('lost');
+    });
+
+    it('is not fixed by adding Shards while the key stays skewed', () => {
+      expect(play(withDatabase({ instances: 4, shardKey: 'country' }))).toBe('lost');
+    });
+
+    it('starts on a skewed key in the starting designs, so the player has to notice it', () => {
+      for (const mode of ['guided', 'normal', 'hard'] as const) {
+        const key = level.startingDesigns[mode].components.find(c => c.type === 'database')!.params?.shardKey;
+        expect(['country', 'date'], mode).toContain(key);
+      }
     });
   });
 

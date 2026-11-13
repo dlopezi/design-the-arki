@@ -22,6 +22,15 @@ export function shardShares(weights: number[], shards: number): number[] {
   return shares;
 }
 /**
+ * The Hot Shard among the loads of a building's Shards: the busiest one when it is (nearly) full while another still
+ * has room, which is what a poor Shard Key does. When every Shard is full, the answer is more Shards, so none is hot.
+ */
+export function hotShardOf(loads: number[] | undefined): number | null {
+  if (!loads || loads.length < 2) return null;
+  const busiest = Math.max(...loads);
+  return busiest >= 0.9 && Math.min(...loads) < 0.7 ? loads.indexOf(busiest) : null;
+}
+/**
  * A building split into Shards (ADR-0007): the Shard Key sends each Shard its slice of `rps`, and a Shard serves only
  * its own slice, up to its capacity. A Shard that is down or still being built serves nothing, so a slice that reaches
  * it is lost (it counts as full). Returns each Shard's load (0–1) and the requests per second served in all.

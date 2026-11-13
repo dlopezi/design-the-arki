@@ -59,3 +59,18 @@ test('level 17: one database cannot take the writes, the hint says to add Shards
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Add Shards');
 });
+
+test('level 18: a poor Shard Key makes a Hot Shard that is shown, the key cannot be changed during the wave, and the hint names the Hot Shard', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write']);
+  await openLevel(page, '18-hot-shard', 'normal');
+  await page.locator('[data-node-id="db"]').first().click();
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await expect(page.locator('.play-unit .sub', { hasText: 'Hot Shard' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('group', { name: 'Shard Key' }).getByRole('button', { name: 'User id' }).click();
+  await expect(page.locator('.play-log')).toContainText('locked');
+  await page.getByRole('button', { name: '4×' }).click();
+  const end = page.getByRole('dialog');
+  await expect(end).toBeVisible({ timeout: 30_000 });
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Hot Shard');
+});

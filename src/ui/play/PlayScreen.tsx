@@ -3,7 +3,7 @@ import { catalog, READ_YOUR_WRITES } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
-import { CLIENT, capacityOf, hitRateOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
+import { CLIENT, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
   demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
@@ -321,7 +321,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
     if (!type) return null;
-    // A level that offers Shard Keys: a full database needs Shards, not a cache.
+    // A level that offers Shard Keys: a Hot Shard needs a better key; a database full on every Shard needs more Shards, not a cache.
+    if (Object.values(flow?.shards ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotShardHint;
     if (type === 'database' && level.play.shardKeys) return t.shardHint;
     // A size the level does not let the player change must not be the advice.
     const fixed = (level.componentOptions[type]?.sizes?.length ?? 2) < 2;
@@ -349,7 +350,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     // A queue shows its Queue Age as a gauge that fills towards the level's maximum, instead of a load bar.
     const isQueue = !!catalog[b.type]!.queue, maxAge = level.requirements.maxQueueAgeS, age = game.queueAge[b.id] ?? 0;
     const ageShare = isQueue && maxAge ? Math.min(1, age / maxAge) : 0;
-    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : backlogNote;
+    // The Shard that gets most of the traffic while the others have room says so on the map.
+    const hotNote = hotShardOf(flow?.shards[b.id]) === k ? `⚠ ${t.rt.inspector.hotShard}` : '';
+    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : warn ? `⚠ ${warn}` : hotNote || backlogNote;
     const selected = selectedBuilding?.id === b.id;
     return (
       <button key={`${b.id}-${k}`} className={`play-unit ${inst.buildLeftS > 0 ? 'building' : ''} ${inst.down ? 'down' : ''} ${selected ? 'selected' : ''} ${warn ? 'warn' : ''} ${tutorialType === b.type ? 'tutorial-target' : ''}`}
@@ -435,6 +438,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <dt>{i.state}</dt><dd>{b.instances.some(x => x.down) ? i.down : serving === b.instances.length ? i.serving : i.building(Math.ceil(Math.max(...b.instances.map(x => x.buildLeftS))))}</dd>
         {hasInstances(b.type) && <><dt>{sharded ? i.shards : i.instances}</dt><dd>{serving}/{b.instances.length}</dd></>}
         {sharded && b.instances.length > 1 && flow?.shards[b.id] && <><dt>{i.load}</dt><dd>{i.shardLoad(flow.shards[b.id]!)}</dd></>}
+        {hotShardOf(flow?.shards[b.id]) !== null && <><dt>{i.hotShard}</dt><dd className="bad">{instanceNames.get(b.id)?.[hotShardOf(flow?.shards[b.id])!]}</dd></>}
         <dt>{i.sendsTo}</dt><dd>{spec.endsRequests && !spec.shortcut ? i.answers : outs}</dd>
         <dt>{i.receives}</dt><dd>{i.perSecond(Math.round(flow?.inflow[b.id] ?? 0))}</dd>
         {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
@@ -457,7 +461,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <fieldset className="play-sizes" aria-label={i.shardKey}>
           <legend className="muted">{i.shardKey}{!building && <> · {i.shardKeyLocked}</>}</legend>
           {shardKeys.map(key => (
-            <button key={key} className={`btn ${key === shardKey ? 'on' : ''}`} aria-pressed={key === shardKey} disabled={key === shardKey || !building}
+            <button key={key} className={`btn ${key === shardKey ? 'on' : ''}`} aria-pressed={key === shardKey} disabled={key === shardKey}
               onClick={() => setGame(g => setShardKey(g, b.id, key, level))}>{t.shardKeyNames[key] ?? key}</button>
           ))}
         </fieldset>
