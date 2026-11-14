@@ -48,6 +48,16 @@ describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, 
     for (const id of ['replicationLag', 'readYourWrites', 'sharding', 'shardKey', 'hotShard', 'presignedUrl', 'failover']) expect(ids).toContain(id);
   });
 
+  it('explains the concepts of chapter 5', () => {
+    const ids = strings.manual.concepts.map(c => c.id);
+    for (const id of ['pubSub', 'consumerGroup', 'partitions', 'consumerLag', 'rebalance', 'fanOut', 'celebrity', 'retention', 'exactlyOnce', 'snsSqs']) expect(ids).toContain(id);
+  });
+
+  it('names the real tools of the Topic', () => {
+    const tools = strings.archive.buildings.topic!.tools.join(' ');
+    for (const tool of ['Kafka', 'Kinesis', 'Pub/Sub', 'SNS', 'Redpanda']) expect(tools).toMatch(tool);
+  });
+
   it('names the real tools of the Read Replica and Object Storage', () => {
     const replica = strings.archive.buildings.readReplica!.tools.join(' '), storage = strings.archive.buildings.objectStorage!.tools.join(' ');
     expect(replica).toMatch(/PostgreSQL/);
@@ -69,6 +79,10 @@ describe.each([['English', en, /consistent hashing/, /cross-shard/, /not simulat
 
     it('says what failover leaves out: the last writes lost, and health checks', () => {
       expect(`${concept('failover').text} ${concept('failover').game}`).toMatch(notSimulated);
+    });
+
+    it('says retention, replay, exactly-once, SNS + SQS and the order of events are not simulated', () => {
+      for (const id of ['retention', 'exactlyOnce', 'snsSqs', 'partitions']) expect(`${concept(id).text} ${concept(id).game}`, id).toMatch(notSimulated);
     });
 
     it('says RPO, cold standby, active-active and the cache purge are not simulated', () => {
