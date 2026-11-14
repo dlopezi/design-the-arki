@@ -64,6 +64,8 @@ const levelSchema = z.object({
       .refine(subs => Object.keys(subs).length > 0, 'A level with Subscriptions needs at least one').optional(),
     /** Levels that teach the Partition Key: the keys on offer (the first is the default) and how posts spread over each one's values. */
     partitionKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Partition Keys needs at least one key').optional(),
+    /** News-feed levels: the Subscription that writes the feeds (fan-out on write), an account's followers, and the accounts a user follows. */
+    feed: z.object({ subscription: z.string().min(1), followers: z.number().positive(), follows: z.number().positive() }).optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
@@ -150,6 +152,13 @@ const levelSchema = z.object({
   if (subs.length && !allowed.has('worker')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level with Subscriptions must allow a worker (it serves them)' });
   }
+  // The feed is written by one of the level's Subscriptions into the database, and read from it.
+  const feed = level.play.feed;
+  if (feed && !subs.includes(feed.subscription)) {
+    ctx.addIssue({ code: 'custom', path: ['play', 'feed', 'subscription'], message: `The feed's Subscription "${feed.subscription}" is not one of the level's Subscriptions` });
+  }
+  if (feed && !allowed.has('database')) ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A news-feed level must allow a database (it stores the feeds)' });
+  if ((mix?.readFeed ?? 0) > 0 && !allowed.has('database')) ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave reads feeds must allow a database' });
   // A Partition Key is a setting of the Topic, and a design can only pick one the level offers.
   if (level.play.partitionKeys && !allowed.has('topic')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that offers Partition Keys must allow a topic' });

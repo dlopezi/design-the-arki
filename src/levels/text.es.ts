@@ -174,4 +174,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Llegan diez posts por segundo, repartidos en tres Partitions que leen tres instancias de Worker. Pero el Topic usa el país como Partition Key, y casi todos tus usuarios viven en un país: el 60 % de los posts cae en una Partition, y la instancia que la lee no da abasto mientras las demás esperan. Más Partitions o más instancias no ayudan, porque un país siempre va a una Partition. Elige una Partition Key mejor en la fase de construcción: el id de usuario tiene muchos valores usados por igual.',
     guidedHint: 'La Partition 1 está caliente: la clave país envía allí el 60 % de los posts, más de lo que puede tomar una instancia. Selecciona el Topic y elige Id de usuario como Partition Key antes de que empiece la oleada.',
   },
+  '31-your-feed': {
+    title: 'Tu feed',
+    brief: 'La gente abre su feed mucho más a menudo de lo que publica: llegan 120 lecturas del feed y 5 posts por segundo. Un usuario sigue a 20 cuentas, así que construir el feed al leerlo (fan-out on read) supone 20 lecturas por cada feed: 2.400 lecturas por segundo, más de lo que aguanta cualquier tier de base de datos. Constrúyelo al escribir los posts (fan-out on write): un Worker de la Subscription Feed escribe cada post en el feed de cada seguidor, 30 escrituras por post, y leer un feed pasa a ser una sola lectura.',
+    guidedHint: 'El Worker de Feed está listo, pero no tiene camino a la base de datos, así que no escribe ningún feed y cada lectura sigue juntando 20 cuentas. Conecta el Worker de Feed a la base de datos.',
+  },
 };

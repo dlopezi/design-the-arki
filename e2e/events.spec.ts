@@ -74,3 +74,19 @@ test('level 30: left on the country key, the base is lost and the hint names the
   await expect(end).toContainText('Base lost');
   await expect(end).toContainText('Hot Partition');
 });
+
+test('level 31: feeds built on read overload the database; the hint says fan-out on write', async ({ page }) => {
+  await openLevel(page, '31-your-feed', 'normal');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('fan-out on write');
+});
+
+test('level 31: connecting the Feed Worker to the Database makes a feed read one read, and the base lasts the wave', async ({ page }) => {
+  await openLevel(page, '31-your-feed', 'guided');
+  await dragConnect(page, 'worker-3', 'Database');
+  await page.locator('.play-unit').filter({ hasText: 'Database' }).click();
+  await expect(page.getByText('1 read · fan-out on write')).toBeVisible();
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});

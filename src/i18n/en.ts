@@ -160,6 +160,8 @@ export const en = {
   topicHint: 'Each post must reach every system: Notifications, Search and Analytics. A Message Queue gives each Message to one Worker only, so each system missed the posts the others took. Use a Topic: connect the app server to it and the Topic to one Worker for each Subscription. Every Subscription then gets its own copy of each post.',
   /** Lost with one Partition full while the others had room: a poor Partition Key. */
   hotPartitionHint: 'One Partition got most of the posts while the others had room: a Hot Partition. Your Partition Key spreads the posts badly, and more Partitions or instances would not fix it, because one key value always goes to one Partition. Pick a better Partition Key in the Build Phase, one with many values used evenly, such as user id.',
+  /** Lost in a news-feed level while no Feed Worker wrote the feeds: every feed read gathered each followed account. */
+  fanOutHint: (follows: number) => `Every feed read gathered the posts of the ${follows} accounts the user follows (fan-out on read), and the database could not keep up: a bigger tier would not be enough. Build a Worker for the Feed Subscription, connect the Topic to it and it to the Database: it writes each post into every follower's feed (fan-out on write), so reading a feed becomes one read.`,
   /** Lost with a Subscription that no Worker serves. */
   subscriptionHint: 'One Subscription had no Worker, so nobody processed its copy of the posts and its Consumer Lag kept growing. Build a Worker for it (a new Worker serves the first Subscription without one) and connect the Topic to it.',
   /** Lost while a Subscription's Consumer Lag was over its maximum. */
@@ -577,6 +579,7 @@ export const en = {
       partitions: 'Partitions', partitionsLocked: 'Locked during the wave', fewerPartitions: 'Fewer Partitions', morePartitions: 'More Partitions',
       noPartition: 'idle · no Partition',
       partitionKey: 'Partition Key', hotPartition: 'Hot Partition',
+      feedRead: 'One feed read', feedReadCost: (reads: number, onWrite: boolean) => `${reads} read${reads === 1 ? '' : 's'} · fan-out on ${onWrite ? 'write' : 'read'}`,
       subscription: 'Subscription', subscriptionLocked: 'Locked during the wave',
       exit: (to: string) => `→ ${to}`,
       link: 'Connection', from: 'From', to: 'To', traffic: 'Traffic now', removeLink: 'Remove connection (Delete)',
