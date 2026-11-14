@@ -169,4 +169,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'La red crece: llegan diez posts por segundo, y una instancia de Worker toma cuatro. Notifications y Search necesitan tres instancias cada una. Pero un Topic se divide en Partitions, y solo una instancia de una Subscription lee una Partition a la vez: con dos Partitions, una tercera instancia no tiene nada que leer y se queda parada. Sube las Partitions del Topic en la fase de construcción y luego añade las instancias. Cada Partition cuesta un poco al mes.',
     guidedHint: 'Cada Worker tiene tres instancias, pero el Topic solo tiene dos Partitions, así que una instancia de cada uno se queda parada. Selecciona el Topic y sube sus Partitions a 3 antes de la oleada: las Partitions se bloquean cuando llegan los usuarios.',
   },
+  '30-hot-partition': {
+    title: 'Partition caliente',
+    brief: 'Llegan diez posts por segundo, repartidos en tres Partitions que leen tres instancias de Worker. Pero el Topic usa el país como Partition Key, y casi todos tus usuarios viven en un país: el 60 % de los posts cae en una Partition, y la instancia que la lee no da abasto mientras las demás esperan. Más Partitions o más instancias no ayudan, porque un país siempre va a una Partition. Elige una Partition Key mejor en la fase de construcción: el id de usuario tiene muchos valores usados por igual.',
+    guidedHint: 'La Partition 1 está caliente: la clave país envía allí el 60 % de los posts, más de lo que puede tomar una instancia. Selecciona el Topic y elige Id de usuario como Partition Key antes de que empiece la oleada.',
+  },
 };

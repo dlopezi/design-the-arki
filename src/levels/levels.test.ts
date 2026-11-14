@@ -34,7 +34,7 @@ describe('Spanish level texts', () => {
 
 describe('level files', () => {
   it('ships the 8 levels of chapter 1, then the Async chapter, then the Data scale chapter, then the Edge chapter, then the Events chapter, in order', () => {
-    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads', '20-release-day', '21-far-away-videos', '22-old-content', '23-one-door', '24-abusive-client', '25-region-falls', '26-worldwide-launch', '27-one-post-many-reactions', '28-slow-subscriber', '29-too-much-for-one-worker']);
+    expect(allLevels().map(l => l.id)).toEqual(['01-hello-world', '02-first-spike', '03-bigger-or-more', '04-flash-sale', '05-popular-content', '06-server-goes-down', '07-tight-budget', '08-black-friday', '09-slow-processing', '10-watch-and-upload', '11-upload-rush', '12-worker-goes-down', '13-fresh-videos', '14-launch-day', '15-too-many-reads', '16-just-saved-not-there', '17-too-much-to-write', '18-hot-shard', '19-big-uploads', '20-release-day', '21-far-away-videos', '22-old-content', '23-one-door', '24-abusive-client', '25-region-falls', '26-worldwide-launch', '27-one-post-many-reactions', '28-slow-subscriber', '29-too-much-for-one-worker', '30-hot-partition']);
     expect(allLevels('en').find(l => l.id === '15-too-many-reads')!.chapter).toBe('Data scale');
   });
 

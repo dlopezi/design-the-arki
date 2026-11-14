@@ -33,6 +33,7 @@ export const ROOMY_LOAD = 0.7;
  * has room, which is what a poor Shard Key does. When every Shard is full, the answer is more Shards, so none is hot.
  */
 export function hotShardOf(loads: number[] | undefined): number | null {
+  // The same rule finds the Hot Partition among the Partitions of a Topic (ADR-0009).
   if (!loads || loads.length < 2) return null;
   const busiest = Math.max(...loads);
   return busiest >= FULL_LOAD && Math.min(...loads) < ROOMY_LOAD ? loads.indexOf(busiest) : null;
@@ -94,13 +95,17 @@ export type Flow = {
   subCapacity: Record<string, number>;
   /** Share of capacity in use for each Partition of a Topic (0–1): the load of the busiest Worker instance that reads it, over every Subscription. */
   partitions: Record<string, number[]>;
+  /** What waits in each Partition of a Topic for each Subscription after this step (`topicId|subscription`). */
+  partBacklog: Record<string, number[]>;
 };
 /** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
 export type Queues = { backlog: Record<string, number>; dt: number;
   /** Writes each Read Replica has not applied yet (ADR-0007), kept from the step before like the Backlog. */
   unapplied?: Record<string, number>;
   /** The posts each Subscription has not processed yet (ADR-0009), kept from the step before like the Backlog. */
-  subBacklog?: Record<string, number> };
+  subBacklog?: Record<string, number>;
+  /** The same, in each Partition of a Topic: for `topicId|subscription`, what waits in each Partition. */
+  partBacklog?: Record<string, number[]> };
 
 /** How many Partitions a Topic has (none for any other building). */
 export const partitionsOf = (b: Pick<Building, 'type' | 'params'>, catalog: Catalog = defaultCatalog) => {
@@ -143,7 +148,7 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
   mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string },
-  subscriptions: string[] = []): Flow {
+  subscriptions: string[] = [], partitionKeys?: ShardKeys): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -165,7 +170,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   let published = 0;
   const processed: Record<string, number> = {};
   const subRelease: Record<string, number> = {}, subCapacity: Record<string, number> = {};
-  const partitionLoads: Record<string, number[]> = {};
+  const partitionLoads: Record<string, number[]> = {}, partBacklog: Record<string, number[]> = {};
   const subBefore = (sub: string) => queues.subBacklog?.[sub] ?? 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
   let lostInBackground = 0;
@@ -250,37 +255,55 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
       const type = spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
       const dt = queues.dt || 1;
       // Partitions: each one is read by one Worker instance of a Subscription at a time, so a Subscription uses at most as many
-      // instances as there are Partitions, and Partition p goes to working instance p mod n (ADR-0009).
-      const count = partitionsOf(b, catalog) || Infinity;
-      const shares = Number.isFinite(count) ? new Array<number>(count).fill(1 / count) : [];
+      // instances as there are Partitions, and Partition p goes to working instance p mod n. Each Subscription keeps its own place
+      // in each Partition, so a post waits in its own Partition: a busy one cannot be emptied by the instances of the others (ADR-0009).
+      const count = Math.max(1, partitionsOf(b, catalog));
+      // The Partition Key spreads the posts over the Partitions as a Shard Key spreads data over Shards: a poor key makes a Hot Partition.
+      const keyWeights = partitionKeys && Object.keys(partitionKeys).length ? partitionKeys[b.params.partitionKey ?? ''] ?? Object.values(partitionKeys)[0]! : null;
+      const shares = keyWeights ? shardShares(keyWeights, count) : new Array<number>(count).fill(1 / count);
       const loads = shares.map(() => 0);
       for (const sub of subscriptions) {
         const takers = links.filter(l => l.from === id && usable[l.to] && byId.get(l.to)?.params.subscription === sub && canFinish(l.to, type));
         // The working instances of the Subscription, in order, each with its capacity and the Worker building it belongs to.
-        const working: { link: Link; capacity: number; share: number }[] = [];
+        const working: { link: Link; capacity: number }[] = [];
         for (const l of takers) {
           const n = Math.min(usable[l.to]!, Math.max(0, count - working.length));
           usable[l.to] = n; // the instances left without a Partition stay idle
-          for (let k = 0; k < n; k++) working.push({ link: l, capacity: capacityOf(byId.get(l.to)!, catalog), share: 0 });
+          for (let k = 0; k < n; k++) working.push({ link: l, capacity: capacityOf(byId.get(l.to)!, catalog) });
         }
-        if (Number.isFinite(count)) shares.forEach((share, p) => { if (working.length) working[p % working.length]!.share += share; });
-        else working.forEach(w => { w.share = 1 / working.length; });
-        const offered = ok + subBefore(sub) / dt;
-        // Each instance processes its Partitions' share up to its capacity; the Subscription keeps up while its busiest instance does.
-        const released = working.map(w => Math.min(w.share * offered, w.capacity));
-        subRelease[sub] = released.reduce((a, v) => a + v, 0);
-        subCapacity[sub] = working.length ? Math.min(...working.map(w => (w.share > 0 ? w.capacity / w.share : Infinity))) : 0;
-        if (!Number.isFinite(subCapacity[sub]!)) subCapacity[sub] = working.reduce((a, w) => a + w.capacity, 0);
-        if (Number.isFinite(count)) shares.forEach((share, p) => {
-          const w = working.length ? working[p % working.length]! : null;
-          loads[p] = Math.max(loads[p]!, w ? Math.min(1, (w.share * offered) / w.capacity) : share > 0 && offered > 0 ? 1 : 0);
+        const owner = (p: number) => (working.length ? p % working.length : -1);
+        // What waits in each Partition for this Subscription (spread by the key the first time, or after the Partitions changed).
+        const kept = queues.partBacklog?.[`${id}|${sub}`];
+        const waitingIn = kept?.length === count ? [...kept] : shares.map(share => subBefore(sub) * share);
+        const offeredIn = shares.map((share, p) => share * ok + waitingIn[p]! / dt);
+        const releasedIn = shares.map(() => 0);
+        working.forEach((w, i) => {
+          const mine = shares.map((_, p) => p).filter(p => owner(p) === i);
+          const asked = mine.reduce((sum, p) => sum + offeredIn[p]!, 0);
+          const done = Math.min(asked, w.capacity);
+          for (const p of mine) releasedIn[p] = asked ? (offeredIn[p]! * done) / asked : 0;
+          // An instance's load is the posts arriving in its Partitions over what it can take.
+          const arriving = mine.reduce((sum, p) => sum + shares[p]! * ok, 0);
+          for (const p of mine) loads[p] = Math.max(loads[p]!, Math.min(1, arriving / w.capacity));
         });
-        working.forEach((w, k) => {
-          if (!released[k]) return;
-          add(edge, linkKey(w.link), released[k]!); add(inflow, w.link.to, released[k]!); add((inflowBy[w.link.to] ??= {}), type + BACKGROUND, released[k]!);
-        });
+        if (!working.length) shares.forEach((share, p) => { if (share > 0 && ok > 0) loads[p] = 1; });
+        const after = shares.map((share, p) => Math.max(0, waitingIn[p]! + (share * ok - releasedIn[p]!) * dt));
+        partBacklog[`${id}|${sub}`] = after;
+        subRelease[sub] = releasedIn.reduce((a, v) => a + v, 0);
+        // The rate for the Consumer Lag: so that the Backlog over it is the time the slowest instance needs to empty its Partitions, and with
+        // nothing waiting, the throughput at which the busiest instance is full.
+        // An instance empties all its Partitions at its capacity; a Partition with no instance never empties.
+        const unread = after.some((x, p) => x > 0 && owner(p) < 0);
+        const worst = unread ? Infinity : Math.max(0, ...working.map((w, i) => after.reduce((sum, x, p) => sum + (owner(p) === i ? x : 0), 0) / w.capacity));
+        const total = after.reduce((a, v) => a + v, 0);
+        const busiest = working.length ? Math.min(...working.map((w, i) => { const share = shares.reduce((sum, x, p) => sum + (owner(p) === i ? x : 0), 0); return share > 0 ? w.capacity / share : Infinity; })) : 0;
+        subCapacity[sub] = !working.length ? 0 : total > 0 && Number.isFinite(worst) && worst > 0 ? total / worst : Number.isFinite(busiest) ? busiest : working.reduce((a, w) => a + w.capacity, 0);
+        // Each Worker building of the Subscription gets what its instances released.
+        const byLink = new Map<Link, number>();
+        shares.forEach((_, p) => { if (owner(p) >= 0 && releasedIn[p]) byLink.set(working[owner(p)]!.link, (byLink.get(working[owner(p)]!.link) ?? 0) + releasedIn[p]!); });
+        byLink.forEach((amount, l) => { add(edge, linkKey(l), amount); add(inflow, l.to, amount); add((inflowBy[l.to] ??= {}), type + BACKGROUND, amount); });
       }
-      if (Number.isFinite(count)) partitionLoads[id] = loads;
+      partitionLoads[id] = loads;
       continue;
     }
     if (spec.queue) {
@@ -373,7 +396,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads,
+    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

@@ -158,6 +158,8 @@ export const en = {
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
   /** Lost with posts in the wave and no Topic: a queue (or a Worker called straight) gives each post to one system only. */
   topicHint: 'Each post must reach every system: Notifications, Search and Analytics. A Message Queue gives each Message to one Worker only, so each system missed the posts the others took. Use a Topic: connect the app server to it and the Topic to one Worker for each Subscription. Every Subscription then gets its own copy of each post.',
+  /** Lost with one Partition full while the others had room: a poor Partition Key. */
+  hotPartitionHint: 'One Partition got most of the posts while the others had room: a Hot Partition. Your Partition Key spreads the posts badly, and more Partitions or instances would not fix it, because one key value always goes to one Partition. Pick a better Partition Key in the Build Phase, one with many values used evenly, such as user id.',
   /** Lost with a Subscription that no Worker serves. */
   subscriptionHint: 'One Subscription had no Worker, so nobody processed its copy of the posts and its Consumer Lag kept growing. Build a Worker for it (a new Worker serves the first Subscription without one) and connect the Topic to it.',
   /** Lost while a Subscription's Consumer Lag was over its maximum. */
@@ -574,6 +576,7 @@ export const en = {
       hotShard: 'Hot Shard',
       partitions: 'Partitions', partitionsLocked: 'Locked during the wave', fewerPartitions: 'Fewer Partitions', morePartitions: 'More Partitions',
       noPartition: 'idle · no Partition',
+      partitionKey: 'Partition Key', hotPartition: 'Hot Partition',
       subscription: 'Subscription', subscriptionLocked: 'Locked during the wave',
       exit: (to: string) => `→ ${to}`,
       link: 'Connection', from: 'From', to: 'To', traffic: 'Traffic now', removeLink: 'Remove connection (Delete)',
@@ -607,6 +610,7 @@ export const en = {
       queueNotPublic: 'jobs reach a queue through an app server, not straight from the users',
       topicNotPublic: 'posts reach a Topic through an app server, not straight from the users',
       topicHoldsMessages: 'the Topic still holds posts for a Subscription: wait until its Workers have processed them',
+      partitionKeyLocked: 'the Partition Key is locked during the wave: changing it moves posts to other Partitions',
       partitionsLocked: 'the Partitions of a Topic are locked during the wave: in Kafka, adding Partitions moves keys to other Partitions',
       subscriptionLocked: 'the Subscription of a Worker is locked during the wave: a consumer group that changes its name starts again from another place in the Topic',
       uploadsOnly: 'the users reach Object Storage straight for uploads only, and this level has no uploads',
