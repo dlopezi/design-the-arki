@@ -128,6 +128,34 @@ Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2
 - **Status (2026-11-14)**: the six missions (levels `21` to `26`), the CDN, API Gateway (with its Client Limit), DNS and standby Region, the freshness limit, the Manual entries and concepts are built, in English and Spanish. What was built, and where it differs from the plan (DNS TTLs of 5, 10 and 30 s, the review without a queue and Workers, the buildings that stand outside the Regions), is in ADR-0008.
 - **Out of scope**: geography and latency by distance, active-active Regions, loss of writes at failover, cold standby, WAF and DDoS protection, edge computing, routing by path to several services, cache purge.
 
+## Chapter 5: Events and pub/sub (planned 2026-11-14)
+
+Settled in a grilling session with the owner; engine rules in ADR-0009. Same rule as chapters 2 to 4: a real problem with the real solution and the real names. The owner asked that every choice be based on how real systems work; the review problems, where the results of subscribers go, the Topic-to-queue question and the Drain Phase were left to Claude on that rule. Built after chapter 4 is merged (it uses Request Types, the Backlog, Shard Key skew and the Worker outage).
+
+- **Story**: a new product, a social network. People post and read their feed. One post must reach many systems (notifications, search, analytics, feeds), and one famous account can have millions of followers. Chapters 5 and 6 follow this story.
+- **Request Types**: `post` (a user publishes; it goes through an app server to the Topic and is answered when it enters it, like a job entering the Message Queue) and `read feed` (synchronous, like a watch in chapter 2).
+- **New building**: only the **Topic** (the Kafka model). Fixed base price plus a small cost per **Partition**. Settings: **Partitions** and **Partition Key**, both changed only in the Build Phase (in Kafka, adding Partitions moves keys; the key is chosen like the Shard Key). Users reach the Topic only through an app server.
+- **Worker as consumer group**: the existing Worker gets a setting, **Subscription**, chosen from the level's list (for example Notifications, Search, Analytics, Feed). Each Worker building connected to the Topic is one consumer group: it gets **every** Message (pub/sub), and its instances share them (competing consumers, as in chapter 2). Only `min(instances, Partitions)` instances work; the others wait.
+- **Rules**:
+  - The Topic keeps a **Backlog for each Subscription**. Each Subscription has its own **Consumer Lag** (seconds the oldest unprocessed Message has waited) and the level sets a maximum for each one (for example Notifications 5 s, Analytics 60 s). Reputation falls while any Subscription is over its maximum. A slow Subscription does not slow the others.
+  - Notifications, Search and Analytics Workers end their work at the Worker: their real destination is outside the system (a push service, a search index, a data warehouse), which the map shows as an exit label. Only the **Feed** Worker writes to the Database.
+  - **Fan-out on write**: with a Feed Worker, each post becomes one write per follower in the Database (the level sets the average followers); reading the feed is one read (the usual Cache can sit in front). **Fan-out on read**: with no Feed Worker, each `read feed` reads the posts of every followed account (the level sets how many). The architecture decides; there is no strategy switch.
+  - **Celebrity Limit** (a setting of the Feed Worker, used from mission 6): posts of accounts with more followers than the limit are not fanned out; their posts are merged when a feed is read (a few extra reads). This is the hybrid model Twitter uses.
+  - A poor Partition Key makes a **Hot Partition**: the level says how traffic spreads over each key value, as for the Shard Key in chapter 3.
+  - When a Worker instance goes down, the other instances of its consumer group take its Partitions (a **rebalance**), with a short pause for that group.
+  - After the wave the Drain Phase runs until **every** Subscription is empty, with maintenance charged.
+- **Unlock**: after the last level of chapter 4.
+- **Six levels** (`27` to `32`), each with one lesson:
+  1. *One post, many reactions*: a post must reach notifications, search and analytics. A Message Queue gives each Message to one Worker only; a Topic gives every Subscription its own copy.
+  2. *A slow subscriber*: analytics is slow and has a loose maximum, notifications must be fast. Each Subscription has its own lag and its own Workers; the slow one does not hold the others.
+  3. *Too much for one Worker*: the posts outgrow one consumer. Add Partitions and Worker instances; instances beyond the number of Partitions do nothing.
+  4. *Hot partition*: a poor Partition Key sends most posts to one Partition; pick a better key in the Build Phase.
+  5. *Your feed*: reading feeds by gathering every followed account (fan-out on read) overloads the Database; a Feed Worker that writes each post into every follower's feed (fan-out on write) makes reads cheap.
+  6. *The celebrity joins*: the review. A celebrity with millions of followers posts in the middle of the wave and fan-out on write explodes; set the Celebrity Limit (hybrid). Later a Worker instance goes down and its group rebalances. It also needs chapter 1 to 4 buildings: load balancer, several app servers, Cache and API Gateway.
+- **Manual**: a Buildings entry for the Topic with *In real life* (Apache Kafka, Amazon Kinesis, Google Pub/Sub, Amazon SNS, Redpanda); Concepts for pub/sub against a queue, consumer groups, Partitions and ordering by key, consumer lag, rebalance, fan-out on write and on read, the celebrity problem and the hybrid feed, retention and replay, at-least-once and exactly-once, the SNS + SQS fan-out pattern.
+- **Look**: decided by real practice with a prototype (ticket of the spec), as for chapters 2 to 4: a text sketch first, then the choice written here.
+- **Out of scope** (Manual only): ordering of events inside a Partition (the Partition Key only spreads load), retention and replay, exactly-once, dead-letter topics and retries (chapter 6), connecting a Topic to a Message Queue (SNS + SQS), adding Partitions during the wave.
+
 ## Game screen
 
 Computer and tablet only (the phone layout was dropped on 2026-11-11). Chosen from the prototype:
