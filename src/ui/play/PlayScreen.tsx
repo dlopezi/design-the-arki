@@ -3,7 +3,7 @@ import { ABUSIVE, catalog, DOWNLOAD, INVALID, READ_YOUR_WRITES, UPLOAD } from '.
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
-import { CLIENT, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
+import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
   demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
@@ -42,7 +42,7 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
 /** The order buildings stand in a zone: the way a request travels. */
-const ORDER = ['cdn', 'apiGateway', 'loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database', 'objectStorage'];
+const ORDER = ['dns', 'cdn', 'apiGateway', 'loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'promotedReplica', 'database', 'objectStorage'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -62,6 +62,8 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'drain': return ev.drain;
     case 'early': return ev.early(e.amount ?? 0);
     case 'incident': return ev.incident(name);
+    case 'regionDown': return ev.regionDown;
+    case 'failover': return ev.failover;
     case 'removed': return ev.removed(name, e.amount ?? 0);
     case 'resized': return ev.resized(name);
     case 'linked': return ev.linked(nameOf(g, e.from), nameOf(g, e.to));
@@ -71,7 +73,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'lost': return ev.lost[e.reason ?? 'reputation'] ?? '';
   }
 }
-const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' ? 'ok' : '');
+const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'regionDown' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' || e.kind === 'failover' ? 'ok' : '');
 
 function Spark({ values, max, color, limit }: { values: number[]; max: number; color: string; limit?: number }) {
   const n = 60, v = values.slice(-n), w = 200, h = 34;
@@ -96,6 +98,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const [overlay, setOverlay] = useState<Overlay>('start');
   const [speed, setSpeed] = useState(1);
   const [layer, setLayer] = useState<C4Layer>(3);
+  // A level with a DNS has two Regions: new buildings go into the one chosen here (ADR-0008).
+  const [buildRegion, setBuildRegion] = useState<string>(MAIN);
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverLink, setHoverLink] = useState<Link | null>(null);
   const [notes, setNotes] = useState<{ t: number; text: string }[]>([]);
@@ -108,8 +112,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const drag = useRef<Drag>(null);
   const canvasApi = useRef<ReturnType<typeof startFlowCanvas> | null>(null);
   const stopped = paused || overlay !== null;
-  const live = useRef({ game, layer, selection, hoverLink, dragLine, paused: stopped, speed });
-  live.current = { game, layer, selection, hoverLink, dragLine, paused: stopped, speed };
+  const live = useRef({ game, layer, selection, hoverLink, dragLine, paused: stopped, speed, region: buildRegion });
+  live.current = { game, layer, selection, hoverLink, dragLine, paused: stopped, speed, region: buildRegion };
   const passed = useRef(false);
   const endId = useId();
   const briefId = useId();
@@ -127,6 +131,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const closeManual = useCallback(() => setOverlay(null), []);
   const over = game.phase === 'won' || game.phase === 'lost';
   /** Whether a type can have several instances in this level: scaled out, or split into Shards when the level offers Shard Keys. */
+  const hasRegions = level.allowedComponents.includes('dns');
   const hasInstances = (type: string) => !!catalog[type]?.scalesOut || (!!catalog[type]?.shardable && !!level.play.shardKeys);
 
   // ───────── Time: 10 updates a second, faster with the speed buttons ─────────
@@ -200,9 +205,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const doBuild = useCallback((type: string) => {
     // The state update stays pure (React may run it twice); what gets selected is worked out from the state on screen.
     const current = live.current.game;
-    if (buildProblem(current, type, level)) return;
-    setGame(g => build(g, type, level));
-    setSelection({ kind: 'building', id: current.buildings.find(b => b.type === type)?.id ?? `${type}-${current.nextId}` });
+    const region = live.current.region;
+    if (buildProblem(current, type, level, undefined, region)) return;
+    setGame(g => build(g, type, level, undefined, region));
+    setSelection({ kind: 'building', id: current.buildings.find(b => b.type === type && (catalog[type]!.global || regionOf(b) === region))?.id ?? `${type}-${current.nextId}` });
     setLayer(l => (l === 1 ? 3 : l)); // layer 1 shows no buildings: show the new one
   }, [level]);
   const restart = () => { setGame(fresh()); setSelection(null); setNotes([]); setPaused(false); canvasApi.current?.clearRequests(); };
@@ -298,6 +304,10 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
   const maxLag = level.requirements.maxReplicationLagS, lagNow = Math.max(0, ...Object.values(game.lag));
   const lagTooHigh = maxLag !== undefined && lagNow > maxLag;
+  const dnsBuilding = game.buildings.find(b => catalog[b.type]!.failover);
+  const failoverText = !dnsBuilding ? '' : game.failover.switched ? t.rt.regions.switched
+    : game.failover.switchAt !== null && game.failover.downAt !== null ? t.rt.regions.failoverIn(Math.max(0, Math.ceil(game.failover.switchAt - game.t)))
+    : t.rt.regions.dnsTtl(Number(dnsBuilding.params.ttlS ?? catalog[dnsBuilding.type]!.failover!.defaultValue));
   const maxStale = level.requirements.maxStaleS, ageNow = contentAge(game);
   const tooStale = maxStale !== undefined && ageNow > maxStale;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
@@ -308,6 +318,12 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const selectedBuilding = selection?.kind === 'building' ? game.buildings.find(b => b.id === selection.id) ?? null : null;
   const hint = useMemo(() => {
     if (game.phase !== 'lost' || !hintAllowed(mode, true)) return null;
+    // A level where a whole Region falls: the answer is a standby Region and a DNS fast enough, whatever else was missing.
+    if (level.play.incident?.region) {
+      const standby = game.buildings.some(b => !catalog[b.type]!.global && regionOf(b) === STANDBY);
+      const reachesStandby = !!dnsBuilding && game.links.some(l => l.from === dnsBuilding.id && regionOf(game.buildings.find(x => x.id === l.to) ?? {}) === STANDBY);
+      return standby && reachesStandby ? t.switchHint : t.regionHint;
+    }
     // Async levels: jobs with no queue, a Worker called straight from the app server, or Messages that waited too long.
     const jobs = (level.play.wave.mix?.job ?? 0) > 0;
     if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
@@ -388,8 +404,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       </button>
     );
   }
-  function zoneContent(zone: string) {
-    const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone)
+  function zoneContent(zone: string, region?: string) {
+    const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone && (!region || (!catalog[b.type]!.global && regionOf(b) === region)))
       .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
     if (layer === 2) {
       return here.map(b => {
@@ -501,6 +517,18 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           </div>
         );
       })()}
+      {spec.failover && (() => {
+        const options = spec.failover!.options, current = Number(b.params.ttlS ?? spec.failover!.defaultValue), at = options.indexOf(current);
+        return (
+          <div className="play-ttl"><span className="muted">{i.ttl}</span>
+            <span className="stepper">
+              <button aria-label={t.inspector.shorterTtl} disabled={at <= 0} onClick={() => setGame(g => setTtl(g, b.id, options[Math.max(0, at - 1)]!))}>−</button>
+              <b>{current}</b>
+              <button aria-label={t.inspector.longerTtl} disabled={at >= options.length - 1} onClick={() => setGame(g => setTtl(g, b.id, options[Math.min(options.length - 1, at + 1)]!))}>+</button>
+            </span>
+          </div>
+        );
+      })()}
       {spec.shortcut && (
         <div className="play-ttl"><span className="muted">{i.ttl}</span>
           <span className="stepper">
@@ -530,10 +558,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
-        {(maxLag !== undefined || hasQueue || maxStale !== undefined) && (
+        {(maxLag !== undefined || hasQueue || maxStale !== undefined || (hasRegions && !!dnsBuilding)) && (
           // Queue Age and Replication Lag share one capsule, one line each, so the top bar does not outgrow a tablet.
           <span className="play-res play-gauges">
             {maxLag !== undefined && <span className="play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
+            {hasRegions && dnsBuilding && <span className="play-age" role="status" aria-label="DNS">🧭 <b className={game.failover.downAt !== null && !game.failover.switched ? 'bad' : ''}>{failoverText}</b></span>}
             {maxStale !== undefined && <span className="play-age" role="status" aria-label={t.rt.freshness}>🕒 <b className={tooStale ? 'bad' : ''}>{t.rt.freshnessOf(ageNow, maxStale)}</b></span>}
             {hasQueue && <span className="play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
           </span>
@@ -564,6 +593,29 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
                     <div className="play-ctx">{counts.map(([type, n]) => <span key={type}><Building type={type} size={48} />{n > 1 && <b>× {n}</b>}</span>)}</div>
                     <span className="muted">{t.rt.contextSummary(counts.reduce((s, [, n]) => s + n, 0), upkeepPerS(game).toFixed(1))}</span>
                   </div>
+                : hasRegions
+                  ? <>
+                    {game.buildings.filter(b => catalog[b.type]!.global).map(b => <div key={b.id} className="play-front">{piece(b, 0, 64)}</div>)}
+                    <div className="play-regions">
+                      {[MAIN, STANDBY].map(r => {
+                        const mine = game.buildings.filter(b => !catalog[b.type]!.global && regionOf(b) === r);
+                        const state = r === MAIN ? (game.failover.downAt !== null ? 'dead' : 'live') : (game.failover.switched ? 'live' : 'standby');
+                        const tag = r === MAIN ? (state === 'dead' ? t.rt.regions.down : t.rt.regions.live) : (state === 'live' ? t.rt.regions.promoted : t.rt.regions.standbyTag);
+                        return (
+                          <div key={r} className={`play-system region-${r} region-${state}`} data-region={r}>
+                            <span className="label">{t.rt.regions[r as 'main' | 'standby']} <small className={`region-tag ${state}`}>{tag}</small></span>
+                            {mine.length
+                              ? <div className="play-zones">
+                                  {ZONES.filter(z => mine.some(b => catalog[b.type]!.presentation?.zone === z)).map(z => (
+                                    <div key={z} className={`play-zone zone-${z}`}><span className="zname">{t.zones[z]} <small>[{t.container}]</small></span>{zoneContent(z, r)}</div>
+                                  ))}
+                                </div>
+                              : <span className="muted">{t.rt.regions.empty}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 : <div className="play-system">
                     <span className="label">{t.systemName} <small>[{t.softwareSystem}]</small></span>
                     <div className="play-zones">
@@ -579,7 +631,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <C4Panel layer={layer} setLayer={k => { setLayer(k); canvasApi.current?.clearRequests(); }} />
         <MapTools autoLink={game.autoLink} toggleAutoLink={() => setGame(g => setAutoLink(g, !g.autoLink))} rewire={() => setGame(g => rewire(g))}
           zoom={zoomCentre} centre={centre} log={[...log].reverse().map(l => ({ time: fmt(l.t), text: l.text, tone: l.tone }))} />
-        {!over && <Announcer phase={game.phase} buildLeft={Math.ceil(BUILD_PHASE_S - game.t)} incident={incidentHappened} started={overlay !== 'start'} />}
+        {!over && <Announcer phase={game.phase} buildLeft={Math.ceil(BUILD_PHASE_S - game.t)} incident={incidentHappened} region={!!level.play.incident?.region} started={overlay !== 'start'} />}
         {tutorial && tutorialState !== 'skipped' && (step || tutorialState === 'done') && (
           <section className="play-panel play-tutorial" aria-label={t.tutorial.title} aria-live="polite">
             {step ? <>
@@ -619,12 +671,20 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           {inspector()}
         </section>
         <section className="play-frame play-build" aria-label={t.rt.build.title}>
-          <span className="label">{t.rt.build.title}</span>
+          <div className="play-build-head">
+            <span className="label">{t.rt.build.title}</span>
+            {hasRegions && (
+              <div className="play-region-switch" role="group" aria-label={t.rt.regions.buildIn}>
+                <span className="muted">{t.rt.regions.buildIn}</span>
+                {[MAIN, STANDBY].map(r => <button key={r} className="btn" aria-pressed={buildRegion === r} onClick={() => setBuildRegion(r)}>{t.rt.regions[r as 'main' | 'standby']}</button>)}
+              </div>
+            )}
+          </div>
           <div className="play-cards" role="toolbar" aria-label={t.components}>
             {level.allowedComponents.map((type, k) => {
-              const existing = game.buildings.find(b => b.type === type);
+              const existing = game.buildings.find(b => b.type === type && (catalog[type]!.global || regionOf(b) === buildRegion));
               const cost = instancePrice(existing ?? { type, params: {} });
-              const problem = buildProblem(game, type, level);
+              const problem = buildProblem(game, type, level, undefined, buildRegion);
               const s = catalog[type]!.buildS ?? 5;
               return (
                 <button key={type} className={`play-card ${tutorialType === type && !existing ? 'tutorial-target' : ''}`} disabled={!!problem} title={problem ? t.rt.build.reasons[problem] : ''}
@@ -655,7 +715,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
         {level.requirements.maxStaleS !== undefined && <li><span aria-hidden="true">🕒</span> {t.objectiveFreshness(level.requirements.maxStaleS)}</li>}
               <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
-              {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
+              {level.play.incident && <li><span aria-hidden="true">⚡</span> {level.play.incident.region ? t.rt.regionIncidentInfo(level.play.incident.atS) : t.rt.incidentInfo(buildingName(level.play.incident.componentType ?? ''), level.play.incident.atS)}</li>}
             </ul>
             {newTypes.length > 0 && (
               <div className="play-brief-new">

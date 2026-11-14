@@ -5,7 +5,7 @@ import { es } from './es';
 
 describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, strings) => {
   it('has a Buildings entry for every building, with what it is in real life', () => {
-    for (const type of Object.keys(catalog)) {
+    for (const type of Object.keys(catalog).filter(t => !catalog[t]!.internal)) {
       const entry = strings.archive.buildings[type];
       expect(entry, `no entry for ${type}`).toBeDefined();
       expect(entry!.tools.length, type).toBeGreaterThan(0);

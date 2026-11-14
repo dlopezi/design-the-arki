@@ -114,4 +114,25 @@ export const catalog: Catalog = {
     shortcut: { param: 'ttlS', defaultValue: 60, halfAt: 20, max: 0.95 },
     presentation: { zone: 'edge', technology: 'Amazon CloudFront', hideCapacity: true },
   },
+  // Chapter 4 (Edge). Decides which Region the users reach. When the main Region fails it needs time to notice and for the old
+  // answers to expire: it switches the users to the standby Region after its TTL, and until then requests to the dead Region fail.
+  // A shorter TTL switches sooner and costs a little more (ADR-0008). The game's clock is fast, so the TTLs are a few seconds.
+  dns: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, acceptsClients: true, global: true, buildS: 4,
+    failover: { options: [5, 10, 30], defaultValue: 30, monthlyCost: { 5: 40, 10: 30, 30: 20 } },
+    presentation: { zone: 'edge', technology: 'Amazon Route 53', hideCapacity: true },
+  },
+  // What a standby Read Replica becomes when the main Region fails and the DNS switches: it takes every kind of request, like the
+  // primary database it replaces. Not a building the player builds.
+  promotedReplica: {
+    primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true, internal: true,
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE], buildS: 7,
+    sizes: {
+      small: { workers: 8, monthlyCost: 50, vcpu: 1 },
+      medium: { workers: 16, monthlyCost: 100, vcpu: 2 },
+      large: { workers: 32, monthlyCost: 200, vcpu: 4 },
+    },
+    defaultSize: 'small',
+    presentation: { zone: 'data', technology: 'PostgreSQL primary', instancePrefix: 'primary' },
+  },
 };

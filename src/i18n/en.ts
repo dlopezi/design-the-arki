@@ -114,6 +114,7 @@ export const en = {
     readReplica: 'The Read Replicas cannot keep up with the reads: add Read Replica instances or use bigger ones.',
     cdn: 'The CDN is saturated.',
     apiGateway: 'The API Gateway is saturated.',
+    promotedReplica: 'The primary database (the promoted Read Replica) cannot keep up: use a bigger size.',
   } as Record<string, string>,
   /** Hints when the bottleneck cannot be resized in this level. */
   fixedHints: {
@@ -140,6 +141,10 @@ export const en = {
   limitLowHint: 'Your Client Limit was so low that it refused normal clients too, and those refusals count as errors (false positives). Raise the limit above what a normal client sends each second, but keep it low enough to stop the abusive clients.',
   /** Lost with abusive clients while the Client Limit was too high to stop them. */
   limitHighHint: 'Your Client Limit was so high that the abusive clients still got through and filled the app servers. Lower it: it must stay above what a normal client sends each second, and well under what an abusive client sends.',
+  /** Lost with a Region failure and no standby Region, DNS, or connection from the DNS to the standby Region. */
+  regionHint: 'A whole Region went down and the users had nowhere to go. Build a standby Region (a load balancer, app servers and a Read Replica, in Region 2), put a DNS in front of both Regions and connect it to each. The standby Read Replica becomes the primary database when the DNS switches the users.',
+  /** Lost with a Region failure while the DNS was too slow to switch. */
+  switchHint: 'The DNS took too long to switch the users to the standby Region, and every request to the dead Region failed until it did. A shorter DNS TTL switches sooner, at a slightly higher price. In real life a DNS TTL is kept long to save queries; here you pay for speed.',
   /** Lost while a CDN kept copies longer than the level allows. */
   staleHint: 'Your CDN kept each copy of the file longer than users may see old content, so they were shown the old video after the edit. Lower the CDN TTL to the limit or under it. A shorter TTL means fresher content but more downloads reaching Object Storage.',
   /** Lost with downloads in the wave and a CDN whose TTL is too short for Object Storage. */
@@ -164,6 +169,7 @@ export const en = {
     readReplica: 'a copy of the primary database that answers reads only; add instances to answer more reads each second.',
     objectStorage: 'stores big files, with a fixed price and no settings. Users upload to it straight (the pre-signed URL pattern), so the app servers stay free. It can send out only so many big files each second.',
     cdn: 'answers a share of the video downloads close to the users, so Object Storage behind it stays calm; a longer TTL means more hits.',
+    dns: 'decides which Region the users reach, and switches them to the standby Region when the main one fails; a shorter TTL switches sooner and costs more.',
     apiGateway: 'the one door for the users: it checks every request, turns away the invalid ones (no token, junk) at a tiny cost, and passes the rest on. Its Client Limit stops a client that sends too many requests.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
@@ -229,7 +235,7 @@ export const en = {
   clients: 'Clients',
   /** The fields a level can offer as a Shard Key. */
   shardKeyNames: { userId: 'User id', videoId: 'Video id', country: 'Country', date: 'Date' } as Record<string, string>,
-  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN', apiGateway: 'API Gateway' } as Record<string, string>,
+  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN', apiGateway: 'API Gateway', dns: 'DNS', promotedReplica: 'Primary (was Read Replica)' } as Record<string, string>,
   person: 'Person',
   systemName: 'Your system',
   softwareSystem: 'Software system',
@@ -362,6 +368,14 @@ export const en = {
         diff: 'Real object storage also has buckets, access rules, storage classes, versioning, and a price per gigabyte stored and transferred. Its limits are far higher, but the origin is still the part you protect with a CDN.',
         read: { label: 'AWS · Amazon S3 pre-signed URLs', url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html' },
       },
+      dns: {
+        role: 'The phone book of the Internet. It decides which Region the users reach. It sends them to the main Region, and when that Region fails it sends them to the standby Region instead, after its TTL has passed.',
+        when: 'As soon as your system lives in more than one Region and you want to survive the loss of a whole Region.',
+        tools: ['Amazon Route 53', 'Cloudflare DNS', 'Google Cloud DNS', 'Azure Traffic Manager'],
+        same: 'Until the TTL passes, users keep going to the dead Region and their requests fail. A shorter TTL switches sooner and costs a little more. When it switches, the standby Read Replica becomes the primary database (failover).',
+        diff: 'A real DNS answer is cached by many resolvers, so some users switch late whatever the TTL says, and real failover also needs a health check. The game models one warm standby (active-passive), with the main Region failing as a whole, and its TTLs are a few seconds because the game clock is fast. Active-active Regions, cold standby and the last writes lost at failover (RPO) are only in the Manual.',
+        read: { label: 'AWS · Route 53 DNS failover', url: 'https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover.html' },
+      },
       apiGateway: {
         role: 'The one door to your system. Every request from the users comes in through it: it checks the request (for example, that it has a valid token), turns away the invalid ones with an error such as 401, and passes the valid ones on to the load balancer or the app servers.',
         when: 'When many requests are junk or have no valid token (bots, scanners, broken clients) and they waste the capacity of the app servers.',
@@ -463,7 +477,7 @@ export const en = {
     reputation: 'Reputation',
     money: 'Money',
     rate: (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}/s`,
-    announce: { build: 'Build!', live: '🚀 Live!', drain: '⏳ Draining the Backlog', incident: '⚡ A server is down!' },
+    announce: { build: 'Build!', live: '🚀 Live!', drain: '⏳ Draining the Backlog', incident: '⚡ A server is down!', regionIncident: '⚡ A whole Region is down!' },
     release: { title: '🚀 Release to production', note: (bonus: number) => `Users arrive now · +$${bonus} for going early`, live: '🚀 In production. You can still build and scale.' },
     time: { label: 'Speed', pause: 'Pause (Space)', resume: 'Resume (Space)' },
     tools: { links: 'Connections', rewire: 'Reconnect all', help: 'Help and events', controls: 'Controls', events: 'Latest events', none: 'Nothing yet' },
@@ -501,6 +515,8 @@ export const en = {
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
     incidentInfo: (type: string, s: number) => `${s} s into the wave, one ${type} instance goes down.`,
+    regionIncidentInfo: (s: number) => `${s} s into the wave, the whole main Region goes down.`,
+    regions: { main: 'Region 1 · main', standby: 'Region 2 · standby', live: 'LIVE', down: 'DOWN', standbyTag: 'STANDBY', promoted: 'LIVE · promoted', empty: 'Empty standby Region: build here the same way as the main one.', buildIn: 'Build in', dnsTtl: (s: number) => `DNS TTL ${s} s`, failoverIn: (s: number) => `Failover in ${s} s`, switched: 'Switched to Region 2' },
     map: 'Map', zoomIn: 'Zoom in', zoomOut: 'Zoom out', center: 'Center',
     autoLink: (on: boolean) => `Auto-connect: ${on ? 'on' : 'off'}`,
     rewire: 'Reconnect',
@@ -541,6 +557,8 @@ export const en = {
       drain: 'The users are gone. The Workers now empty the Backlog.',
       early: (bonus: number) => `Released early! Bonus +$${bonus}`,
       incident: (name: string) => `${name} went down!`,
+      regionDown: 'Region 1 is down! Requests to it fail until the DNS switches.',
+      failover: 'The DNS switched the users to Region 2. Its Read Replica is now the primary database.',
       removed: (name: string, back: number) => `${name} removed: +$${back}`,
       resized: (name: string) => `Rebuilding ${name} at its new size`,
       linked: (a: string, b: string) => `Connected: ${a} → ${b}`,
@@ -555,6 +573,7 @@ export const en = {
       queueNotPublic: 'jobs reach a queue through an app server, not straight from the users',
       uploadsOnly: 'the users reach Object Storage straight for uploads only, and this level has no uploads',
       downloadsOnly: 'the users reach the CDN straight for downloads only, and this level has no downloads',
+      otherRegion: 'a Region is a group of buildings that connect inside it; only the DNS and the replication of a Read Replica cross to another Region',
       shardKeyLocked: 'the Shard Key is locked during the wave: in real life re-sharding means moving data and downtime',
       endsRequests: 'the database does not send requests', exists: 'they are already connected', circle: 'that would make a circle', missing: 'that building is gone',
     } as Record<string, string>,

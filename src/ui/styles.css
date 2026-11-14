@@ -1163,3 +1163,16 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
   .play-rep { width: 56px; }
   .play-time { margin-left: 4px; } .play-time button { padding: 2px 6px; }
 }
+
+/* Chapter 4: two Regions. The DNS stands in front of both; the main one fails as a whole and the standby takes over (ADR-0008). */
+.play-front { display: flex; align-items: center; }
+.play-regions { display: flex; flex-direction: column; gap: 26px; }
+.play-system.region-standby { border-style: dashed; opacity: .72; }
+.play-system.region-live { border-color: rgba(62, 224, 200, .6); opacity: 1; }
+.play-system.region-dead { border-color: rgba(248, 113, 113, .7); }
+.region-tag { font: 700 10px ui-monospace, Menlo, monospace; letter-spacing: .12em; padding: 1px 6px; border: 1px solid currentColor; margin-left: 8px; }
+.region-tag.live { color: var(--ok, #3ee0c8); } .region-tag.dead { color: #f87171; } .region-tag.standby { color: var(--muted); }
+.play-build-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.play-region-switch { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.play-region-switch .btn { padding: 3px 8px; font-size: 11px; }
+.play-region-switch .btn[aria-pressed="true"] { border-color: #3ee0c8; color: #3ee0c8; }

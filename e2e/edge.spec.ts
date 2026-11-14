@@ -101,3 +101,41 @@ test('level 24: a Client Limit that is too low refuses normal clients and loses 
   const win = await playWave(page);
   await expect(win).toContainText('Base defended');
 });
+
+test('level 25: the map shows two Regions and the DNS, and a building goes into the Region chosen in the build card', async ({ page }) => {
+  await openLevel(page, '25-region-falls', 'normal');
+  await expect(page.locator('[data-region="main"]')).toContainText('Region 1 · main');
+  await expect(page.locator('[data-region="standby"]')).toContainText('Region 2 · standby');
+  await expect(page.locator('[data-region="standby"]')).toContainText('Empty standby Region');
+  await page.getByRole('group', { name: 'Build in' }).getByRole('button', { name: 'Region 2 · standby' }).click();
+  await buildKeys(page, '2'); // the load balancer: the DNS is the first card
+  await expect(page.locator('[data-region="standby"] .play-unit', { hasText: 'Load balancer' })).toBeVisible();
+  await expect(page.locator('[data-region="main"] .play-unit', { hasText: 'Load balancer' })).toBeVisible(); // the one that was there
+});
+
+test('level 25: with no standby Region the whole base is lost when Region 1 falls, and the hint says to build one and a DNS', async ({ page }) => {
+  await openLevel(page, '25-region-falls', 'normal');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('standby Region');
+});
+
+test('level 25: a DNS with a long TTL switches too late and loses; a shorter TTL wins, and the gauge counts the switch', async ({ page }) => {
+  await openLevel(page, '25-region-falls', 'guided');
+  await expect(page.getByRole('status', { name: 'DNS' })).toContainText('DNS TTL 30 s');
+  const lost = await playWave(page);
+  await expect(lost).toContainText('Base lost');
+  await expect(lost).toContainText('DNS TTL');
+
+  await page.reload();
+  await page.getByRole('button', { name: /Start building/ }).click();
+  await page.locator('[data-node-id="dns"]').first().click();
+  await page.getByRole('button', { name: 'Shorter TTL' }).click(); // 30 → 10
+  await expect(page.getByRole('status', { name: 'DNS' })).toContainText('DNS TTL 10 s');
+  await page.getByRole('button', { name: /Release to production/ }).click();
+  await page.getByRole('button', { name: '4×' }).click();
+  await expect(page.getByRole('status', { name: 'DNS' })).toContainText('Failover in', { timeout: 20_000 });
+  const won = page.getByRole('dialog');
+  await expect(won).toBeVisible({ timeout: 40_000 });
+  await expect(won).toContainText('Base defended');
+});

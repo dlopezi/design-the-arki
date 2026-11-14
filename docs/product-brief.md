@@ -106,7 +106,7 @@ Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2
   - A new Request Type, *download a video file*, goes to the CDN, which answers a share of requests at the edge (hit share grows with TTL, like the cache) and sends the rest to Object Storage. Users connect straight to the CDN. Object Storage now has a fixed output capacity (not shown to the player) that a viral video exceeds; chapter 2 and 3 levels stay under it.
   - The API Gateway is the entry for API requests. A new Request Type, *invalid* (no token, or junk), is rejected at the gateway at low cost, so app servers see only valid requests.
   - A level can have an *abusive* Request Type: a few clients that send many requests. The Client Limit rejects what one client sends above the limit. A limit that is too low also rejects normal clients, which counts as an error (a false positive).
-  - A new Failure Event, *Region down*, takes down every building of the main Region at a set time. The DNS detects it and sends users to the standby Region after a delay set by its TTL (30 s, 60 s or 300 s); until then requests to the dead Region fail. At that moment the standby Region's Read Replica becomes the primary database. A short TTL switches faster and costs a little more.
+  - A new Failure Event, *Region down*, takes down every building of the main Region at a set time. The DNS detects it and sends users to the standby Region after a delay set by its TTL (5 s, 10 s or 30 s in the game's fast clock: reputation falls 6 % a second while requests fail, so a real 30 to 300 s wait could never be survived); until then requests to the dead Region fail. At that moment the standby Region's Read Replica becomes the primary database. A short TTL switches faster and costs a little more.
   - Only a warm standby is modelled. Cold standby and the loss of the last writes at failover (RPO) are in the Manual only.
 - **Unlock**: after the last level of chapter 3.
 - **Six levels**, each with one lesson:
@@ -124,7 +124,7 @@ Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2
                                                                   └── Region 2 · standby  STANDBY (dim, dashed) → LIVE · promoted
   build:    the build card has a Region switch (Main | Standby); a new building goes into the Region shown selected
   ```
-  The DNS ring counts down the TTL after the Region fails; the line to the main Region turns red and the line to the standby turns green at the switch; the standby Read Replica is renamed "Primary (was replica)". The Region ticket (#79) builds this; nothing else in the game screen changes.
+  The DNS ring counts down the TTL after the Region fails; the line to the main Region turns red and the line to the standby turns green at the switch; the standby Read Replica is renamed "Primary (was replica)". The Region ticket (#79) builds this; nothing else in the game screen changes. As built, the two Regions are stacked one above the other (not side by side) because each Region is already wide, and the DNS stands between the Internet and them.
 - **Out of scope**: geography and latency by distance, active-active Regions, loss of writes at failover, cold standby, WAF and DDoS protection, edge computing, routing by path to several services, cache purge.
 
 ## Game screen

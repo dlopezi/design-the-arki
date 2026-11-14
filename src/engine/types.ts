@@ -60,6 +60,15 @@ export type StationPrimitive = {
    * uses, in normal requests (an upload on an app server).
    */
   effort?: Record<string, number>;
+  /** Real-time play: the building stands in front of the Regions and belongs to none of them (the DNS). */
+  global?: boolean;
+  /** Real-time play: not a building the player builds; it only appears when another one is promoted (the Manual and the cards skip it). */
+  internal?: boolean;
+  /**
+   * Real-time play: the building decides which Region the users go to. When the main Region fails it switches them to the standby
+   * Region after its TTL (param `ttlS`, one of `options`, in seconds); a shorter TTL switches sooner and costs more (`monthlyCost` by TTL).
+   */
+  failover?: { options: number[]; defaultValue: number; monthlyCost: Record<number, number> };
   /**
    * Per-client limit (real-time play): of each Request Type whose clients the level counts, this building passes at most the
    * `param` value in requests per second for each client. The rest of an abusive type is turned away; the rest of any other type

@@ -17,6 +17,8 @@ export const componentArt: Record<string, { color: string }> = {
   objectStorage: { color: '#e0794a' },
   cdn: { color: '#2dd4bf' },
   apiGateway: { color: '#a3e635' },
+  dns: { color: '#f472b6' },
+  promotedReplica: { color: '#9b6bff' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -148,6 +150,19 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <IsoBox cx={41} cy={44} w={9} h={11} p={p} />
     <IsoBox cx={32} cy={35} w={9} h={11} p={p} />
     <path d="M32 12 L32 22 M27 17 L32 12 L37 17" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </>,
+  // A signpost with two arrows: it decides which way the users go.
+  dns: p => <>
+    <IsoBox cx={32} cy={56} w={9} h={5} p={p} />
+    <path d="M32 52 L32 14" stroke={p.dark} strokeWidth={3.2} strokeLinecap="round" />
+    <path d="M32 20 L48 20 L53 25 L48 30 L32 30 Z" fill={p.light} stroke={p.dark} strokeWidth={1} strokeLinejoin="round" />
+    <path d="M32 34 L16 34 L11 39 L16 44 L32 44 Z" fill={p.base} stroke={p.dark} strokeWidth={1} strokeLinejoin="round" />
+    <circle cx={32} cy={12} r={2.4} fill={p.glow} />
+  </>,
+  // The standby copy that took over: a silo with a star, where the primary database was.
+  promotedReplica: p => <>
+    <Cylinder cx={32} cy={52} r={13} h={30} p={p} />
+    <path d="M32 12 L34.4 18 L40.8 18.4 L35.8 22.4 L37.4 28.6 L32 25.2 L26.6 28.6 L28.2 22.4 L23.2 18.4 L29.6 18 Z" fill={p.glow} stroke={p.dark} strokeWidth={0.8} strokeLinejoin="round" />
   </>,
   // A gate in a wall: every request passes through one door, and the wrong ones are stopped at the bar.
   apiGateway: p => <>

@@ -52,7 +52,8 @@ const levelSchema = z.object({
   play: z.object({
     startMoney: z.number().positive(),
     wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive(), mix: waveMix.optional() }),
-    incident: z.object({ atS: z.number().min(0), componentType }).optional(),
+    incident: z.object({ atS: z.number().min(0), componentType: componentType.optional(), region: z.literal('main').optional() })
+      .refine(i => (i.componentType === undefined) !== (i.region === undefined), 'An incident needs either a componentType or a region, not both').optional(),
     starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
     /** Edge levels with abusive clients: how many clients send each Request Type (a count above 0). */
     clients: z.record(z.string(), z.number().int().positive()).optional(),
@@ -109,6 +110,10 @@ const levelSchema = z.object({
   // Invalid requests are turned away at the gateway (ADR-0008): a wave with them needs an apiGateway in the level.
   if ((mix?.invalid ?? 0) > 0 && !allowed.has('apiGateway')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has invalid requests must allow an apiGateway' });
+  }
+  // A whole Region failing is only survivable with a DNS to switch the users to the standby Region, and a Read Replica to promote.
+  if (level.play.incident?.region && !(allowed.has('dns') && allowed.has('readReplica'))) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level where a Region goes down must allow a dns and a readReplica' });
   }
   // Clients are counted for Request Types of the wave, and a Client Limit lives at an apiGateway.
   const clients = level.play.clients;

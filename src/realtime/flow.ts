@@ -12,7 +12,11 @@ import type { Catalog } from '../engine/types';
 
 /** One running copy of a building; it serves only when built and not down. */
 export type Instance = { buildLeftS: number; buildTotalS: number; down: boolean };
-export type Building = { id: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number }; instances: Instance[] };
+/** The Regions a design can have: the main one, and a standby the DNS switches to when the main one fails (ADR-0008). */
+export const MAIN = 'main', STANDBY = 'standby';
+/** The Region a building stands in: the main one unless it says otherwise. */
+export const regionOf = (b: Pick<Building, 'region'>) => b.region ?? MAIN;
+export type Building = { id: string; region?: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number }; instances: Instance[] };
 /** How traffic spreads over the values of each Shard Key: per key, the share of requests for each value (adds up to 1). */
 export type ShardKeys = Record<string, number[]>;
 /** Each value of a key lives on shard `value mod shards`; a Shard's share is the sum over its values. */
@@ -89,6 +93,8 @@ export type Queues = { backlog: Record<string, number>; dt: number;
 
 const perInstance = (b: Building, catalog: Catalog) => {
   const spec = catalog[b.type]!;
+  // A DNS costs more the shorter its TTL.
+  if (spec.failover) return { workers: spec.workers, monthlyCost: spec.failover.monthlyCost[Number(b.params.ttlS ?? spec.failover.defaultValue)] ?? spec.monthlyCost };
   const size = b.params.size ?? spec.defaultSize;
   return size && spec.sizes?.[size] ? spec.sizes[size]! : { workers: spec.workers, monthlyCost: spec.monthlyCost };
 };
@@ -117,7 +123,7 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
  * Backlog of each queue from the step before; the result holds it after this one.
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
-  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>): Flow {
+  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string }): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -174,7 +180,9 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const inflowBy: Record<string, Record<string, number>> = {};
   const send = (from: string, channel: string, amount: number) => {
     const type = typeOfChannel(channel);
-    const open = links.filter(l => l.from === from && usable[l.to]);
+    // A DNS sends the users to one Region only: the active one, even when it is dead (the requests then fail until it switches).
+    const regional = !!specOf(from)?.failover && !!regions;
+    const open = links.filter(l => l.from === from && usable[l.to] && (!regional || regionOf(byId.get(l.to) ?? {}) === regions!.active));
     // Where the type can be finished; if nowhere, it still goes to a building that accepts it and is dropped there,
     // so the error shows at the building that has nowhere to send it (as a dead end does today).
     let targets = open.filter(l => canFinish(l.to, type)).map(l => l.to);

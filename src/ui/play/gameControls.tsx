@@ -5,7 +5,7 @@ import type { C4Layer } from './flowCanvas';
 const LAYER_ICON: Record<C4Layer, string> = { 1: '🌐', 2: '▣', 3: '⚙' };
 
 /** Big text in the middle of the map that shows once and fades, like "Round 1… Fight!"; a 3-2-1 count before the wave. */
-export function Announcer({ phase, buildLeft, incident, started }: { phase: string; buildLeft: number; incident: boolean; started: boolean }) {
+export function Announcer({ phase, buildLeft, incident, region = false, started }: { phase: string; buildLeft: number; incident: boolean; region?: boolean; started: boolean }) {
   const [flash, setFlash] = useState<{ id: number; text: string; tone: string } | null>(null);
   const show = (text: string, tone: string, ms = 1800) => {
     const id = Date.now();
@@ -16,7 +16,7 @@ export function Announcer({ phase, buildLeft, incident, started }: { phase: stri
   useEffect(() => { if (started) show(a.build, 'ok', 1400); }, [started]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (phase === 'wave') show(a.live, 'warn'); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (phase === 'drain') show(a.drain, 'warn', 2400); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (incident) show(a.incident, 'bad'); }, [incident]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (incident) show(region ? a.regionIncident : a.incident, 'bad'); }, [incident]); // eslint-disable-line react-hooks/exhaustive-deps
   const count = phase === 'build' && started && buildLeft <= 3 && buildLeft > 0 ? buildLeft : null;
   if (count) return <div key={`c${count}`} className="play-announce count" aria-hidden="true">{count}</div>;
   if (!flash) return null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
 import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setClientLimit, setShardKey, setTtl, starsOf, type GameState } from '../realtime/game';
+import { MAIN, regionOf } from '../realtime/flow';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
 
@@ -14,23 +15,26 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
   const log: string[] = [];
   const want = level.referenceDesign.components;
   // Take away what the reference does not use, and duplicates of a type (the reference has one building per type).
+  const regionOfRef = (c: { params?: Record<string, unknown> }) => String(c.params?.region ?? MAIN);
+  const sameSpot = (x: { type: string; region?: string }, type: string, region: string) => x.type === type && (catalog[type]!.global || regionOf(x) === region);
   for (const b of [...s.buildings]) {
-    const first = s.buildings.find(x => x.type === b.type);
-    if (!want.some(c => c.type === b.type) || first !== b) {
+    const first = s.buildings.find(x => sameSpot(x, b.type, regionOf(b)));
+    if (!want.some(c => sameSpot({ type: c.type, region: regionOfRef(c) }, b.type, regionOf(b))) || first !== b) {
       while (s.buildings.some(x => x.id === b.id)) s = demolish(s, b.id);
       log.push(`demolish ${b.id}`);
     }
   }
   for (const c of want) {
-    if (!s.buildings.some(b => b.type === c.type)) { s = build(s, c.type, level); log.push(`build ${c.type}`); }
-    const b = () => s.buildings.find(x => x.type === c.type);
+    const region = regionOfRef(c);
+    if (!s.buildings.some(b => sameSpot(b, c.type, region))) { s = build(s, c.type, level, undefined, region); log.push(`build ${c.type}`); }
+    const b = () => s.buildings.find(x => sameSpot(x, c.type, region));
     if (!b()) { log.push(`could not build ${c.type} with $${Math.floor(s.money)}`); continue; }
     const size = String(c.params?.size ?? catalog[c.type]!.defaultSize);
     if ((b()!.params.size ?? catalog[c.type]!.defaultSize) !== size) { s = resize(s, b()!.id, size); log.push(`resize ${c.type} to ${size}`); }
     const instances = Number(c.params?.instances ?? 1);
     while (b()!.instances.length < instances) {
       const before = b()!.instances.length;
-      s = build(s, c.type, level);
+      s = build(s, c.type, level, undefined, region);
       if (b()!.instances.length === before) { log.push(`could not add a ${c.type} instance with $${Math.floor(s.money)}`); break; }
     }
     if (c.params?.ttlS !== undefined) s = setTtl(s, b()!.id, Number(c.params.ttlS));
@@ -39,7 +43,11 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
   }
   s = rewire(s);
   // A player also draws the connections the default wiring does not make (the users straight to Object Storage).
-  const idOf = (refId: string) => (refId === 'client' ? 'client' : s.buildings.find(b => b.type === want.find(c => c.id === refId)!.type)!.id);
+  const idOf = (refId: string) => {
+    if (refId === 'client') return 'client';
+    const ref = want.find(c => c.id === refId)!;
+    return s.buildings.find(b => sameSpot(b, ref.type, regionOfRef(ref)))!.id;
+  };
   for (const [from, to] of level.referenceDesign.connections) if (!s.links.some(l => l.from === idOf(from) && l.to === idOf(to))) s = connect(s, idOf(from), idOf(to));
   log.push(`money left after building: $${Math.floor(s.money)}`);
   return { state: runToEnd(s, level), log };
