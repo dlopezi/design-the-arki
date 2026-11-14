@@ -153,7 +153,19 @@ Settled in a grilling session with the owner; engine rules in ADR-0009. Same rul
   5. *Your feed*: reading feeds by gathering every followed account (fan-out on read) overloads the Database; a Feed Worker that writes each post into every follower's feed (fan-out on write) makes reads cheap.
   6. *The celebrity joins*: the review. A celebrity with millions of followers posts in the middle of the wave and fan-out on write explodes; set the Celebrity Limit (hybrid). Later a Worker instance goes down and its group rebalances. It also needs chapter 1 to 4 buildings: load balancer, several app servers, Cache and API Gateway.
 - **Manual**: a Buildings entry for the Topic with *In real life* (Apache Kafka, Amazon Kinesis, Google Pub/Sub, Amazon SNS, Redpanda); Concepts for pub/sub against a queue, consumer groups, Partitions and ordering by key, consumer lag, rebalance, fan-out on write and on read, the celebrity problem and the hybrid feed, retention and replay, at-least-once and exactly-once, the SNS + SQS fan-out pattern.
-- **Look**: decided by real practice with a prototype (ticket of the spec), as for chapters 2 to 4: a text sketch first, then the choice written here.
+- **Look (decided 2026-11-14 with the owner, prototype `prototypes/topic-look.prototype.html`, ticket #91)**: three variants were compared: **A** gauges on the map, **B** the Topic drawn as a log with one marker per Subscription (the Kafka offset picture), **C** the map shows only buildings and the console has a consumer-group table. Chosen: **A**. It uses the same grammar as the Queue Age and the Shards (a gauge on the building, a chart in the console), and it is how Kafka dashboards (Grafana, Confluent) show lag per consumer group and load per Partition. B teaches the log well but crowds the map with four Subscriptions and three Partitions; C hides the problem from the map, which breaks the idea that the map is the system (the same reason C lost in chapter 4).
+  ```
+  top bar:  $540 +0.4/s  ⏱ Wave 0:21 [⏸ 1× 2× 4×]  📨 Notifications 4 s / 5 s  ❤ 86%   (the Subscription closest to its maximum; only in a level with a Topic)
+  map:      🌍 ── [app server] ── [Topic] ──┬── [Worker · Notifications] ■■■   ⏳ ▓▓▓▓▓▓▓▓░ 4 s / 5 s     → push service
+                     ⚠ Hot Partition P1     ├── [Worker · Search]        ■■■   ⏳ ▓▓░░░░░░░ 3 s / 20 s    → search index
+                     P1 ▓▓▓▓▓▓▓ HOT         ├── [Worker · Analytics]     ■■■□□ ⏳ ▓▓▓▓▓░░░░ 35 s / 60 s   → data warehouse
+                     P2 ▓▓░░░  75/s         └── [Worker · Feed]          ■■    ⏳ ░░░░░░░░░ 0 s / 10 s ── [Database]
+                     P3 ▓░░░░  45/s
+  console:  Consumer Lag chart: one line per Subscription, as % of its own maximum, a red dashed line at 100 %
+            Inspector · Topic:  Partitions [− 3 +]   Partition Key [user id ▾] 🔒 (locked in the wave)
+            Inspector · Worker: Subscription [Feed ▾]   Celebrity Limit [100 k followers ▾] (Feed only)   Instances 2 · working 2
+  ```
+  Each Partition has a load bar under the Topic, and a Hot Partition gets a "Hot Partition" mark (as the Hot Shard). Each Worker shows its instances as small squares; instances above the number of Partitions are grey and marked "idle". The lag gauge fills to the Subscription's maximum (amber at 70 %, red at 90 %, like the Queue Age). Workers of Notifications, Search and Analytics show a dashed exit label for where their work goes; the Feed Worker connects to the Database instead. The Consumer Lag chart replaces the RPS chart in levels with a Topic, as the Queue Age chart does in levels with a queue.
 - **Out of scope** (Manual only): ordering of events inside a Partition (the Partition Key only spreads load), retention and replay, exactly-once, dead-letter topics and retries (chapter 6), connecting a Topic to a Message Queue (SNS + SQS), adding Partitions during the wave.
 
 ## Game screen
