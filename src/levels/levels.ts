@@ -62,6 +62,8 @@ const levelSchema = z.object({
     /** Pub/sub levels (ADR-0009): the systems that must each process every post, in order, with the longest their oldest unprocessed post may wait. */
     subscriptions: z.record(z.string(), z.object({ maxLagS: z.number().positive() }))
       .refine(subs => Object.keys(subs).length > 0, 'A level with Subscriptions needs at least one').optional(),
+    /** Levels that teach the Partition Key: the keys on offer (the first is the default) and how posts spread over each one's values. */
+    partitionKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Partition Keys needs at least one key').optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
@@ -147,6 +149,17 @@ const levelSchema = z.object({
   }
   if (subs.length && !allowed.has('worker')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level with Subscriptions must allow a worker (it serves them)' });
+  }
+  // A Partition Key is a setting of the Topic, and a design can only pick one the level offers.
+  if (level.play.partitionKeys && !allowed.has('topic')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that offers Partition Keys must allow a topic' });
+  }
+  const partitionKeys = Object.keys(level.play.partitionKeys ?? {});
+  for (const [path, design] of designs) {
+    for (const c of design.components) {
+      const key = c.params?.partitionKey;
+      if (key !== undefined && !partitionKeys.includes(String(key))) ctx.addIssue({ code: 'custom', path: path.split('.'), message: `Partition Key "${String(key)}" is not on offer in this level` });
+    }
   }
   // In a level with Subscriptions every Worker of a design serves one the level lists.
   for (const [path, design] of subs.length ? designs : []) {

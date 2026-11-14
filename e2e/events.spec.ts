@@ -57,3 +57,20 @@ test('level 29: a Worker instance with no Partition stands idle; one more Partit
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 30: the country key makes a Hot Partition; the user id key, picked in the build phase, spreads the posts', async ({ page }) => {
+  await openLevel(page, '30-hot-partition', 'guided');
+  const topic = page.locator('.play-unit').filter({ hasText: 'Topic' });
+  await topic.click();
+  await page.getByRole('group', { name: 'Partition Key' }).getByRole('button', { name: 'User id' }).click();
+  await expect(page.getByRole('group', { name: 'Partition Key' }).getByRole('button', { name: 'User id' })).toHaveAttribute('aria-pressed', 'true');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});
+
+test('level 30: left on the country key, the base is lost and the hint names the Hot Partition', async ({ page }) => {
+  await openLevel(page, '30-hot-partition', 'normal');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Hot Partition');
+});

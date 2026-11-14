@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, partitionsOf, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
-  demolish, disconnect, maxPartitions, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
+  demolish, disconnect, maxPartitions, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -360,6 +360,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       const topicFed = game.links.some(l => typeOfId(l.from) === 'appServer' && catalog[typeOfId(l.to) ?? '']?.pubSub);
       if (!topicFed) return t.topicHint;
       if (subs.some(sub => !game.buildings.some(b => b.params.subscription === sub && game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub)))) return t.subscriptionHint;
+      if (Object.values(flow?.partitions ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotPartitionHint;
       if (subs.some(subBehind)) return t.consumerLagHint;
     }
     // Async levels: jobs with no queue, a Worker called straight from the app server, or Messages that waited too long.
@@ -428,7 +429,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const isQueue = !!catalog[b.type]!.queue, maxAge = level.requirements.maxQueueAgeS, age = game.queueAge[b.id] ?? 0;
     const ageShare = isQueue && maxAge ? Math.min(1, age / maxAge) : 0;
     // The Shard that gets most of the traffic while the others have room says so on the map.
-    const hotNote = hotShard === k ? `⚠ ${t.rt.inspector.hotShard}` : '';
+    const hotPartition = catalog[b.type]!.partitions ? hotShardOf(flow?.partitions[b.id]) : null;
+    const hotNote = hotShard === k ? `⚠ ${t.rt.inspector.hotShard}` : hotPartition !== null ? `⚠ ${t.rt.inspector.hotPartition} P${hotPartition + 1}` : '';
     // A Worker instance with no Partition left to read stands idle (ADR-0009).
     const fedByTopic = game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub);
     const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? (fedByTopic ? t.rt.inspector.noPartition : t.rt.inspector.idle) : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
@@ -475,8 +477,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   /** Under a Topic: one load bar for each Partition (the busiest Worker instance that reads it). */
   function partitionRows(b: Bld) {
     const loads = flow?.partitions[b.id] ?? new Array<number>(partitionsOf(b)).fill(0);
+    const hot = hotShardOf(loads);
     return loads.map((l, p) => (
-      <span key={p} className="play-prow"><i>P{p + 1}</i><span className={`play-load ${loadClass(l)}`}><span style={{ width: `${Math.round(l * 100)}%` }} /></span></span>
+      <span key={p} className={`play-prow ${hot === p ? 'hot' : ''}`}><i>P{p + 1}</i><span className={`play-load ${loadClass(l)}`}><span style={{ width: `${Math.round(l * 100)}%` }} /></span></span>
     ));
   }
   /** Under a Worker that serves a Subscription: its Consumer Lag, as a gauge that fills towards the level's maximum. */
@@ -580,6 +583,18 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               <button aria-label={i.morePartitions} disabled={!building || count >= most} onClick={() => setGame(g => setPartitions(g, b.id, count + 1, level))}>+</button>
             </span>
           </div>
+        );
+      })()}
+      {spec.partitions && level.play.partitionKeys && (() => {
+        const keys = Object.keys(level.play.partitionKeys!), key = b.params.partitionKey ?? keys[0];
+        return (
+          <fieldset className="play-sizes" aria-label={i.partitionKey}>
+            <legend className="muted">{i.partitionKey}{!building && <> · {i.partitionsLocked}</>}</legend>
+            {keys.map(k => (
+              <button key={k} className={`btn ${k === key ? 'on' : ''}`} aria-pressed={k === key} disabled={k === key || !building}
+                onClick={() => setGame(g => setPartitionKey(g, b.id, k, level))}>{t.shardKeyNames[k] ?? k}</button>
+            ))}
+          </fieldset>
         );
       })()}
       {spec.subscribes && hasTopic && (

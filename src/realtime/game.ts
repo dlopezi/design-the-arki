@@ -41,6 +41,8 @@ export type Play = {
    * their oldest unprocessed post may wait (the Consumer Lag), in seconds.
    */
   subscriptions?: Record<string, { maxLagS: number }>;
+  /** Levels that teach the Partition Key: the keys on offer and how posts spread over the values of each, as for Shard Keys. The first is the default. */
+  partitionKeys?: ShardKeys;
 };
 export type GameLevel = {
   allowedComponents: string[];
@@ -82,6 +84,8 @@ export type GameState = {
   /** Posts each Subscription has not processed yet, and how long the oldest of them has waited, in seconds (ADR-0009). */
   subBacklog: Record<string, number>;
   consumerLag: Record<string, number>;
+  /** What waits in each Partition of a Topic for each Subscription (`topicId|subscription`). */
+  partBacklog: Record<string, number[]>;
   /** A Region failure and the switch to the standby Region: when it fell, when the DNS will switch (null: nothing will), and whether it has. */
   failover: { downAt: number | null; switchAt: number | null; switched: boolean };
   history: Sample[];
@@ -118,7 +122,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
-    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, partBacklog: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -393,6 +397,12 @@ export function setPartitions(s: GameState, id: string, partitions: number, leve
   if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'partitionsLocked' }) };
   return { ...s, buildings: s.buildings.map(x => (x.id === id ? { ...x, params: { ...x.params, partitions } } : x)) };
 }
+/** Picks the Partition Key of a Topic. Only in the build phase, like the Shard Key: changing it moves posts to other Partitions. */
+export function setPartitionKey(s: GameState, id: string, key: string, level: GameLevel): GameState {
+  if (!level.play.partitionKeys?.[key] || !s.buildings.some(b => b.id === id && defaultCatalog[b.type]?.partitions)) return s;
+  if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'partitionKeyLocked' }) };
+  return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, partitionKey: key } } : b)) };
+}
 /** Changes the Client Limit of an API Gateway, in requests per second for each client: free and immediate. */
 export const setClientLimit = (s: GameState, id: string, limitRps: number): GameState =>
   ({ ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, limitRps } } : b)) });
@@ -455,7 +465,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
   const subs = subscriptionsOf(level);
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys);
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;
@@ -466,6 +476,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }));
   // The Consumer Lag of each Subscription: its Backlog over the rate its Workers take posts, or growing with the clock when none takes them.
   s.subBacklog = flow.subBacklog;
+  s.partBacklog = flow.partBacklog;
   s.consumerLag = Object.fromEntries(subs.map(sub => {
     const waiting = flow.subBacklog[sub] ?? 0, rate = flow.subCapacity[sub] ?? 0;
     return [sub, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.consumerLag[sub] ?? 0) + dt];

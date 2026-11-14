@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { hotShardOf } from './flow';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setPartitionKey, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -1191,5 +1192,49 @@ describe('events: Partitions cap how many Worker instances of a Subscription can
     expect(setPartitions(s, 't', 7, level)).toBe(s); // over the level's maximum
     expect(setPartitions(callNow(s), 't', 3, level).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'partitionsLocked' });
     expect(toDesign(s).components.find(c => c.id === 't')!.params).toMatchObject({ partitions: 4 });
+  });
+});
+
+describe('events: the Partition Key spreads posts over the Partitions, and a poor one makes a Hot Partition', () => {
+  // 10 posts/s over 3 Partitions, read by 3 medium instances (4 posts/s each). Country sends 60% of posts to one Partition.
+  const level: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 }, topic: { limits: { partitions: 6 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 50, lengthS: 30, mix: { post: 0.2, readFeed: 0.8 } }, starMoney: [100, 200], subscriptions: { notifications: { maxLagS: 5 } },
+      partitionKeys: { country: [0.6, 0.25, 0.15], userId: [0.17, 0.17, 0.17, 0.17, 0.16, 0.16] } },
+  };
+  const design = (partitionKey: string, partitions = 3, instances = 3): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic', params: { partitions, partitionKey } }, { id: 'w', type: 'worker', params: { subscription: 'notifications', instances } }],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'w']],
+  });
+  const play = (d: Design) => run(callNow(createGame(level, d)), 10, level);
+
+  it('an even key keeps every instance under its capacity', () => {
+    const s = play(design('userId'));
+    expect(hotShardOf(s.flow!.partitions['t'])).toBeNull();
+    expect(s.subBacklog['notifications']).toBeLessThan(1);
+  });
+
+  it('a skewed key sends most posts to one Partition: its instance falls behind while the others have room', () => {
+    const s = play(design('country'));
+    expect(hotShardOf(s.flow!.partitions['t'])).toBe(0);
+    expect(s.subBacklog['notifications']).toBeGreaterThan(15); // about 6 − 4 posts/s for 10 s
+    expect(s.consumerLag['notifications']).toBeGreaterThan(4.5); // about 20 posts waiting in Partition 1, read at 4 posts/s
+    expect(s.partBacklog['t|notifications']![0]).toBeGreaterThan(15); // they wait in the hot Partition, not in the others
+    expect(s.partBacklog['t|notifications']![1]).toBeLessThan(1);
+  });
+
+  it('more Partitions and instances do not cool a Hot Partition: the busy key value stays on one Partition', () => {
+    const s = play(design('country', 6, 4));
+    expect(s.subBacklog['notifications']).toBeGreaterThan(15);
+  });
+
+  it('the key is the first on offer by default, and can be changed only in the build phase', () => {
+    let s = createGame(level, { ...design('country'), components: design('country').components.map(c => (c.id === 't' ? { id: 't', type: 'topic', params: { partitions: 3 } } : c)) });
+    expect(hotShardOf(run(callNow(s), 10, level).flow!.partitions['t'])).toBe(0); // country, the first key
+    s = setPartitionKey(s, 't', 'userId', level);
+    expect(s.buildings.find(b => b.id === 't')!.params.partitionKey).toBe('userId');
+    expect(setPartitionKey(callNow(s), 't', 'country', level).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'partitionKeyLocked' });
   });
 });

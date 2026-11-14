@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setClientLimit, setPartitions, setShardKey, setSubscription, setTtl, starsOf, type GameState } from '../realtime/game';
+import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, type GameState } from '../realtime/game';
 import { MAIN, regionOf } from '../realtime/flow';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
@@ -50,6 +50,7 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
     if (c.params?.limitRps !== undefined) s = setClientLimit(s, b()!.id, Number(c.params.limitRps));
     if (c.params?.shardKey !== undefined) s = setShardKey(s, b()!.id, String(c.params.shardKey), level);
     if (c.params?.partitions !== undefined) s = setPartitions(s, b()!.id, Number(c.params.partitions), level);
+    if (c.params?.partitionKey !== undefined) s = setPartitionKey(s, b()!.id, String(c.params.partitionKey), level);
   }
   s = rewire(s);
   // A player also draws the connections the default wiring does not make (the users straight to Object Storage).
