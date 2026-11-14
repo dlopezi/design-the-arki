@@ -1238,3 +1238,49 @@ describe('events: the Partition Key spreads posts over the Partitions, and a poo
     expect(setPartitionKey(callNow(s), 't', 'country', level).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'partitionKeyLocked' });
   });
 });
+
+describe('events: the news feed is built when posts are written (fan-out on write) or when feeds are read (fan-out on read)', () => {
+  // 5 posts/s and 120 feed reads/s. An account has 30 followers and a user follows 20 accounts. A small database serves 400 req/s.
+  const level: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 125, lengthS: 30, mix: { post: 0.04, readFeed: 0.96 } }, starMoney: [100, 200],
+      subscriptions: { notifications: { maxLagS: 10 }, feed: { maxLagS: 10 } }, feed: { subscription: 'feed', followers: 30, follows: 20 } },
+  };
+  const base: Design['components'] = [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic' }, { id: 'wn', type: 'worker', params: { subscription: 'notifications', instances: 2 } }];
+  const onRead: Design = { components: base, connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'wn']] };
+  const onWrite: Design = {
+    components: [...base, { id: 'wf', type: 'worker', params: { subscription: 'feed', instances: 2 } }],
+    connections: [...onRead.connections, ['t', 'wf'], ['wf', 'db']],
+  };
+  const play = (d: Design) => run(callNow(createGame(level, d)), 10, level);
+
+  it('fan-out on read: each feed read gathers the posts of 20 accounts, and the database cannot keep up', () => {
+    const s = play(onRead);
+    expect(s.flow!.load['db']).toBe(1);
+    expect(s.flow!.errors).toBeGreaterThan(0.5);
+  });
+
+  it('fan-out on write: the Feed Worker writes each post to 30 followers, and a feed read is one read', () => {
+    const s = play(onWrite);
+    expect(s.flow!.edge['wf>db']).toBeCloseTo(5 * 30); // 150 writes/s
+    expect(s.flow!.load['db']).toBeCloseTo((150 + 120) / 400, 1);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.subBacklog['feed']).toBeLessThan(1);
+  });
+
+  it('a Feed Worker with no way to the database writes no feed, so feed reads still gather every account', () => {
+    const cut: Design = { ...onWrite, connections: onWrite.connections.filter(([from]) => from !== 'wf') };
+    expect(play(cut).flow!.load['db']).toBe(1);
+  });
+
+  it('a new Feed Worker connects itself to the Topic and to the database; the others only to the Topic', () => {
+    let s = createGame(level, { components: base.slice(0, 3), connections: [['client', 'api'], ['api', 'db'], ['api', 't']] });
+    s = build(build(s, 'worker', level), 'worker', level);
+    const feedWorker = s.buildings.find(b => b.params.subscription === 'feed')!.id;
+    const notifyWorker = s.buildings.find(b => b.params.subscription === 'notifications')!.id;
+    expect(s.links.some(l => l.from === feedWorker && l.to === 'db')).toBe(true);
+    expect(s.links.some(l => l.from === notifyWorker)).toBe(false);
+  });
+});

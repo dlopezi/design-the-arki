@@ -22,6 +22,8 @@ export const READ_FEED = 'readFeed';
 export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE, POST, READ_FEED];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
+/** Fan-out on write (ADR-0009): a Feed Worker writes each post into every follower's feed. Internal, never in a level's mix. */
+export const FEED_WRITE = 'feedWrite';
 
 // Every component type is a combination of engine primitives plus its numbers (ADR-0004).
 export const catalog: Catalog = {
@@ -47,8 +49,8 @@ export const catalog: Catalog = {
   cache: {
     primitive: 'station', workers: 50, meanServiceMs: 2, monthlyCost: 30, endsRequests: false, buildS: 6,
     shortcut: { param: 'ttlS', defaultValue: 10, halfAt: 30, max: 0.95 },
-    // Only reads are worth caching: a processing job is not.
-    accepts: ['watch'],
+    // Only reads are worth caching: a processing job is not. A feed read can be cached too (a timeline cache, as in Redis).
+    accepts: ['watch', READ_FEED],
     presentation: { zone: 'data', technology: 'Redis' },
   },
   database: {
@@ -57,7 +59,7 @@ export const catalog: Catalog = {
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
     // It serves every kind of read (also Read-your-writes, which a Read Replica cannot), takes writes and the results Workers write; processing a job is not its work.
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED],
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true,
     // In a level that offers Shard Keys its instances are Shards (ADR-0007).
     shardable: true,
     presentation: { zone: 'data', technology: 'PostgreSQL', instancePrefix: 'shard' },
@@ -147,7 +149,7 @@ export const catalog: Catalog = {
   // primary database it replaces. Not a building the player builds.
   promotedReplica: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true, internal: true,
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED], buildS: 7,
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true, buildS: 7,
     sizes: {
       small: { workers: 8, monthlyCost: 50, vcpu: 1 },
       medium: { workers: 16, monthlyCost: 100, vcpu: 2 },

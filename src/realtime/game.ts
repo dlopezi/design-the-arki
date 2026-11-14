@@ -43,6 +43,11 @@ export type Play = {
   subscriptions?: Record<string, { maxLagS: number }>;
   /** Levels that teach the Partition Key: the keys on offer and how posts spread over the values of each, as for Shard Keys. The first is the default. */
   partitionKeys?: ShardKeys;
+  /**
+   * News-feed levels (ADR-0009): the Subscription whose Workers write each post into every follower's feed (fan-out on write),
+   * the followers of an account, and the accounts a user follows (what a feed read gathers without fan-out on write).
+   */
+  feed?: { subscription: string; followers: number; follows: number };
 };
 export type GameLevel = {
   allowedComponents: string[];
@@ -68,6 +73,8 @@ export type GameState = {
   links: Link[];
   /** Whether new buildings are connected automatically. */
   autoLink: boolean;
+  /** The Subscription whose Workers write the feeds into the database (a news-feed level), so a new one connects to it. */
+  feedSubscription?: string;
   /** The Request Types the wave carries: a building the users reach for only some types is useless without them. */
   waveTypes: string[];
   /** Requests answered so far. */
@@ -121,6 +128,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
+    ...(level.play.feed ? { feedSubscription: level.play.feed.subscription } : {}),
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
     visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, partBacklog: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
@@ -198,7 +206,8 @@ function autoLink(s: GameState, b: Building): GameState {
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
   const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'topic', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
   // A Worker that serves a Subscription finishes the posts itself (their work leaves the system), so it needs no way to the database.
-  const writesToDatabase = (w: Building) => !w.params.subscription;
+  // Only the Feed Worker writes to the database: it writes each post into every follower's feed (ADR-0009).
+  const writesToDatabase = (w: Building) => !w.params.subscription || w.params.subscription === s.feedSubscription;
   let next = s;
   // The API Gateway is the one door: when there is one, the users reach the load balancer or the app servers through it.
   if (b.type === 'dns') {
@@ -465,7 +474,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
   const subs = subscriptionsOf(level);
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys, level.play.feed);
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;

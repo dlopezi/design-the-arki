@@ -1,4 +1,4 @@
-import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, POST } from '../catalog/catalog';
+import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, FEED_WRITE, POST, READ_FEED } from '../catalog/catalog';
 import type { Catalog } from '../engine/types';
 
 /**
@@ -50,6 +50,11 @@ function serveShards(b: Building, rps: number, keys: ShardKeys, capacityPerShard
   const served = slices.reduce((sum, slice, k) => sum + (isServing(b.instances[k]!) ? Math.min(slice, capacityPerShard) : 0), 0);
   return { loads, served };
 }
+/**
+ * The news feed of a level (ADR-0009): the Subscription whose Workers write each post into every follower's feed, how many
+ * followers an account has, and how many accounts a user follows.
+ */
+export type FeedModel = { subscription: string; followers: number; follows: number };
 /** A connection; `client` is the users on the Internet. */
 export type Link = { from: string; to: string };
 
@@ -97,6 +102,9 @@ export type Flow = {
   partitions: Record<string, number[]>;
   /** What waits in each Partition of a Topic for each Subscription after this step (`topicId|subscription`). */
   partBacklog: Record<string, number[]>;
+  /** In a news-feed level: whether a Feed Worker writes the feeds ahead (fan-out on write), and what one feed read costs the database, in reads. */
+  fanOutOnWrite: boolean;
+  feedReadCost: number;
 };
 /** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
 export type Queues = { backlog: Record<string, number>; dt: number;
@@ -148,7 +156,7 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
   mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string },
-  subscriptions: string[] = [], partitionKeys?: ShardKeys): Flow {
+  subscriptions: string[] = [], partitionKeys?: ShardKeys, feed?: FeedModel): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -158,9 +166,16 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   /** Writes per second each building served: what a Read Replica has to copy. */
   const writesServed: Record<string, number> = {};
   const add = (map: Record<string, number>, key: string, v: number) => { map[key] = (map[key] ?? 0) + v; };
+  /**
+   * Fan-out on write (ADR-0009): a Worker serving the feed's Subscription, fed posts and with a way to a building that stores feeds.
+   * Without one, every feed read gathers the posts of each followed account (fan-out on read).
+   */
+  const fanOutOnWrite = !!feed && buildings.some(b => b.params.subscription === feed.subscription && links.some(l => l.to === b.id)
+    && links.some(l => l.from === b.id && !!catalog[byId.get(l.to)?.type ?? '']?.feedStore));
+  const feedReadCost = (spec: Catalog[string]) => (feed && spec.feedStore && !fanOutOnWrite ? feed.follows : 1);
   /** The capacity the requests reaching a building use, in normal requests per second: each Request Type weighs by its effort. */
   const demandOn = (id: string, spec: Catalog[string], requests: number) => {
-    const weighted = Object.entries(inflowBy[id] ?? {}).reduce((sum, [channel, x]) => sum + x * (spec.effort?.[typeOfChannel(channel)] ?? 1), 0);
+    const weighted = Object.entries(inflowBy[id] ?? {}).reduce((sum, [channel, x]) => sum + x * (typeOfChannel(channel) === READ_FEED ? feedReadCost(spec) : spec.effort?.[typeOfChannel(channel)] ?? 1), 0);
     return weighted || requests; // no recorded traffic by type (nothing reached it): the plain request count
   };
   /** Whether a building is split into several Shards: a shardable one, with more than one instance, in a level that offers Shard Keys. */
@@ -194,7 +209,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const types = Object.keys(mix);
   const emitted = Object.values(catalog).flatMap(spec => (spec.emits ? [spec.emits] : []));
   // A channel is a type of request, for the users (`job`) or released by a queue (`job#bg`).
-  const channels = [...new Set([...types, ...emitted])].flatMap(t => [t, t + BACKGROUND]);
+  const channels = [...new Set([...types, ...emitted, ...(feed ? [FEED_WRITE] : [])])].flatMap(t => [t, t + BACKGROUND]);
   const specOf = (id: string) => catalog[byId.get(id)?.type ?? ''];
   const accepts = (id: string, type: string) => { const list = specOf(id)?.accepts; return !list || list.includes(type); };
   const finishable = new Map<string, boolean>();
@@ -334,6 +349,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
         if (!isBackground(c)) { answered += taken(c); if (typeOfChannel(c) === POST) published += taken(c); }
         const sub = b.params.subscription;
         if (sub) processed[sub] = (processed[sub] ?? 0) + taken(c);
+        // A Feed Worker writes the post into the feed of every follower: background work, never the users' own requests.
+        if (feed && sub === feed.subscription && typeOfChannel(c) === POST) send(id, FEED_WRITE + BACKGROUND, taken(c) * feed.followers);
         continue;
       }
       // A Client Limit passes at most so many requests per second for each client of a type the level counts clients for.
@@ -396,7 +413,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog,
+    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog, fanOutOnWrite, feedReadCost: feed && !fanOutOnWrite ? feed.follows : 1,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

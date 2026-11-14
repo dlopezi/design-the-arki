@@ -1,0 +1,280 @@
+{
+  "id": "31-your-feed",
+  "chapter": "Events",
+  "title": "Your feed",
+  "brief": "People open their feed far more often than they post: 120 feed reads and 5 posts arrive each second. A user follows 20 accounts, so building the feed when it is read (fan-out on read) means 20 reads for every feed: 2,400 reads a second, more than any database tier. Build it when posts are written instead (fan-out on write): a Worker for the Feed Subscription writes each post into the feed of every follower, 30 writes per post, and reading a feed becomes one read.",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 125
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 600,
+  "starCostThresholds": [
+    500,
+    450
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database",
+    "topic",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 3
+    }
+  },
+  "guidedHint": "The Feed Worker is ready, but it has no way to the Database, so it writes no feed and every feed read still gathers 20 accounts. Connect the Feed Worker to the Database.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 125,
+      "lengthS": 60,
+      "mix": {
+        "post": 0.04,
+        "readFeed": 0.96
+      }
+    },
+    "starMoney": [
+      100,
+      180
+    ],
+    "subscriptions": {
+      "notifications": {
+        "maxLagS": 10
+      },
+      "feed": {
+        "maxLagS": 10
+      }
+    },
+    "feed": {
+      "subscription": "feed",
+      "followers": 30,
+      "follows": 20
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "topic",
+          "type": "topic"
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications",
+            "instances": 2
+          }
+        },
+        {
+          "id": "feed",
+          "type": "worker",
+          "params": {
+            "subscription": "feed",
+            "instances": 2
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ],
+        [
+          "topic",
+          "feed"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "topic",
+          "type": "topic"
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications",
+            "instances": 2
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database",
+          "params": {
+            "size": "large"
+          }
+        },
+        {
+          "id": "topic",
+          "type": "topic"
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications",
+            "instances": 2
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "api",
+        "type": "appServer"
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "topic",
+        "type": "topic"
+      },
+      {
+        "id": "notify",
+        "type": "worker",
+        "params": {
+          "subscription": "notifications",
+          "instances": 2
+        }
+      },
+      {
+        "id": "feed",
+        "type": "worker",
+        "params": {
+          "subscription": "feed",
+          "instances": 2
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "api",
+        "topic"
+      ],
+      [
+        "topic",
+        "notify"
+      ],
+      [
+        "topic",
+        "feed"
+      ],
+      [
+        "feed",
+        "db"
+      ]
+    ]
+  }
+}

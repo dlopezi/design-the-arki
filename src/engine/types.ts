@@ -102,6 +102,11 @@ export type StationPrimitive = {
    * many instances as there are Partitions (ADR-0009).
    */
   partitions?: { defaultValue: number; costEach: number };
+  /**
+   * It answers feed reads (ADR-0009). With fan-out on read (no Feed Worker writing the feeds ahead), one feed read costs it one
+   * read per followed account; with fan-out on write, one read.
+   */
+  feedStore?: boolean;
   /** Request Types it finishes itself: their work leaves the system from here (a Worker sends a notification to a push service). */
   ends?: string[];
   /** In a level with Subscriptions, each building of this type serves one of them (param `subscription`): a consumer group (ADR-0009). */

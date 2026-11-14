@@ -359,6 +359,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     if (hasTopic && (level.play.wave.mix?.[POST] ?? 0) > 0) {
       const topicFed = game.links.some(l => typeOfId(l.from) === 'appServer' && catalog[typeOfId(l.to) ?? '']?.pubSub);
       if (!topicFed) return t.topicHint;
+      // News feed: without a Feed Worker writing the feeds into the database, every feed read gathers each followed account.
+      if (level.play.feed && !flow?.fanOutOnWrite) return t.fanOutHint(level.play.feed.follows);
       if (subs.some(sub => !game.buildings.some(b => b.params.subscription === sub && game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub)))) return t.subscriptionHint;
       if (Object.values(flow?.partitions ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotPartitionHint;
       if (subs.some(subBehind)) return t.consumerLagHint;
@@ -411,7 +413,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const loadClass = (load: number) => (load >= FULL_LOAD ? 'high' : load >= ROOMY_LOAD ? 'medium' : '');
   const noEntry = (b: Bld) => !game.links.some(l => l.to === b.id);
   // A Worker that finishes posts itself (its work leaves the system) needs no way out in a level with posts.
-  const endsHere = (b: Bld) => !!catalog[b.type]!.ends?.some(type => game.waveTypes.includes(type));
+  // The Feed Worker is the exception: it writes each post into the followers' feeds, so it needs its way to the database (ADR-0009).
+  const endsHere = (b: Bld) => !!catalog[b.type]!.ends?.some(type => game.waveTypes.includes(type)) && !(level.play.feed && b.params.subscription === level.play.feed.subscription);
   const deadEnd = (b: Bld) => !catalog[b.type]!.endsRequests && !endsHere(b) && !game.links.some(l => l.from === b.id);
   function piece(b: Bld, k: number, size: number) {
     const inst = b.instances[k]!, scaled = hasInstances(b.type), hotShard = hotShardOf(flow?.shards[b.id]);
@@ -549,6 +552,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {hasTopic && b.params.subscription && level.play.subscriptions?.[b.params.subscription] && <><dt>{t.rt.consumerLag}</dt><dd className={subBehind(b.params.subscription) ? 'bad' : ''}>{t.rt.consumerLagOf(game.consumerLag[b.params.subscription] ?? 0, subMax(b.params.subscription))}</dd></>}
         {spec.pubSub && subs.map(sub => <Fragment key={sub}><dt>{subName(sub)}</dt><dd className={subBehind(sub) ? 'bad' : ''}>{t.rt.messages(Math.round(game.subBacklog[sub] ?? 0))} · {t.rt.consumerLagOf(game.consumerLag[sub] ?? 0, subMax(sub))}</dd></Fragment>)}
         {spec.queue && <><dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(game.backlog[b.id] ?? 0))}</dd><dt>{t.rt.queueAge}</dt><dd>{t.rt.queueAgeOf(game.queueAge[b.id] ?? 0, level.requirements.maxQueueAgeS)}</dd></>}
+        {spec.feedStore && level.play.feed && <><dt>{i.feedRead}</dt><dd className={flow && !flow.fanOutOnWrite ? 'bad' : ''}>{i.feedReadCost(flow?.feedReadCost ?? level.play.feed.follows, !!flow?.fanOutOnWrite)}</dd></>}
         {!spec.presentation?.hideCapacity && <><dt>{i.capacity}</dt><dd>{i.perSecond(Math.round(capacityOf(b) * Math.max(1, serving)))}</dd></>}
         {spec.shortcut && <><dt>{i.hitRate}</dt><dd>{Math.round(hitRateOf(b) * 100)}%</dd></>}
         <dt>{i.upkeep}</dt><dd>{i.money((price * b.instances.length) / UPKEEP_DIVISOR)}</dd>
