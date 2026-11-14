@@ -1,0 +1,471 @@
+{
+  "id": "26-worldwide-launch",
+  "chapter": "Edge",
+  "title": "Worldwide launch",
+  "brief": "Launch day for the whole world, and everything goes wrong at once: 700 requests arrive every second. 245 are downloads of a viral video, and Object Storage cannot send out that many files. Three clients send 315 requests, far more than the 35 normal clients send in all, and they fill your app servers. People also upload 35 big files a second, which must not go through the app servers. And 45 seconds into the wave the whole main Region goes down. Use what you learned: a CDN in front of Object Storage, an API Gateway with a Client Limit at the door, a DNS in front of a standby Region with a Read Replica, and uploads straight to Object Storage. The API Gateway, the CDN, the DNS and Object Storage stand outside the Regions, so they survive.",
+  "durationS": 70,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 70,
+      "rps": 700
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 800,
+  "starCostThresholds": [
+    700,
+    600
+  ],
+  "allowedComponents": [
+    "cdn",
+    "apiGateway",
+    "dns",
+    "loadBalancer",
+    "appServer",
+    "database",
+    "readReplica",
+    "objectStorage"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 2
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "readReplica": {
+      "sizes": [
+        "small"
+      ],
+      "maxInstances": 1
+    },
+    "cdn": {
+      "limits": {
+        "ttlS": 120
+      }
+    },
+    "apiGateway": {
+      "limits": {
+        "limitRps": 100
+      }
+    }
+  },
+  "guidedHint": "Four problems, four answers. Downloads: a CDN in front of Object Storage. Abusive clients: a Client Limit on the API Gateway. Uploads: connect the users straight to Object Storage. A Region that falls: a standby Region and a DNS with a short TTL (10 s is enough). Check that the DNS reaches both Regions.",
+  "play": {
+    "startMoney": 800,
+    "wave": {
+      "rps": 700,
+      "lengthS": 70,
+      "mix": {
+        "download": 0.35,
+        "abusive": 0.45,
+        "watch": 0.15,
+        "upload": 0.05
+      }
+    },
+    "clients": {
+      "watch": 35,
+      "abusive": 3
+    },
+    "incident": {
+      "atS": 45,
+      "region": "main"
+    },
+    "starMoney": [
+      100,
+      530
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "gw",
+          "type": "apiGateway",
+          "params": {
+            "limitRps": 40
+          }
+        },
+        {
+          "id": "dns",
+          "type": "dns",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "cdn",
+          "type": "cdn",
+          "params": {
+            "ttlS": 40
+          }
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        },
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "lb2",
+          "type": "loadBalancer",
+          "params": {
+            "region": "standby"
+          }
+        },
+        {
+          "id": "api2",
+          "type": "appServer",
+          "params": {
+            "region": "standby",
+            "instances": 2
+          }
+        },
+        {
+          "id": "rep",
+          "type": "readReplica",
+          "params": {
+            "region": "standby"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "gw"
+        ],
+        [
+          "gw",
+          "dns"
+        ],
+        [
+          "dns",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "cdn",
+          "files"
+        ],
+        [
+          "client",
+          "cdn"
+        ],
+        [
+          "client",
+          "files"
+        ],
+        [
+          "lb2",
+          "api2"
+        ],
+        [
+          "api2",
+          "rep"
+        ],
+        [
+          "rep",
+          "db"
+        ],
+        [
+          "dns",
+          "lb2"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "gw",
+          "type": "apiGateway",
+          "params": {
+            "limitRps": 100
+          }
+        },
+        {
+          "id": "dns",
+          "type": "dns",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "cdn",
+          "type": "cdn",
+          "params": {
+            "ttlS": 40
+          }
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        },
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "lb2",
+          "type": "loadBalancer",
+          "params": {
+            "region": "standby"
+          }
+        },
+        {
+          "id": "api2",
+          "type": "appServer",
+          "params": {
+            "region": "standby",
+            "instances": 2
+          }
+        },
+        {
+          "id": "rep",
+          "type": "readReplica",
+          "params": {
+            "region": "standby"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "gw"
+        ],
+        [
+          "gw",
+          "dns"
+        ],
+        [
+          "dns",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "cdn",
+          "files"
+        ],
+        [
+          "api",
+          "files"
+        ],
+        [
+          "lb2",
+          "api2"
+        ],
+        [
+          "api2",
+          "rep"
+        ],
+        [
+          "rep",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "gw",
+        "type": "apiGateway",
+        "params": {
+          "limitRps": 40
+        }
+      },
+      {
+        "id": "dns",
+        "type": "dns",
+        "params": {
+          "ttlS": 10
+        }
+      },
+      {
+        "id": "cdn",
+        "type": "cdn",
+        "params": {
+          "ttlS": 40
+        }
+      },
+      {
+        "id": "files",
+        "type": "objectStorage"
+      },
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 2
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "lb2",
+        "type": "loadBalancer",
+        "params": {
+          "region": "standby"
+        }
+      },
+      {
+        "id": "api2",
+        "type": "appServer",
+        "params": {
+          "region": "standby",
+          "instances": 2
+        }
+      },
+      {
+        "id": "rep",
+        "type": "readReplica",
+        "params": {
+          "region": "standby"
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "gw"
+      ],
+      [
+        "gw",
+        "dns"
+      ],
+      [
+        "dns",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "cdn",
+        "files"
+      ],
+      [
+        "client",
+        "cdn"
+      ],
+      [
+        "client",
+        "files"
+      ],
+      [
+        "lb2",
+        "api2"
+      ],
+      [
+        "api2",
+        "rep"
+      ],
+      [
+        "rep",
+        "db"
+      ],
+      [
+        "dns",
+        "lb2"
+      ]
+    ]
+  }
+}

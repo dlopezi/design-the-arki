@@ -41,6 +41,8 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
+/** The plot for the buildings that belong to no Region (the DNS, the gateway, the CDN, Object Storage). */
+const GLOBAL = 'global';
 /** The order buildings stand in a zone: the way a request travels. */
 const ORDER = ['dns', 'cdn', 'apiGateway', 'loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'promotedReplica', 'database', 'objectStorage'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
@@ -405,7 +407,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     );
   }
   function zoneContent(zone: string, region?: string) {
-    const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone && (!region || (!catalog[b.type]!.global && regionOf(b) === region)))
+    const here = game.buildings.filter(b => catalog[b.type]!.presentation?.zone === zone && (!region || (region === GLOBAL ? !!catalog[b.type]!.global : !catalog[b.type]!.global && regionOf(b) === region)))
       .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
     if (layer === 2) {
       return here.map(b => {
@@ -595,7 +597,16 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
                   </div>
                 : hasRegions
                   ? <>
-                    {game.buildings.filter(b => catalog[b.type]!.global).map(b => <div key={b.id} className="play-front">{piece(b, 0, 64)}</div>)}
+                    {game.buildings.some(b => catalog[b.type]!.global) && (
+                      <div className="play-system region-global" data-region={GLOBAL}>
+                        <span className="label">{t.rt.regions.global}</span>
+                        <div className="play-zones">
+                          {ZONES.filter(z => game.buildings.some(b => catalog[b.type]!.global && catalog[b.type]!.presentation?.zone === z)).map(z => (
+                            <div key={z} className={`play-zone zone-${z}`}><span className="zname">{t.zones[z]} <small>[{t.container}]</small></span>{zoneContent(z, GLOBAL)}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="play-regions">
                       {[MAIN, STANDBY].map(r => {
                         const mine = game.buildings.filter(b => !catalog[b.type]!.global && regionOf(b) === r);

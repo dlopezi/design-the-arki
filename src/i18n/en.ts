@@ -516,7 +516,7 @@ export const en = {
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
     incidentInfo: (type: string, s: number) => `${s} s into the wave, one ${type} instance goes down.`,
     regionIncidentInfo: (s: number) => `${s} s into the wave, the whole main Region goes down.`,
-    regions: { main: 'Region 1 · main', standby: 'Region 2 · standby', live: 'LIVE', down: 'DOWN', standbyTag: 'STANDBY', promoted: 'LIVE · promoted', empty: 'Empty standby Region: build here the same way as the main one.', buildIn: 'Build in', dnsTtl: (s: number) => `DNS TTL ${s} s`, failoverIn: (s: number) => `Failover in ${s} s`, switched: 'Switched to Region 2' },
+    regions: { global: 'Outside the Regions', main: 'Region 1 · main', standby: 'Region 2 · standby', live: 'LIVE', down: 'DOWN', standbyTag: 'STANDBY', promoted: 'LIVE · promoted', empty: 'Empty standby Region: build here the same way as the main one.', buildIn: 'Build in', dnsTtl: (s: number) => `DNS TTL ${s} s`, failoverIn: (s: number) => `Failover in ${s} s`, switched: 'Switched to Region 2' },
     map: 'Map', zoomIn: 'Zoom in', zoomOut: 'Zoom out', center: 'Center',
     autoLink: (on: boolean) => `Auto-connect: ${on ? 'on' : 'off'}`,
     rewire: 'Reconnect',

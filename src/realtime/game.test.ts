@@ -998,3 +998,38 @@ describe('edge: a standby Region, the DNS and a Region that falls', () => {
     expect(saved.components.find(c => c.id === 'lb')!.params?.region).toBeUndefined();
   });
 });
+
+describe('edge: the buildings that stand outside the Regions, and the way in through the gateway and the DNS', () => {
+  const lvl: GameLevel = {
+    allowedComponents: ['cdn', 'apiGateway', 'dns', 'loadBalancer', 'appServer', 'database', 'readReplica', 'objectStorage'],
+    componentOptions: { appServer: { maxInstances: 2 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 2000, wave: { rps: 700, lengthS: 70, mix: { download: 0.35, abusive: 0.45, watch: 0.15, upload: 0.05 } }, clients: { watch: 35, abusive: 3 }, incident: { atS: 45, region: 'main' }, starMoney: [100, 300] },
+  };
+  const built = (order: [string, string?][]) => order.reduce((acc, [type, region]) => build(acc, type, lvl, undefined, region ?? 'main'), createGame(lvl, { components: [], connections: [] }));
+
+  it('the gateway stands in front of the DNS, in any build order: the users reach the gateway, the gateway the DNS, the DNS each Region', () => {
+    const wired = ['apiGateway>dns', 'client>apiGateway', 'dns>loadBalancer', 'dns>loadBalancer'];
+    const parts: [string, string?][] = [['loadBalancer'], ['loadBalancer', 'standby']];
+    const a = named(built([...parts, ['dns'], ['apiGateway']])).sort();
+    const b = named(built([...parts, ['apiGateway'], ['dns']])).sort();
+    const c = named(built([['apiGateway'], ['dns'], ...parts])).sort();
+    expect(a).toEqual(wired);
+    expect(b).toEqual(wired);
+    expect(c).toEqual(wired);
+  });
+
+  it('the CDN, the gateway and Object Storage belong to no Region, so a Region that falls does not take them down', () => {
+    const l: GameLevel = { ...lvl, play: { ...lvl.play, incident: { atS: 1, region: 'main' } } };
+    let s = createGame(l, { components: [{ id: 'cdn', type: 'cdn' }, { id: 'gw', type: 'apiGateway' }, { id: 'files', type: 'objectStorage' }, { id: 'lb', type: 'loadBalancer' }], connections: [] });
+    s = run(callNow(s), 3, l);
+    expect(s.buildings.find(b => b.id === 'lb')!.instances.every(i => i.down)).toBe(true);
+    for (const id of ['cdn', 'gw', 'files']) expect(s.buildings.find(b => b.id === id)!.instances.every(i => !i.down)).toBe(true);
+  });
+
+  it('a global building is one for the whole design, wherever it is built', () => {
+    const s = built([['objectStorage', 'standby'], ['cdn', 'standby'], ['apiGateway', 'standby']]);
+    expect(s.buildings.every(b => b.region === undefined)).toBe(true);
+    expect(buildProblem(s, 'cdn', lvl, undefined, 'main')).toBe('built');
+  });
+});
