@@ -113,7 +113,7 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
     id: c.id, type: c.type, ...(c.params?.region && c.params.region !== MAIN ? { region: String(c.params.region) } : {}),
-    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}), ...(c.params?.subscription ? { subscription: String(c.params.subscription) } : {}) },
+    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}), ...(c.params?.subscription ? { subscription: String(c.params.subscription) } : {}), ...(c.params?.partitions !== undefined ? { partitions: Number(c.params.partitions) } : {}), ...(c.params?.partitionKey ? { partitionKey: String(c.params.partitionKey) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
@@ -380,6 +380,18 @@ export function setSubscription(s: GameState, id: string, subscription: string, 
   if (!level.play.subscriptions?.[subscription] || !s.buildings.some(b => b.id === id && defaultCatalog[b.type]?.subscribes)) return s;
   if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'subscriptionLocked' }) };
   return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, subscription } } : b)) };
+}
+/** The most Partitions a Topic may have in a level. */
+export const maxPartitions = (level: Pick<GameLevel, 'componentOptions'>) => level.componentOptions['topic']?.limits?.['partitions'] ?? 12;
+/**
+ * Sets how many Partitions a Topic has. Only in the build phase: in Kafka, adding Partitions moves keys to other Partitions,
+ * so teams plan them before going live (ADR-0009). Each Partition costs a little every month.
+ */
+export function setPartitions(s: GameState, id: string, partitions: number, level: GameLevel): GameState {
+  const b = s.buildings.find(x => x.id === id);
+  if (!b || !defaultCatalog[b.type]?.partitions || partitions < 1 || partitions > maxPartitions(level)) return s;
+  if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'partitionsLocked' }) };
+  return { ...s, buildings: s.buildings.map(x => (x.id === id ? { ...x, params: { ...x.params, partitions } } : x)) };
 }
 /** Changes the Client Limit of an API Gateway, in requests per second for each client: free and immediate. */
 export const setClientLimit = (s: GameState, id: string, limitRps: number): GameState =>

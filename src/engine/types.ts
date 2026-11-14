@@ -96,6 +96,12 @@ export type StationPrimitive = {
    * of the level and gives every Subscription its own copy, released to the buildings that serve that Subscription.
    */
   pubSub?: boolean;
+  /**
+   * Its log is split into Partitions (param `partitions`, default `defaultValue`), each costing `costEach` a month on top of
+   * `monthlyCost`. Only one Worker instance of a Subscription reads a Partition at a time, so a Subscription uses at most as
+   * many instances as there are Partitions (ADR-0009).
+   */
+  partitions?: { defaultValue: number; costEach: number };
   /** Request Types it finishes itself: their work leaves the system from here (a Worker sends a notification to a push service). */
   ends?: string[];
   /** In a level with Subscriptions, each building of this type serves one of them (param `subscription`): a consumer group (ADR-0009). */

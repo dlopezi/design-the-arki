@@ -1,0 +1,305 @@
+{
+  "id": "29-too-much-for-one-worker",
+  "chapter": "Events",
+  "title": "Too much for one Worker",
+  "brief": "The network grows: ten posts arrive each second, and one Worker instance takes four. Notifications and Search each need three instances. But a Topic is split into Partitions, and only one instance of a Subscription reads a Partition at a time: with two Partitions, a third instance has nothing to read and stands idle. Raise the Partitions of the Topic in the Build Phase, then add the instances. Each Partition costs a little each month.",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 50
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 600,
+  "starCostThresholds": [
+    500,
+    450
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database",
+    "topic",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 4
+    },
+    "topic": {
+      "limits": {
+        "partitions": 6
+      }
+    }
+  },
+  "guidedHint": "Each Worker has three instances, but the Topic has only two Partitions, so one instance of each stands idle. Select the Topic and raise its Partitions to 3 before the wave: Partitions are locked once the users arrive.",
+  "play": {
+    "startMoney": 600,
+    "wave": {
+      "rps": 50,
+      "lengthS": 60,
+      "mix": {
+        "post": 0.2,
+        "readFeed": 0.8
+      }
+    },
+    "starMoney": [
+      100,
+      180
+    ],
+    "subscriptions": {
+      "notifications": {
+        "maxLagS": 10
+      },
+      "search": {
+        "maxLagS": 20
+      }
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "topic",
+          "type": "topic",
+          "params": {
+            "partitions": 2
+          }
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications",
+            "instances": 3
+          }
+        },
+        {
+          "id": "search",
+          "type": "worker",
+          "params": {
+            "subscription": "search",
+            "instances": 3
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ],
+        [
+          "topic",
+          "search"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "topic",
+          "type": "topic",
+          "params": {
+            "partitions": 3
+          }
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications"
+          }
+        },
+        {
+          "id": "search",
+          "type": "worker",
+          "params": {
+            "subscription": "search"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ],
+        [
+          "topic",
+          "search"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "api",
+          "type": "appServer"
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "topic",
+          "type": "topic",
+          "params": {
+            "partitions": 1
+          }
+        },
+        {
+          "id": "notify",
+          "type": "worker",
+          "params": {
+            "subscription": "notifications",
+            "instances": 4
+          }
+        },
+        {
+          "id": "search",
+          "type": "worker",
+          "params": {
+            "subscription": "search",
+            "instances": 4
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "topic"
+        ],
+        [
+          "topic",
+          "notify"
+        ],
+        [
+          "topic",
+          "search"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "api",
+        "type": "appServer"
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "topic",
+        "type": "topic",
+        "params": {
+          "partitions": 3
+        }
+      },
+      {
+        "id": "notify",
+        "type": "worker",
+        "params": {
+          "subscription": "notifications",
+          "instances": 3
+        }
+      },
+      {
+        "id": "search",
+        "type": "worker",
+        "params": {
+          "subscription": "search",
+          "instances": 3
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "api",
+        "topic"
+      ],
+      [
+        "topic",
+        "notify"
+      ],
+      [
+        "topic",
+        "search"
+      ]
+    ]
+  }
+}

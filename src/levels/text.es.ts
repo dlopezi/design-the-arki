@@ -164,4 +164,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Llegan seis posts por segundo. Notifications debe llegar rápido a los seguidores: su Consumer Lag puede ser de 5 s como mucho. Analytics solo prepara un informe, así que puede quedarse atrás hasta 30 s y ponerse al día después de la oleada. Cada Subscription tiene sus propios Workers y su propio Backlog, así que un Analytics lento nunca frena a Notifications. Una instancia de Worker toma 4 posts por segundo. Da a cada Subscription los Workers que necesita, y ni uno más.',
     guidedHint: 'Notifications se queda atrás: una instancia de Worker toma 4 posts por segundo, y llegan 6. Añade una instancia al Worker de Notifications. Analytics puede esperar hasta 30 s, así que le basta una instancia.',
   },
+  '29-too-much-for-one-worker': {
+    title: 'Demasiado para un Worker',
+    brief: 'La red crece: llegan diez posts por segundo, y una instancia de Worker toma cuatro. Notifications y Search necesitan tres instancias cada una. Pero un Topic se divide en Partitions, y solo una instancia de una Subscription lee una Partition a la vez: con dos Partitions, una tercera instancia no tiene nada que leer y se queda parada. Sube las Partitions del Topic en la fase de construcción y luego añade las instancias. Cada Partition cuesta un poco al mes.',
+    guidedHint: 'Cada Worker tiene tres instancias, pero el Topic solo tiene dos Partitions, así que una instancia de cada uno se queda parada. Selecciona el Topic y sube sus Partitions a 3 antes de la oleada: las Partitions se bloquean cuando llegan los usuarios.',
+  },
 };

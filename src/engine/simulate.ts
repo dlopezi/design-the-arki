@@ -48,6 +48,8 @@ type SimEvent =
 /** Workers and monthly cost per instance, after applying the `size` param. */
 function perInstance(component: Design['components'][number], catalog: Catalog): { workers: number; monthlyCost: number } {
   const spec = catalog[component.type]!;
+  // A Topic costs a base price plus each of its Partitions (ADR-0009).
+  if (spec.partitions) return { workers: spec.workers, monthlyCost: spec.monthlyCost + spec.partitions.costEach * Math.max(1, Number(component.params?.partitions ?? spec.partitions.defaultValue)) };
   if (!spec.sizes) return { workers: spec.workers, monthlyCost: spec.monthlyCost };
   const size = component.params?.size ?? spec.defaultSize;
   const chosen = spec.sizes[size as string];

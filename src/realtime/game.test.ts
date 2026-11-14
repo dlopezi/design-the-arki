@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -1143,5 +1143,53 @@ describe('events: a Topic keeps every post for each Subscription, served by its 
   it('a Topic that still holds posts for a Subscription cannot be removed', () => {
     const s = play(live(withTopic(2, 1)), 10);
     expect(demolish(s, 't').events.at(-1)).toMatchObject({ kind: 'refused', reason: 'topicHoldsMessages' });
+  });
+});
+
+describe('events: Partitions cap how many Worker instances of a Subscription can work', () => {
+  // 10 posts/s; a medium Worker takes 4, so three instances are needed, and three Partitions for them to work.
+  const level: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 }, topic: { limits: { partitions: 6 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 50, lengthS: 30, mix: { post: 0.2, readFeed: 0.8 } }, starMoney: [100, 200], subscriptions: { notifications: { maxLagS: 5 } } },
+  };
+  const design = (partitions: number, instances: number): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic', params: { partitions } }, { id: 'w', type: 'worker', params: { subscription: 'notifications', instances } }],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'w']],
+  });
+  const live = (d: Design) => callNow(createGame(level, d));
+
+  it('instances beyond the number of Partitions do no work: three Workers on two Partitions take 8 posts/s, not 12', () => {
+    const s = run(live(design(2, 3)), 10, level);
+    expect(s.flow!.usable['w']).toBe(2);
+    expect(s.flow!.subRelease['notifications']).toBeCloseTo(8);
+    expect(s.subBacklog['notifications']).toBeGreaterThan(15);
+  });
+
+  it('with as many Partitions as instances every instance works and the Subscription keeps up', () => {
+    const s = run(live(design(3, 3)), 10, level);
+    expect(s.flow!.usable['w']).toBe(3);
+    expect(s.subBacklog['notifications']).toBeLessThan(1);
+    expect(s.flow!.partitions['t']).toHaveLength(3);
+    expect(s.flow!.partitions['t']!.every(l => l > 0.8 && l <= 1)).toBe(true); // 10/3 posts/s on each 4 posts/s instance
+  });
+
+  it('more Partitions than instances: one instance reads several Partitions', () => {
+    const s = run(live(design(4, 2)), 10, level);
+    expect(s.flow!.usable['w']).toBe(2);
+    expect(s.flow!.subRelease['notifications']).toBeCloseTo(8);
+  });
+
+  it('each Partition costs $5 a month on top of the Topic price, and Partitions change only in the build phase', () => {
+    let s = createGame(level, design(2, 1));
+    const price = (st: GameState) => upkeepPerS(st);
+    const before = price(s);
+    s = setPartitions(s, 't', 4, level);
+    expect(s.buildings.find(b => b.id === 't')!.params.partitions).toBe(4);
+    expect(price(s) - before).toBeCloseTo(10 / 100);
+    expect(setPartitions(s, 't', 7, level)).toBe(s); // over the level's maximum
+    expect(setPartitions(callNow(s), 't', 3, level).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'partitionsLocked' });
+    expect(toDesign(s).components.find(c => c.id === 't')!.params).toMatchObject({ partitions: 4 });
   });
 });

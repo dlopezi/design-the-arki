@@ -96,9 +96,11 @@ export const catalog: Catalog = {
     presentation: { zone: 'application', technology: 'Celery', instancePrefix: 'worker' },
   },
   // Chapter 5 (Events). A Kafka-like Topic: it answers a post at once and keeps a copy of it for every Subscription, each
-  // with its own Backlog, released to that Subscription's Workers at their capacity (ADR-0009). A fixed price, no settings yet.
+  // with its own Backlog, released to that Subscription's Workers at their capacity (ADR-0009). Split into Partitions:
+  // $20 plus $5 for each, two by default ($30); a Subscription uses at most one Worker instance per Partition.
   topic: {
-    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, pubSub: true, distributes: true, accepts: [POST], buildS: 4,
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, pubSub: true, distributes: true, accepts: [POST], buildS: 4,
+    partitions: { defaultValue: 2, costEach: 5 },
     presentation: { zone: 'application', technology: 'Apache Kafka', hideCapacity: true },
   },
   // Chapter 3 (Data scale). Managed object storage: a fixed price, no settings, and a capacity that never fills in these
