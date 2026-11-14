@@ -32,6 +32,8 @@ export type Play = {
   incident?: { atS: number; componentType: string };
   /** Money left at the end for the 2nd, 3rd… star. */
   starMoney: number[];
+  /** Levels with abusive clients: how many clients send each Request Type, so a Client Limit can be applied to each one's rate (ADR-0008). */
+  clients?: Record<string, number>;
   /** Levels that teach Sharding: the Shard Keys on offer and how traffic spreads over the values of each (ADR-0007). The first is the default. */
   shardKeys?: ShardKeys;
 };
@@ -93,7 +95,7 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
     id: c.id, type: c.type,
-    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}) },
+    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
@@ -297,6 +299,9 @@ export function setShardKey(s: GameState, id: string, key: string, level: GameLe
   if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'shardKeyLocked' }) };
   return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, shardKey: key } } : b)) };
 }
+/** Changes the Client Limit of an API Gateway, in requests per second for each client: free and immediate. */
+export const setClientLimit = (s: GameState, id: string, limitRps: number): GameState =>
+  ({ ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, limitRps } } : b)) });
 /** Changes a cache's TTL: free and immediate. */
 export const setTtl = (s: GameState, id: string, ttlS: number): GameState =>
   ({ ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, ttlS } } : b)) });
@@ -339,7 +344,7 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys, level.play.clients);
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;

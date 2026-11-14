@@ -61,6 +61,12 @@ export type StationPrimitive = {
    */
   effort?: Record<string, number>;
   /**
+   * Per-client limit (real-time play): of each Request Type whose clients the level counts, this building passes at most the
+   * `param` value in requests per second for each client. The rest of an abusive type is turned away; the rest of any other type
+   * is an error, because normal clients were refused (ADR-0008).
+   */
+  clientLimit?: { param: string; defaultValue: number };
+  /**
    * Request Types this building turns away itself (real-time play): it answers them with a refusal, such as 401 for a request
    * with no token. They are neither answered nor errors, and they go no further, but they use some of its capacity.
    */

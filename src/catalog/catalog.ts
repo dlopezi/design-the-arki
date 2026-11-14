@@ -13,7 +13,9 @@ export const READ_YOUR_WRITES = 'readYourWrites';
 export const DOWNLOAD = 'download';
 /** A request with no token, or junk: whoever receives it turns it away, and an app server wastes capacity on it (ADR-0008). */
 export const INVALID = 'invalid';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID];
+/** Valid requests, but from a few clients that send far more than normal ones: only a Client Limit at the gateway holds them back (ADR-0008). */
+export const ABUSIVE = 'abusive';
+export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -51,7 +53,7 @@ export const catalog: Catalog = {
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
     // It serves every kind of read (also Read-your-writes, which a Read Replica cannot), takes writes and the results Workers write; processing a job is not its work.
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE],
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE],
     // In a level that offers Shard Keys its instances are Shards (ADR-0007).
     shardable: true,
     presentation: { zone: 'data', technology: 'PostgreSQL', instancePrefix: 'shard' },
@@ -100,6 +102,8 @@ export const catalog: Catalog = {
   apiGateway: {
     primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, acceptsClients: true, distributes: false,
     rejects: [INVALID], buildS: 4,
+    // The Client Limit: requests per second one client may send (a level sets how many clients send each Request Type).
+    clientLimit: { param: 'limitRps', defaultValue: 40 },
     presentation: { zone: 'edge', technology: 'Kong', hideCapacity: true },
   },
   // Chapter 4 (Edge). Sits in front of Object Storage: a share of downloads is answered at the edge (the hit share grows with

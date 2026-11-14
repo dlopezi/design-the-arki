@@ -54,6 +54,8 @@ const levelSchema = z.object({
     wave: z.object({ rps: z.number().positive(), lengthS: z.number().positive(), mix: waveMix.optional() }),
     incident: z.object({ atS: z.number().min(0), componentType }).optional(),
     starMoney: z.array(z.number().min(0)).refine(t => t.every((x, i) => i === 0 || x > t[i - 1]!), 'starMoney must be strictly increasing'),
+    /** Edge levels with abusive clients: how many clients send each Request Type (a count above 0). */
+    clients: z.record(z.string(), z.number().int().positive()).optional(),
     /** Levels that teach Sharding: the Shard Keys on offer (the first is the default) and how traffic spreads over each one's values. */
     shardKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Shard Keys needs at least one key').optional(),
   }),
@@ -107,6 +109,17 @@ const levelSchema = z.object({
   // Invalid requests are turned away at the gateway (ADR-0008): a wave with them needs an apiGateway in the level.
   if ((mix?.invalid ?? 0) > 0 && !allowed.has('apiGateway')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has invalid requests must allow an apiGateway' });
+  }
+  // Clients are counted for Request Types of the wave, and a Client Limit lives at an apiGateway.
+  const clients = level.play.clients;
+  if (clients) {
+    const missing = Object.keys(clients).filter(type => !(type in (mix ?? {})));
+    if (missing.length) ctx.addIssue({ code: 'custom', path: ['play', 'clients'], message: `Clients are counted for a type that is not in the wave: ${missing.join(', ')}` });
+    if (!allowed.has('apiGateway')) ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level that counts clients must allow an apiGateway (it holds the Client Limit)' });
+  }
+  // Abusive clients are only held back by a Client Limit: the level must count them.
+  if ((mix?.abusive ?? 0) > 0 && !(clients?.abusive)) {
+    ctx.addIssue({ code: 'custom', path: ['play', 'clients'], message: 'A level whose wave has abusive requests must count its abusive clients' });
   }
   // A freshness limit is about the copies a CDN keeps: without one there is nothing to limit.
   if (level.requirements.maxStaleS !== undefined && !allowed.has('cdn')) {

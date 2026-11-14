@@ -138,4 +138,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Un bot está escaneando tu API: llegan 360 peticiones inválidas (sin token, basura) por segundo, junto a 240 visitas reales a la página. Un app server tiene que leer cada petición antes de poder rechazarla, así que la basura gasta la capacidad que necesitan tus usuarios reales, y tus dos app servers no dan más. Pon un API Gateway en la puerta. Revisa cada petición primero y rechaza las inválidas con un coste mínimo, así los app servers solo ven peticiones válidas. Conecta a los usuarios al API Gateway, y el API Gateway al load balancer.',
     guidedHint: 'Un app server tiene que leer una petición inválida antes de poder rechazarla, así que la basura gasta la capacidad que necesitan los usuarios reales. Conecta a los usuarios al API Gateway: rechaza primero las peticiones inválidas, con un coste mínimo, y pasa solo las válidas al load balancer.',
   },
+  '24-abusive-client': {
+    title: 'Cliente abusivo',
+    brief: 'Cuatro clientes envían 90 peticiones por segundo cada uno: 360 peticiones, todas válidas, que llenan tus app servers. Tus 30 clientes normales envían unas 8 peticiones por segundo cada uno, 240 en total. El API Gateway tiene un Client Limit: lo máximo que un cliente puede enviar por segundo. Lo que pase de ahí se rechaza. Ponlo lo bastante alto para los clientes normales, y lo bastante bajo para frenar a los abusivos. Si es demasiado bajo, también se rechaza a los clientes normales, y cada rechazo cuenta como un error. Conecta a los usuarios al API Gateway, luego selecciónalo y ajusta su Client Limit.',
+    guidedHint: 'Un Client Limit es lo máximo que un cliente puede enviar por segundo. Un cliente normal envía unas 8 y uno abusivo envía 90. Pon el límite por encima de 8 para que pasen los clientes normales, y lo bastante bajo para que los cuatro abusivos no llenen los app servers: alrededor de 10 o 15.',
+  },
 };
