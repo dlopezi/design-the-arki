@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { catalog, DOWNLOAD, INVALID, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
+import { ABUSIVE, catalog, DOWNLOAD, INVALID, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
-  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
+  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -330,6 +330,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     // Invalid requests that no API Gateway turns away first all reach the app servers.
     const hasInvalid = (level.play.wave.mix?.[INVALID] ?? 0) > 0;
     if (hasInvalid && level.allowedComponents.includes('apiGateway') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'apiGateway')) return t.gatewayHint;
+    // Abusive clients: no gateway at all, a Client Limit too low (normal clients refused), or too high (the abusers get through).
+    const hasAbusive = (level.play.wave.mix?.[ABUSIVE] ?? 0) > 0;
+    if (hasAbusive && level.allowedComponents.includes('apiGateway') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'apiGateway')) return t.abuseHint;
+    if (hasAbusive && type === 'apiGateway') return t.limitLowHint;
+    if (hasAbusive && game.buildings.some(b => b.type === 'apiGateway')) return t.limitHighHint;
     // Downloads that do not go through a CDN all land on Object Storage, which has a limit.
     const hasDownloads = (level.play.wave.mix?.[DOWNLOAD] ?? 0) > 0;
     if (hasDownloads && level.allowedComponents.includes('cdn') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'cdn')) return t.cdnHint;
@@ -484,6 +489,18 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           ))}
         </fieldset>
       )}
+      {spec.clientLimit && level.play.clients && (() => {
+        const limit = Number(b.params.limitRps ?? spec.clientLimit!.defaultValue), limitMax = level.componentOptions[b.type]?.limits?.limitRps ?? 100;
+        return (
+          <div className="play-ttl"><span className="muted">{i.clientLimit}</span>
+            <span className="stepper">
+              <button aria-label={i.lowerLimit} disabled={limit <= 1} onClick={() => setGame(g => setClientLimit(g, b.id, Math.max(1, limit - 5)))}>−</button>
+              <b>{limit}</b>
+              <button aria-label={i.higherLimit} disabled={limit >= limitMax} onClick={() => setGame(g => setClientLimit(g, b.id, Math.min(limitMax, limit + 5)))}>+</button>
+            </span>
+          </div>
+        );
+      })()}
       {spec.shortcut && (
         <div className="play-ttl"><span className="muted">{i.ttl}</span>
           <span className="stepper">

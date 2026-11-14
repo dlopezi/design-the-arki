@@ -80,3 +80,24 @@ test('level 23: building an API Gateway takes the users and passes the valid req
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 24: with no way to stop the abusive clients the base loses, and the hint explains the Client Limit', async ({ page }) => {
+  await openLevel(page, '24-abusive-client', 'normal');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Client Limit');
+});
+
+test('level 24: a Client Limit that is too low refuses normal clients and loses with its own hint, and a good one wins', async ({ page }) => {
+  await openLevel(page, '24-abusive-client', 'hard'); // starts with a limit of 5, under what a normal client sends
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('normal clients too');
+
+  await page.reload();
+  await page.getByRole('button', { name: /Start building/ }).click();
+  await page.locator('[data-node-id="gw"]').first().click();
+  await page.getByRole('button', { name: 'Higher Client Limit' }).click(); // 5 → 10
+  const win = await playWave(page);
+  await expect(win).toContainText('Base defended');
+});

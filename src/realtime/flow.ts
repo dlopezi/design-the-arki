@@ -1,4 +1,4 @@
-import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
+import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
 import type { Catalog } from '../engine/types';
 
 /**
@@ -12,7 +12,7 @@ import type { Catalog } from '../engine/types';
 
 /** One running copy of a building; it serves only when built and not down. */
 export type Instance = { buildLeftS: number; buildTotalS: number; down: boolean };
-export type Building = { id: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string }; instances: Instance[] };
+export type Building = { id: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number }; instances: Instance[] };
 /** How traffic spreads over the values of each Shard Key: per key, the share of requests for each value (adds up to 1). */
 export type ShardKeys = Record<string, number[]>;
 /** Each value of a key lives on shard `value mod shards`; a Shard's share is the sum over its values. */
@@ -117,7 +117,7 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
  * Backlog of each queue from the step before; the result holds it after this one.
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
-  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys): Flow {
+  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -228,9 +228,19 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
       const out = spec.emits ? spec.emits + (isBackground(c) ? BACKGROUND : '') : c;
       // A building that turns this type away answers with a refusal: the request goes no further and is no error.
       if (spec.rejects?.includes(typeOfChannel(c))) { rejected += taken(c); continue; }
+      // A Client Limit passes at most so many requests per second for each client of a type the level counts clients for.
+      let amount = taken(c);
+      const type = typeOfChannel(c), count = clients?.[type];
+      if (spec.clientLimit && count && !isBackground(c)) {
+        const limit = Number(b.params.limitRps ?? spec.clientLimit.defaultValue);
+        const over = Math.max(0, amount - limit * count);
+        amount -= over;
+        // What an abusive client sent above the limit is turned away; what a normal client sent above it is an error (a false positive).
+        if (type === ABUSIVE) rejected += over; else add(drop, id, over);
+      }
       if (spec.shortcut) { if (!isBackground(c)) answered += taken(c) * hit; send(id, out, taken(c) - taken(c) * hit); }
       else if (spec.endsRequests) { if (!isBackground(c)) answered += taken(c); }
-      else send(id, out, taken(c));
+      else send(id, out, amount);
     }
   }
   // A queue that no traffic reached still keeps its Messages.

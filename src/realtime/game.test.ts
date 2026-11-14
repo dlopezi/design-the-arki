@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -829,5 +829,54 @@ describe('edge: the API Gateway turns invalid requests away before the app serve
   it('connecting the users to the gateway replaces their old way in', () => {
     const s = connect(createGame(gatewayLevel, { ...doored, connections: [['client', 'lb'], ['gw', 'lb'], ['lb', 'api'], ['api', 'db']] }), 'client', 'gw');
     expect(named(s).filter(x => x.startsWith('client>'))).toEqual(['client>apiGateway']);
+  });
+});
+
+describe('edge: the Client Limit stops abusive clients without refusing normal ones', () => {
+  // 30 normal clients send 8 requests a second each (240); 4 abusive clients send 90 each (360).
+  const limitLevel: GameLevel = {
+    allowedComponents: ['apiGateway', 'loadBalancer', 'appServer', 'database'],
+    componentOptions: { appServer: { maxInstances: 2 }, apiGateway: { limits: { limitRps: 100 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 800, wave: { rps: 600, lengthS: 30, mix: { watch: 0.4, abusive: 0.6 } }, clients: { watch: 30, abusive: 4 }, starMoney: [100, 200] },
+  };
+  const withLimit = (limitRps: number): Design => ({
+    components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }, { id: 'gw', type: 'apiGateway', params: { limitRps } }],
+    connections: [['client', 'gw'], ['gw', 'lb'], ['lb', 'api'], ['api', 'db']],
+  });
+  const play = (limitRps: number, seconds = 5) => run(callNow(createGame(limitLevel, withLimit(limitRps))), seconds, limitLevel);
+
+  it('a limit above what the abusive clients send changes nothing: they fill the app servers', () => {
+    expect(play(100).flow!.errors).toBeGreaterThan(0.1);
+  });
+
+  it('a limit between the two keeps the normal clients and turns the abusive ones away above it', () => {
+    const s = play(10);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.inflow.api).toBeCloseTo(240 + 4 * 10);
+    expect(s.flow!.rejected).toBeCloseTo(360 - 4 * 10); // not errors
+    expect(s.reputation).toBe(100);
+  });
+
+  it('a limit under what a normal client sends refuses normal clients too, and those refusals are errors', () => {
+    const s = play(5);
+    expect(s.flow!.errors).toBeCloseTo((8 - 5) * 30 / 600); // 90 of 600 requests
+    expect(s.flow!.drop.gw).toBeGreaterThan(0);
+  });
+
+  it('only some limits win: too low and too high both fail', () => {
+    const wins = [5, 10, 15, 20, 25, 30, 35, 40].filter(l => { const s = play(l, 15); return s.flow!.errors <= 0.01 && s.reputation === 100; });
+    expect(wins).toEqual([10, 15, 20]);
+  });
+
+  it('the Client Limit is changed in the inspector: free, immediate, and saved with the design', () => {
+    const s = setClientLimit(createGame(limitLevel, withLimit(40)), 'gw', 15);
+    expect(s.buildings.find(b => b.id === 'gw')!.params.limitRps).toBe(15);
+    expect(toDesign(s).components.find(c => c.id === 'gw')!.params).toMatchObject({ limitRps: 15 });
+  });
+
+  it('a level with no counted clients ignores the limit', () => {
+    const l: GameLevel = { ...limitLevel, play: { ...limitLevel.play, clients: undefined, wave: { rps: 300, lengthS: 30, mix: { watch: 1 } } } };
+    expect(run(callNow(createGame(l, withLimit(1))), 5, l).flow!.errors).toBe(0);
   });
 });

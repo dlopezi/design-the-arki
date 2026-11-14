@@ -134,6 +134,12 @@ export const en = {
   cdnHint: 'Object Storage can only send out so many big files each second, and a viral video passes that limit. Put a CDN in front of it and connect the users to the CDN: it answers a share of the downloads at the edge, and a longer TTL answers more of them.',
   /** Lost with invalid requests in the wave while no API Gateway turns them away first. */
   gatewayHint: 'Invalid requests (no token, junk) went all the way to your app servers, and each one used capacity before being refused. Put an API Gateway at the door and connect the users to it: it checks every request first and turns the invalid ones away at a tiny cost, so the app servers see only valid requests.',
+  /** Lost with abusive clients in the wave and no API Gateway at the door. */
+  abuseHint: 'A few clients sent most of the requests, and the app servers could not take them all. Put an API Gateway at the door and connect the users to it, then set its Client Limit: the most requests per second one client may send. The gateway turns away what a client sends above the limit.',
+  /** Lost with abusive clients while the Client Limit refused normal clients. */
+  limitLowHint: 'Your Client Limit was so low that it refused normal clients too, and those refusals count as errors (false positives). Raise the limit above what a normal client sends each second, but keep it low enough to stop the abusive clients.',
+  /** Lost with abusive clients while the Client Limit was too high to stop them. */
+  limitHighHint: 'Your Client Limit was so high that the abusive clients still got through and filled the app servers. Lower it: it must stay above what a normal client sends each second, and well under what an abusive client sends.',
   /** Lost while a CDN kept copies longer than the level allows. */
   staleHint: 'Your CDN kept each copy of the file longer than users may see old content, so they were shown the old video after the edit. Lower the CDN TTL to the limit or under it. A shorter TTL means fresher content but more downloads reaching Object Storage.',
   /** Lost with downloads in the wave and a CDN whose TTL is too short for Object Storage. */
@@ -158,7 +164,7 @@ export const en = {
     readReplica: 'a copy of the primary database that answers reads only; add instances to answer more reads each second.',
     objectStorage: 'stores big files, with a fixed price and no settings. Users upload to it straight (the pre-signed URL pattern), so the app servers stay free. It can send out only so many big files each second.',
     cdn: 'answers a share of the video downloads close to the users, so Object Storage behind it stays calm; a longer TTL means more hits.',
-    apiGateway: 'the one door for the users: it checks every request, turns away the invalid ones (no token, junk) at a tiny cost, and passes the rest on.',
+    apiGateway: 'the one door for the users: it checks every request, turns away the invalid ones (no token, junk) at a tiny cost, and passes the rest on. Its Client Limit stops a client that sends too many requests.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
@@ -360,8 +366,8 @@ export const en = {
         role: 'The one door to your system. Every request from the users comes in through it: it checks the request (for example, that it has a valid token), turns away the invalid ones with an error such as 401, and passes the valid ones on to the load balancer or the app servers.',
         when: 'When many requests are junk or have no valid token (bots, scanners, broken clients) and they waste the capacity of the app servers.',
         tools: ['Kong', 'AWS API Gateway', 'Nginx', 'Envoy'],
-        same: 'It turns away every invalid request at a tiny cost, so the app servers see only valid requests. The users connect to it, and it connects to the load balancer or the app servers. It has a fixed price and no settings yet.',
-        diff: 'A real API Gateway also routes by path to many services, limits how many requests each client may send, adds logs and metrics, and can check tokens with an identity provider. A later mission adds the limit per client.',
+        same: 'It turns away every invalid request at a tiny cost, so the app servers see only valid requests. The users connect to it, and it connects to the load balancer or the app servers. It has a fixed price. Its one setting is the Client Limit, in the levels that have abusive clients.',
+        diff: 'A real API Gateway also routes by path to many services, adds logs and metrics, and can check tokens with an identity provider. The limit per client is a rate limit, often a token bucket, which allows short bursts.',
         read: { label: 'Kong · What is an API gateway?', url: 'https://konghq.com/learning-center/api-gateway/' },
       },
       cdn: {
@@ -486,7 +492,7 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads', invalid: 'invalid requests' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads', invalid: 'invalid requests', abusive: 'abusive requests' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     replicationLag: 'Replication Lag', lagShort: 'Lag',
     freshness: 'Content age',
@@ -515,6 +521,7 @@ export const en = {
       remove: (back: number) => `Remove · +$${back}`,
       size: 'Size', tier: 'Tier', fixed: 'fixed in this level', resizeCost: (cost: number) => (cost > 0 ? `$${cost}` : 'free'),
       ttl: 'TTL (seconds)',
+      clientLimit: 'Client Limit (req/s per client)', lowerLimit: 'Lower Client Limit', higherLimit: 'Higher Client Limit',
       shards: 'Shards', shardKey: 'Shard Key', addShard: (cost: number) => `+ Shard · $${cost}`, removeShard: (back: number) => `− Shard · +$${back}`,
       shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')}%`,
       shardKeyLocked: 'Locked during the wave: re-sharding means moving data.',
