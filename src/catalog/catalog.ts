@@ -15,7 +15,11 @@ export const DOWNLOAD = 'download';
 export const INVALID = 'invalid';
 /** Valid requests, but from a few clients that send far more than normal ones: only a Client Limit at the gateway holds them back (ADR-0008). */
 export const ABUSIVE = 'abusive';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE];
+/** A user publishes a post: it is answered when it enters a Topic (or a queue), and every Subscription must then process it (ADR-0009). */
+export const POST = 'post';
+/** A user reads their feed: synchronous, answered by the database (ADR-0009). */
+export const READ_FEED = 'readFeed';
+export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE, POST, READ_FEED];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -53,7 +57,7 @@ export const catalog: Catalog = {
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
     // It serves every kind of read (also Read-your-writes, which a Read Replica cannot), takes writes and the results Workers write; processing a job is not its work.
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE],
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED],
     // In a level that offers Shard Keys its instances are Shards (ADR-0007).
     shardable: true,
     presentation: { zone: 'data', technology: 'PostgreSQL', instancePrefix: 'shard' },
@@ -72,14 +76,17 @@ export const catalog: Catalog = {
     presentation: { zone: 'data', technology: 'PostgreSQL replica', instancePrefix: 'replica' },
   },
   // Chapter 2 (Async). A managed queue: no settings, a fixed price, and a capacity that never fills in these levels.
+  // It also takes posts, so a player can try one for pub/sub work and see that it gives each Message to one Worker only (ADR-0009).
   messageQueue: {
-    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, queue: true, distributes: true, accepts: ['job'], buildS: 4,
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, queue: true, distributes: true, accepts: ['job', POST], buildS: 4,
     presentation: { zone: 'application', technology: 'Amazon SQS', hideCapacity: true },
   },
   // Takes Messages from the queue and processes each job (about a second), then writes the result to the database.
-  // Concurrency is how many jobs one instance processes at once.
+  // Concurrency is how many jobs one instance processes at once. In a level with Subscriptions each Worker building serves
+  // one of them (a consumer group, ADR-0009): it processes posts and their work leaves the system (a push service, a search index).
   worker: {
-    primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: ['job'], emits: RESULT_TYPE, buildS: 5,
+    primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: ['job', POST], emits: RESULT_TYPE, buildS: 5,
+    ends: [POST], subscribes: true,
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
       medium: { workers: 4, monthlyCost: 40, vcpu: 2 },
@@ -87,6 +94,12 @@ export const catalog: Catalog = {
     },
     defaultSize: 'medium',
     presentation: { zone: 'application', technology: 'Celery', instancePrefix: 'worker' },
+  },
+  // Chapter 5 (Events). A Kafka-like Topic: it answers a post at once and keeps a copy of it for every Subscription, each
+  // with its own Backlog, released to that Subscription's Workers at their capacity (ADR-0009). A fixed price, no settings yet.
+  topic: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, pubSub: true, distributes: true, accepts: [POST], buildS: 4,
+    presentation: { zone: 'application', technology: 'Apache Kafka', hideCapacity: true },
   },
   // Chapter 3 (Data scale). Managed object storage: a fixed price, no settings, and a capacity that never fills in these
   // levels. Users may connect to it straight to upload files (the pre-signed URL pattern); it takes uploads only.
@@ -132,7 +145,7 @@ export const catalog: Catalog = {
   // primary database it replaces. Not a building the player builds.
   promotedReplica: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true, internal: true,
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE], buildS: 7,
+    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED], buildS: 7,
     sizes: {
       small: { workers: 8, monthlyCost: 50, vcpu: 1 },
       medium: { workers: 16, monthlyCost: 100, vcpu: 2 },

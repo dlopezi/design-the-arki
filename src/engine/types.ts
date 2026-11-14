@@ -91,6 +91,15 @@ export type StationPrimitive = {
    * tick to the next, then releases it to the buildings behind it at their total capacity. Never drops the Backlog.
    */
   queue?: boolean;
+  /**
+   * Pub/sub primitive (real-time play, ADR-0009): like a queue it answers at once, but it keeps one Backlog for each Subscription
+   * of the level and gives every Subscription its own copy, released to the buildings that serve that Subscription.
+   */
+  pubSub?: boolean;
+  /** Request Types it finishes itself: their work leaves the system from here (a Worker sends a notification to a push service). */
+  ends?: string[];
+  /** In a level with Subscriptions, each building of this type serves one of them (param `subscription`): a consumer group (ADR-0009). */
+  subscribes?: boolean;
   /** Instance sizes the player can pick (param `size`); each overrides workers and monthly cost. */
   sizes?: Record<string, { workers: number; monthlyCost: number; vcpu?: number }>;
   defaultSize?: string;

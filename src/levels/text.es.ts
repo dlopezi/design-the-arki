@@ -14,6 +14,7 @@ export const chaptersEs: Record<string, string> = {
   Async: 'Asíncrono',
   'Data scale': 'Escala de datos',
   Edge: 'Borde',
+  Events: 'Eventos',
 };
 
 export const levelTextEs: Record<string, LevelText> = {
@@ -152,5 +153,10 @@ export const levelTextEs: Record<string, LevelText> = {
     title: 'Lanzamiento mundial',
     brief: 'Día de lanzamiento para todo el mundo, y todo sale mal a la vez: llegan 700 peticiones por segundo. 245 son descargas de un vídeo viral, y Object Storage no puede enviar tantos archivos. Tres clientes envían 315 peticiones, mucho más que los 35 clientes normales juntos, y llenan tus app servers. La gente también sube 35 archivos grandes por segundo, que no deben pasar por los app servers. Y a los 45 segundos de la oleada cae toda la Región principal. Usa lo que has aprendido: una CDN delante de Object Storage, un API Gateway con un Client Limit en la puerta, un DNS delante de una Región de reserva con una Read Replica, y las subidas directo a Object Storage. El API Gateway, la CDN, el DNS y Object Storage están fuera de las Regiones, así que sobreviven.',
     guidedHint: 'Cuatro problemas, cuatro respuestas. Descargas: una CDN delante de Object Storage. Clientes abusivos: un Client Limit en el API Gateway. Subidas: conecta a los usuarios directo a Object Storage. Una Región que cae: una Región de reserva y un DNS con un TTL corto (10 s bastan). Comprueba que el DNS llega a las dos Regiones.',
+  },
+  '27-one-post-many-reactions': {
+    title: 'Un post, muchas reacciones',
+    brief: 'Tu nueva red social ya está en marcha. Cuando alguien publica, tres sistemas deben reaccionar: Notifications avisa a sus seguidores, Search indexa el post y Analytics lo cuenta. Llegan tres posts por segundo, y cada sistema necesita todos. Una cola de mensajes da cada mensaje a un solo Worker, así que cada sistema perdería casi todos los posts. Un Topic guarda una copia de cada post para cada Subscription, y cada Subscription tiene su propio Worker.',
+    guidedHint: 'El Topic y un Worker para cada Subscription ya están listos, pero ningún post llega al Topic. Conecta el app server al Topic: así cada Subscription recibe su propia copia de cada post.',
   },
 };

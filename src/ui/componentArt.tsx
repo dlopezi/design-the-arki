@@ -18,6 +18,7 @@ export const componentArt: Record<string, { color: string }> = {
   cdn: { color: '#2dd4bf' },
   apiGateway: { color: '#a3e635' },
   dns: { color: '#f472b6' },
+  topic: { color: '#facc15' },
   promotedReplica: { color: '#9b6bff' },
 };
 
@@ -180,6 +181,17 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <path d="M32 31 L32 15" stroke={p.glow} strokeWidth={1.6} strokeLinecap="round" />
     <circle cx={32} cy={13} r={2.4} fill={p.glow} />
     <path d="M22 12 Q32 4 42 12" fill="none" stroke={p.glow} strokeWidth={1.4} strokeLinecap="round" opacity={0.8} />
+  </>,
+  // A log in layers with a mast that sends three copies out: one post in, a copy for every Subscription.
+  topic: p => <>
+    <IsoBox cx={32} cy={54} w={20} h={5} p={p} />
+    <IsoBox cx={32} cy={49} w={17} h={5} p={p} />
+    <IsoBox cx={32} cy={44} w={14} h={5} p={p} />
+    <polygon points={faceQuad('right', 32, 44, 14, 0.1, 0.9, 1.5, 3.5)} fill={p.window} />
+    <path d="M32 38 L32 22" stroke={p.dark} strokeWidth={3} strokeLinecap="round" />
+    <circle cx={32} cy={20} r={3} fill={p.glow} />
+    <path d="M36 18 L50 10 M36 20 L52 20 M36 22 L50 30" fill="none" stroke={p.glow} strokeWidth={1.6} strokeLinecap="round" />
+    <path d="M46 8 L50 10 L47 14 M49 17 L52 20 L49 23 M47 26 L50 30 L46 32" fill="none" stroke={p.glow} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
   </>,
   // A copy of the database: two small silos side by side, with an arrow that carries the copy to the new one.
   readReplica: p => <>

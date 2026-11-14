@@ -114,6 +114,7 @@ export const en = {
     readReplica: 'The Read Replicas cannot keep up with the reads: add Read Replica instances or use bigger ones.',
     cdn: 'The CDN is saturated.',
     apiGateway: 'The API Gateway is saturated.',
+    topic: 'The Topic is saturated.',
     promotedReplica: 'The primary database (the promoted Read Replica) cannot keep up: use a bigger size.',
   } as Record<string, string>,
   /** Hints when the bottleneck cannot be resized in this level. */
@@ -155,6 +156,12 @@ export const en = {
   shardHint: 'The database is full of writes, and a Read Replica cannot take writes. Add Shards: each one is another database that holds a slice of the data and serves only that slice. The Shard Key decides how the traffic spreads over them.',
   /** Lost while Messages were waiting too long. */
   backlogHint: 'The Backlog kept growing, so Messages waited too long: the Workers took jobs more slowly than they arrived. Add Workers, or use bigger ones.',
+  /** Lost with posts in the wave and no Topic: a queue (or a Worker called straight) gives each post to one system only. */
+  topicHint: 'Each post must reach every system: Notifications, Search and Analytics. A Message Queue gives each Message to one Worker only, so each system missed the posts the others took. Use a Topic: connect the app server to it and the Topic to one Worker for each Subscription. Every Subscription then gets its own copy of each post.',
+  /** Lost with a Subscription that no Worker serves. */
+  subscriptionHint: 'One Subscription had no Worker, so nobody processed its copy of the posts and its Consumer Lag kept growing. Build a Worker for it (a new Worker serves the first Subscription without one) and connect the Topic to it.',
+  /** Lost while a Subscription's Consumer Lag was over its maximum. */
+  consumerLagHint: 'One Subscription fell behind: its Workers took posts more slowly than they arrived, so its Consumer Lag passed its maximum. Add instances to that Subscription\'s Worker. Each Subscription has its own Workers, so a slow one does not slow the others.',
   redundancyHint: 'An instance went down and the others could not absorb its traffic: run one more instance than you need (N+1).',
   incidents: 'Incidents',
   newComponents: 'New components',
@@ -171,6 +178,7 @@ export const en = {
     cdn: 'answers a share of the video downloads close to the users, so Object Storage behind it stays calm; a longer TTL means more hits.',
     dns: 'decides which Region the users reach, and switches them to the standby Region when the main one fails; a shorter TTL switches sooner and costs more.',
     apiGateway: 'the one door for the users: it checks every request, turns away the invalid ones (no token, junk) at a tiny cost, and passes the rest on. Its Client Limit stops a client that sends too many requests.',
+    topic: 'answers the app server at once and keeps a copy of every post for each Subscription. Each Subscription has its own Worker, its own Backlog and its own Consumer Lag.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
@@ -206,6 +214,7 @@ export const en = {
   objectiveQueueAge: (s: number) => `Queue Age ≤ ${s} s`,
   objectiveReplicationLag: (s: number) => `Replication Lag ≤ ${s} s`,
   objectiveFreshness: (s: number) => `Content no older than ${s} s (CDN TTL ≤ ${s} s)`,
+  objectiveConsumerLag: (limits: [name: string, s: number][]) => `Consumer Lag ≤ ${limits.map(([name, s]) => `${name} ${s} s`).join(' · ')}`,
   objectiveCost: (budget: number) => `Cost ≤ $${budget}/month`,
   objectiveState: { met: 'met', failed: 'not met', pending: 'not run yet' },
   traffic: (rps: number, fromS: number, toS: number) => `${rps} req/s from ${fromS} s to ${toS} s`,
@@ -235,7 +244,10 @@ export const en = {
   clients: 'Clients',
   /** The fields a level can offer as a Shard Key. */
   shardKeyNames: { userId: 'User id', videoId: 'Video id', country: 'Country', date: 'Date' } as Record<string, string>,
-  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN', apiGateway: 'API Gateway', dns: 'DNS', promotedReplica: 'Primary (was Read Replica)' } as Record<string, string>,
+  /** The systems a level can list as Subscriptions of a Topic, and where each one's work goes (outside the system). */
+  subscriptionNames: { notifications: 'Notifications', search: 'Search', analytics: 'Analytics', feed: 'Feed' } as Record<string, string>,
+  subscriptionExits: { notifications: 'push service', search: 'search index', analytics: 'data warehouse', feed: 'Database' } as Record<string, string>,
+  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN', apiGateway: 'API Gateway', dns: 'DNS', topic: 'Topic', promotedReplica: 'Primary (was Read Replica)' } as Record<string, string>,
   person: 'Person',
   systemName: 'Your system',
   softwareSystem: 'Software system',
@@ -384,6 +396,14 @@ export const en = {
         diff: 'A real API Gateway also routes by path to many services, adds logs and metrics, and can check tokens with an identity provider. The limit per client is a rate limit, often a token bucket, which allows short bursts.',
         read: { label: 'Kong · What is an API gateway?', url: 'https://konghq.com/learning-center/api-gateway/' },
       },
+      topic: {
+        role: 'A log of events that many systems read. The app server writes each post to it once, and the Topic keeps a copy for every Subscription: Notifications, Search, Analytics each read every post at their own pace. A Message Queue is different: it gives each Message to one Worker only.',
+        when: 'When one event must reach several systems, and you do not want the app server to call each of them, or one slow system to hold the others back.',
+        tools: ['Apache Kafka', 'Amazon Kinesis', 'Google Pub/Sub', 'Amazon SNS', 'Redpanda'],
+        same: 'A post is answered when it enters the Topic. Each Subscription is a consumer group: its own Worker building, its own Backlog and its own Consumer Lag. The Worker instances of one Subscription share its posts. It has a fixed price.',
+        diff: 'A real Topic keeps events for days (retention), so a new consumer group can read old events again (replay). It is split into Partitions, which keep the order of events with the same key. Retention, replay and ordering are not in the game.',
+        read: { label: 'Apache Kafka · Introduction', url: 'https://kafka.apache.org/intro' },
+      },
       cdn: {
         role: 'A network of servers close to the users. It answers a share of the video downloads itself, with very low latency, and sends the rest to Object Storage, the origin. Users connect to it straight for downloads.',
         when: 'When many people download the same files, such as a viral video, and the origin cannot send out so many files each second.',
@@ -512,9 +532,13 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads', invalid: 'invalid requests', abusive: 'abusive requests' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads', invalid: 'invalid requests', abusive: 'abusive requests', post: 'posts', readFeed: 'feed reads' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     replicationLag: 'Replication Lag', lagShort: 'Lag',
+    consumerLag: 'Consumer Lag',
+    consumerLagOf: (lag: number, max: number) => `${Math.round(lag)} s / ${max} s`,
+    consumerLagChart: 'Consumer Lag · % of max',
+    subscriptionCount: (n: number) => `${n} Subscription${n === 1 ? '' : 's'}`,
     freshness: 'Content age',
     freshnessOf: (age: number, max: number) => `TTL ${age} s / max ${max} s`,
     lagOf: (lag: number, max: number | undefined) => (max === undefined ? `${lag.toFixed(1)} s` : `${lag.toFixed(1)} s / max ${max} s`),
@@ -548,13 +572,15 @@ export const en = {
       shardLoad: (loads: number[]) => `${loads.map(l => Math.round(l * 100)).join('/')}%`,
       shardKeyLocked: 'Locked during the wave: re-sharding means moving data.',
       hotShard: 'Hot Shard',
+      subscription: 'Subscription', subscriptionLocked: 'Locked during the wave',
+      exit: (to: string) => `→ ${to}`,
       link: 'Connection', from: 'From', to: 'To', traffic: 'Traffic now', removeLink: 'Remove connection (Delete)',
     },
     build: {
       title: 'Build',
       seconds: (s: number) => `${s}s`,
       card: (key: number, name: string, cost: number, s: number) => `${key}: build ${name}, $${cost}, ${s} seconds`,
-      reasons: { money: 'Not enough money', built: 'Already built', maxInstances: 'No more instances in this level', notInLevel: 'Not in this level', over: 'The wave is over' } as Record<string, string>,
+      reasons: { money: 'Not enough money', built: 'Already built', maxInstances: 'No more instances in this level', notInLevel: 'Not in this level', over: 'The wave is over', allSubscribed: 'Every Subscription has its Worker: add instances from the Worker\'s inspector' } as Record<string, string>,
     },
     events: {
       building: (name: string) => `Building ${name}`,
@@ -577,6 +603,9 @@ export const en = {
       self: 'a building does not connect to itself', intoUsers: 'requests do not go back to the users along a line',
       queueHoldsMessages: 'the queue still holds Messages: wait until the Workers have taken them',
       queueNotPublic: 'jobs reach a queue through an app server, not straight from the users',
+      topicNotPublic: 'posts reach a Topic through an app server, not straight from the users',
+      topicHoldsMessages: 'the Topic still holds posts for a Subscription: wait until its Workers have processed them',
+      subscriptionLocked: 'the Subscription of a Worker is locked during the wave: a consumer group that changes its name starts again from another place in the Topic',
       uploadsOnly: 'the users reach Object Storage straight for uploads only, and this level has no uploads',
       downloadsOnly: 'the users reach the CDN straight for downloads only, and this level has no downloads',
       otherRegion: 'a Region is a group of buildings that connect inside it; only the DNS and the replication of a Read Replica cross to another Region',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -1031,5 +1031,117 @@ describe('edge: the buildings that stand outside the Regions, and the way in thr
     const s = built([['objectStorage', 'standby'], ['cdn', 'standby'], ['apiGateway', 'standby']]);
     expect(s.buildings.every(b => b.region === undefined)).toBe(true);
     expect(buildProblem(s, 'cdn', lvl, undefined, 'main')).toBe('built');
+  });
+});
+
+// ───────── Events: a Topic gives every Subscription its own copy of each post (ADR-0009) ─────────
+describe('events: a Topic keeps every post for each Subscription, served by its own Workers', () => {
+  // 6 posts/s. A medium Worker takes 4 posts/s, so each Subscription needs two instances to keep up.
+  const pubSub: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'messageQueue', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01, maxQueueAgeS: 30 },
+    play: { startMoney: 900, wave: { rps: 30, lengthS: 30, mix: { post: 0.2, readFeed: 0.8 } }, starMoney: [100, 200],
+      subscriptions: { notifications: { maxLagS: 5 }, search: { maxLagS: 20 } } },
+  };
+  const worker = (id: string, subscription: string, instances = 2) => ({ id, type: 'worker', params: { subscription, instances } });
+  const withTopic = (n = 2, s = 2): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic' }, worker('wn', 'notifications', n), worker('ws', 'search', s)],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'wn'], ['t', 'ws']],
+  });
+  const withQueue: Design = {
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 'q', type: 'messageQueue' }, worker('wn', 'notifications'), worker('ws', 'search')],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 'q'], ['q', 'wn'], ['q', 'ws']],
+  };
+  const play = (s: GameState, seconds: number) => run(s, seconds, pubSub);
+  const live = (design: Design) => callNow(createGame(pubSub, design));
+
+  it('a post is answered when it enters the Topic, and every Subscription processes every post', () => {
+    const s = play(live(withTopic()), 10);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.p95).toBeLessThan(100);
+    // Both Subscriptions get all 6 posts/s, not a share of them.
+    expect(s.flow!.edge['t>wn']).toBeCloseTo(6);
+    expect(s.flow!.edge['t>ws']).toBeCloseTo(6);
+    expect(s.subBacklog['notifications']).toBeLessThan(1);
+    expect(s.subBacklog['search']).toBeLessThan(1);
+    expect(s.reputation).toBe(100);
+  });
+
+  it('a Message Queue gives each post to one Worker only: each Subscription misses the posts the other took, and falls behind', () => {
+    const s = play(live(withQueue), 15);
+    expect(s.flow!.errors).toBe(0); // the posts are answered: the problem is what never reaches each system
+    expect(s.subBacklog['notifications']).toBeGreaterThan(30); // about 3 posts/s missed for 15 s
+    expect(s.consumerLag['notifications']!).toBeGreaterThan(pubSub.play.subscriptions!.notifications!.maxLagS);
+    expect(s.reputation).toBeLessThan(100);
+  });
+
+  it('each Subscription has its own Backlog and Consumer Lag: a slow one does not slow the others', () => {
+    const s = play(live(withTopic(2, 1)), 10); // search: 4 posts/s of capacity against 6
+    expect(s.subBacklog['notifications']).toBeLessThan(1);
+    expect(s.consumerLag['notifications']).toBe(0);
+    expect(s.subBacklog['search']).toBeGreaterThan(15); // about 2 posts/s for 10 s
+    expect(s.consumerLag['search']).toBeCloseTo(s.subBacklog['search']! / 4, 1);
+    // Search is under its loose 20 s maximum: the reputation holds.
+    expect(s.reputation).toBe(100);
+  });
+
+  it('a Subscription with no Worker keeps every post, and its lag grows with the clock until the reputation falls', () => {
+    const noSearch: Design = { ...withTopic(), components: withTopic().components.filter(c => c.id !== 'ws'), connections: withTopic().connections.filter(([, to]) => to !== 'ws') };
+    const s = play(live(noSearch), 25);
+    expect(s.subBacklog['search']).toBeGreaterThan(140);
+    expect(s.consumerLag['search']).toBeGreaterThan(20);
+    expect(s.reputation).toBeLessThan(100);
+  });
+
+  it('records each Subscription\'s Consumer Lag every second, for the console chart', () => {
+    const s = play(live(withTopic(2, 1)), 6);
+    expect(s.history.at(-1)!.consumerLag?.['search']).toBeCloseTo(s.consumerLag['search']!, 0);
+    expect(Object.keys(s.history.at(-1)!.consumerLag ?? {})).toEqual(['notifications', 'search']);
+  });
+
+  it('the Drain Phase lasts until every Subscription has caught up', () => {
+    let s = play(live(withTopic(2, 1)), pubSub.play.wave.lengthS + 0.5);
+    expect(s.phase).toBe('drain');
+    expect(s.subBacklog['search']).toBeGreaterThan(30);
+    s = play(s, 30);
+    expect(s.phase).toBe('won');
+  });
+
+  it('a new Worker serves the first Subscription without one; when all have one, more capacity is an instance added from the inspector', () => {
+    let s = createGame(pubSub, { components: [{ id: 'api', type: 'appServer' }, { id: 't', type: 'topic' }], connections: [['client', 'api'], ['api', 't']] });
+    s = build(s, 'worker', pubSub);
+    s = build(s, 'worker', pubSub);
+    const workers = s.buildings.filter(b => b.type === 'worker');
+    expect(workers.map(w => w.params.subscription)).toEqual(['notifications', 'search']);
+    // The new Workers connect themselves to the Topic, not to the database: their work leaves the system.
+    expect(named(s).filter(l => l.includes('worker'))).toEqual(['topic>worker', 'topic>worker']);
+    expect(buildProblem(s, 'worker', pubSub)).toBe('allSubscribed');
+    const target = workers[1]!.id;
+    s = build(s, 'worker', pubSub, undefined, undefined, target);
+    expect(s.buildings.find(b => b.id === target)!.instances).toHaveLength(2);
+  });
+
+  it('a Topic connects itself between the app servers and the Workers, and the users cannot write to it straight', () => {
+    let s = createGame(pubSub, empty);
+    for (const type of ['appServer', 'worker', 'topic']) s = build(s, type, pubSub);
+    expect(named(s).sort()).toEqual(['appServer>topic', 'client>appServer', 'topic>worker']);
+    const topic = s.buildings.find(b => b.type === 'topic')!.id;
+    expect(connect(s, 'client', topic).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'topicNotPublic' });
+  });
+
+  it('the Subscription of a Worker is picked in the build phase and locked during the wave', () => {
+    let s = createGame(pubSub, withTopic());
+    s = setSubscription(s, 'wn', 'search', pubSub);
+    expect(s.buildings.find(b => b.id === 'wn')!.params.subscription).toBe('search');
+    expect(setSubscription(s, 'wn', 'nothing', pubSub)).toBe(s);
+    const live = callNow(s);
+    expect(setSubscription(live, 'wn', 'notifications', pubSub).events.at(-1)).toMatchObject({ kind: 'refused', reason: 'subscriptionLocked' });
+    expect(toDesign(s).components.find(c => c.id === 'wn')!.params).toMatchObject({ subscription: 'search', instances: 2 });
+  });
+
+  it('a Topic that still holds posts for a Subscription cannot be removed', () => {
+    const s = play(live(withTopic(2, 1)), 10);
+    expect(demolish(s, 't').events.at(-1)).toMatchObject({ kind: 'refused', reason: 'topicHoldsMessages' });
   });
 });

@@ -74,7 +74,7 @@ test('the campaign map scrolls with the mouse wheel, so the last chapter can be 
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/#levels');
 
-  const lastChapter = page.getByRole('heading', { name: /^Chapter 4/ });
+  const lastChapter = page.getByRole('heading', { name: /^Chapter 5/ });
   await expect(lastChapter).not.toBeInViewport();
   await page.mouse.move(400, 400);
   await page.mouse.wheel(0, 3000);
