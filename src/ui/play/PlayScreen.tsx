@@ -5,7 +5,7 @@ import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
 import {
-  BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, createGame,
+  BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
   demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setShardKey, setTtl, starsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
@@ -298,6 +298,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   const tooOld = level.requirements.maxQueueAgeS !== undefined && oldest > level.requirements.maxQueueAgeS;
   const maxLag = level.requirements.maxReplicationLagS, lagNow = Math.max(0, ...Object.values(game.lag));
   const lagTooHigh = maxLag !== undefined && lagNow > maxLag;
+  const maxStale = level.requirements.maxStaleS, ageNow = contentAge(game);
+  const tooStale = maxStale !== undefined && ageNow > maxStale;
   const rps = game.phase === 'wave' ? level.play.wave.rps : 0;
   const net = PASSIVE_INCOME + ((flow?.answered ?? 0) / 100) * PER_100_VISITS - upkeepPerS(game);
   const building = game.phase === 'build';
@@ -318,6 +320,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const reads = (level.play.wave.mix?.read ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
     if (lagTooHigh) return t.lagHint;
+    if (tooStale) return t.staleHint;
     if (tooOld) return t.backlogHint;
     if (incidentHappened) return t.redundancyHint;
     const worst = Object.entries(flow?.drop ?? {}).filter(([id]) => id !== CLIENT).sort((a, b) => b[1] - a[1])[0]
@@ -327,7 +330,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     // Downloads that do not go through a CDN all land on Object Storage, which has a limit.
     const hasDownloads = (level.play.wave.mix?.[DOWNLOAD] ?? 0) > 0;
     if (hasDownloads && level.allowedComponents.includes('cdn') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'cdn')) return t.cdnHint;
-    if (hasDownloads && type === 'objectStorage') return t.cdnHint;
+    if (hasDownloads && type === 'objectStorage') return game.buildings.some(b => b.type === 'cdn') ? t.shortTtlHint : t.cdnHint;
     // Uploads that do not go straight to Object Storage keep the app servers busy.
     const hasUploads = (level.play.wave.mix?.[UPLOAD] ?? 0) > 0;
     if (hasUploads && level.allowedComponents.includes('objectStorage') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'objectStorage')) return t.uploadHint;
@@ -507,10 +510,11 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         <span className="play-res">⏱ <b className="play-phase">{building ? t.rt.phase.build(fmt(BUILD_PHASE_S - game.t)) : game.phase === 'wave' ? t.rt.phase.wave(fmt(waveEnd(level) - game.t)) : game.phase === 'drain' ? t.rt.phase.drain(Math.ceil(totalBacklog(game))) : t.rt.phase.end}</b>
           <TimeControls paused={paused} togglePause={() => setPaused(p => !p)} speed={speed} setSpeed={x => { setSpeed(x); setPaused(false); }} disabled={overlay !== null} />
         </span>
-        {(maxLag !== undefined || hasQueue) && (
+        {(maxLag !== undefined || hasQueue || maxStale !== undefined) && (
           // Queue Age and Replication Lag share one capsule, one line each, so the top bar does not outgrow a tablet.
           <span className="play-res play-gauges">
             {maxLag !== undefined && <span className="play-lag" role="status" aria-label={t.rt.replicationLag}>⏪ <b className={lagTooHigh ? 'bad' : ''}>{t.rt.lagOf(lagNow, maxLag)}</b></span>}
+            {maxStale !== undefined && <span className="play-age" role="status" aria-label={t.rt.freshness}>🕒 <b className={tooStale ? 'bad' : ''}>{t.rt.freshnessOf(ageNow, maxStale)}</b></span>}
             {hasQueue && <span className="play-age" role="status" aria-label={t.rt.queueAge}>⏳ <b className={tooOld ? 'bad' : ''}>{t.rt.queueAgeOf(oldest, level.requirements.maxQueueAgeS)}</b></span>}
           </span>
         )}
@@ -628,6 +632,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
               <li><span aria-hidden="true">⚠</span> {t.objectiveErrors(level.requirements.maxErrorRate)}</li>
               {level.requirements.maxQueueAgeS !== undefined && <li><span aria-hidden="true">⏳</span> {t.objectiveQueueAge(level.requirements.maxQueueAgeS)}</li>}
               {level.requirements.maxReplicationLagS !== undefined && <li><span aria-hidden="true">⏪</span> {t.objectiveReplicationLag(level.requirements.maxReplicationLagS)}</li>}
+        {level.requirements.maxStaleS !== undefined && <li><span aria-hidden="true">🕒</span> {t.objectiveFreshness(level.requirements.maxStaleS)}</li>}
               <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
               {level.play.incident && <li><span aria-hidden="true">⚡</span> {t.rt.incidentInfo(buildingName(level.play.incident.componentType), level.play.incident.atS)}</li>}
             </ul>

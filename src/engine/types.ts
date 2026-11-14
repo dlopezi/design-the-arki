@@ -7,7 +7,8 @@ export type Level = {
   durationS: number;
   traffic: TrafficSegment[];
   requirements: { p95Ms: number; maxErrorRate: number; /** Real-time play only: the longest the oldest Message may wait in a queue. */ maxQueueAgeS?: number;
-    /** Real-time play only: the longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number };
+    /** Real-time play only: the longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number;
+    /** Real-time play only: the longest a user may be shown an old copy of a file, in seconds: no CDN may keep a copy longer (its TTL). */ maxStaleS?: number };
   /** Maximum monthly cost in dollars. */
   budget: number;
   /** Monthly costs at or below which the 2nd, 3rd… star is earned. */

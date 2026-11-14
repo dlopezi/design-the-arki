@@ -50,3 +50,19 @@ test('the Manual: the CDN entry is locked until its level and says what it is in
   await page.getByRole('button', { name: /CDN/ }).click();
   await expect(page.getByText('Cloudflare · Amazon CloudFront')).toBeVisible();
 });
+
+test('level 22: the freshness limit is shown, and a TTL that is too long loses with a hint about old content', async ({ page }) => {
+  await openLevel(page, '22-old-content', 'guided');
+  await expect(page.getByRole('status', { name: 'Content age' })).toContainText('max 50 s');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('old content');
+});
+
+test('level 22: raising the TTL of a CDN that is too short, to a value under the limit, wins', async ({ page }) => {
+  await openLevel(page, '22-old-content', 'normal');
+  await page.locator('[data-node-id="cdn"]').first().click();
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Longer TTL' }).click(); // 10 → 40
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});

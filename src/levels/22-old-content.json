@@ -1,0 +1,283 @@
+{
+  "id": "22-old-content",
+  "chapter": "Edge",
+  "title": "Old content",
+  "brief": "The video was edited, and users must see the new version soon: no CDN may keep a copy for more than 50 seconds. But 510 downloads and 90 page views arrive every second, and Object Storage can send out only so many files. The CDN TTL is how long it keeps a copy. A long TTL answers more downloads, but shows older content. A short TTL shows fresh content, but lets more downloads reach Object Storage. Pick a TTL that does both: select the CDN and change its TTL.",
+  "durationS": 30,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 30,
+      "rps": 600
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxStaleS": 50
+  },
+  "budget": 400,
+  "starCostThresholds": [
+    300,
+    240
+  ],
+  "allowedComponents": [
+    "cdn",
+    "loadBalancer",
+    "appServer",
+    "database",
+    "objectStorage"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 3
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "cdn": {
+      "limits": {
+        "ttlS": 300
+      }
+    }
+  },
+  "guidedHint": "A longer TTL answers more downloads at the edge but shows older content. Object Storage needs the CDN to answer about 60% of the downloads, which takes a TTL of about 32 s or more. Users must not see content older than 50 s. Choose a TTL between the two, such as 40 s.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 600,
+      "lengthS": 30,
+      "mix": {
+        "watch": 0.15,
+        "download": 0.85
+      }
+    },
+    "starMoney": [
+      100,
+      390
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        },
+        {
+          "id": "cdn",
+          "type": "cdn",
+          "params": {
+            "ttlS": 120
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ],
+        [
+          "cdn",
+          "files"
+        ],
+        [
+          "client",
+          "cdn"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        },
+        {
+          "id": "cdn",
+          "type": "cdn",
+          "params": {
+            "ttlS": 10
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ],
+        [
+          "cdn",
+          "files"
+        ],
+        [
+          "client",
+          "cdn"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "files",
+          "type": "objectStorage"
+        },
+        {
+          "id": "cdn",
+          "type": "cdn",
+          "params": {
+            "ttlS": 5
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "files"
+        ],
+        [
+          "cdn",
+          "files"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 2
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "files",
+        "type": "objectStorage"
+      },
+      {
+        "id": "cdn",
+        "type": "cdn",
+        "params": {
+          "ttlS": 40
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "cdn",
+        "files"
+      ],
+      [
+        "client",
+        "cdn"
+      ]
+    ]
+  }
+}
