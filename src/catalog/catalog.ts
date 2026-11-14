@@ -93,6 +93,8 @@ export const catalog: Catalog = {
   objectStorage: {
     primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: true, acceptsClients: true,
     accepts: [UPLOAD, DOWNLOAD], prefers: [UPLOAD], buildS: 4,
+    // Real object storage keeps its data across Regions, so a Region that falls does not take it down.
+    global: true,
     // Sending a big file out is a lot of work: a viral video passes its limit (about 200 downloads a second), which a CDN in front prevents (ADR-0008).
     effort: { [DOWNLOAD]: 5000 },
     presentation: { zone: 'data', technology: 'Amazon S3', hideCapacity: true },
@@ -102,6 +104,8 @@ export const catalog: Catalog = {
   apiGateway: {
     primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, acceptsClients: true, distributes: false,
     rejects: [INVALID], buildS: 4,
+    // In a design with Regions the gateway stands at the door, in front of the DNS, outside any one Region.
+    global: true,
     // The Client Limit: requests per second one client may send (a level sets how many clients send each Request Type).
     clientLimit: { param: 'limitRps', defaultValue: 40 },
     presentation: { zone: 'edge', technology: 'Kong', hideCapacity: true },
@@ -111,6 +115,8 @@ export const catalog: Catalog = {
   cdn: {
     primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 40, endsRequests: false, acceptsClients: true,
     accepts: [DOWNLOAD], prefers: [DOWNLOAD], buildS: 4,
+    // A CDN is a network of edge servers outside any one Region.
+    global: true,
     shortcut: { param: 'ttlS', defaultValue: 60, halfAt: 20, max: 0.95 },
     presentation: { zone: 'edge', technology: 'Amazon CloudFront', hideCapacity: true },
   },

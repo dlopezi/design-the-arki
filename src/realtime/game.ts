@@ -178,8 +178,12 @@ function autoLink(s: GameState, b: Building): GameState {
   let next = s;
   // The API Gateway is the one door: when there is one, the users reach the load balancer or the app servers through it.
   if (b.type === 'dns') {
-    // The DNS is the users' way in, and sends them to the load balancer (or the app servers) of each Region.
-    next = addLink(next, CLIENT, b.id);
+    // The DNS is the users' way in (behind the API Gateway when there is one), and sends them to the load balancer (or the app servers) of each Region.
+    if (gateway) {
+      // The DNS takes over from the load balancer or the app servers the gateway was sending to.
+      next = { ...next, links: next.links.filter(l => !(l.from === gateway.id && typeOf(next, l.to) !== 'dns')) };
+      next = addLink(next, gateway.id, b.id);
+    } else next = addLink(next, CLIENT, b.id);
     for (const region of new Set(s.buildings.filter(x => !defaultCatalog[x.type]?.global).map(regionOf))) {
       const inRegion = (type: string) => s.buildings.filter(x => x.type === type && regionOf(x) === region);
       const entry = inRegion('loadBalancer')[0];
@@ -188,7 +192,9 @@ function autoLink(s: GameState, b: Building): GameState {
     }
   } else if (b.type === 'apiGateway') {
     next = addLink(next, CLIENT, b.id);
-    if (lb) next = addLink(next, b.id, lb.id);
+    // With a DNS the gateway stands in front of it; otherwise it passes the requests to the load balancer or the app servers.
+    if (dns) next = addLink(next, b.id, dns.id);
+    else if (lb) next = addLink(next, b.id, lb.id);
     else for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'loadBalancer') {
     // The load balancer takes over from the app servers behind the DNS or the gateway.

@@ -498,7 +498,7 @@ export const es: Strings = {
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / máx. ${max} s`),
     waveInfo: (rps: number, s: number) => `Una oleada de ${rps} req/s durante ${s} s. Aguanta sin que la reputación llegue a 0; las estrellas dependen del dinero que te quede.`,
     regionIncidentInfo: (s: number) => `A los ${s} s de la oleada, cae toda la Región principal.`,
-    regions: { main: 'Región 1 · principal', standby: 'Región 2 · reserva', live: 'ACTIVA', down: 'CAÍDA', standbyTag: 'RESERVA', promoted: 'ACTIVA · promovida', empty: 'Región de reserva vacía: construye aquí igual que en la principal.', buildIn: 'Construir en', dnsTtl: (s: number) => `TTL del DNS ${s} s`, failoverIn: (s: number) => `Failover en ${s} s`, switched: 'Cambiado a la Región 2' },
+    regions: { global: 'Fuera de las Regiones', main: 'Región 1 · principal', standby: 'Región 2 · reserva', live: 'ACTIVA', down: 'CAÍDA', standbyTag: 'RESERVA', promoted: 'ACTIVA · promovida', empty: 'Región de reserva vacía: construye aquí igual que en la principal.', buildIn: 'Construir en', dnsTtl: (s: number) => `TTL del DNS ${s} s`, failoverIn: (s: number) => `Failover en ${s} s`, switched: 'Cambiado a la Región 2' },
     incidentInfo: (type: string, s: number) => `A los ${s} s de la oleada se cae una instancia de ${type}.`,
     map: 'Mapa', zoomIn: 'Acercar', zoomOut: 'Alejar', center: 'Centrar',
     autoLink: (on: boolean) => `Auto-conectar: ${on ? 'sí' : 'no'}`,

@@ -139,3 +139,20 @@ test('level 25: a DNS with a long TTL switches too late and loses; a shorter TTL
   await expect(won).toBeVisible({ timeout: 40_000 });
   await expect(won).toContainText('Base defended');
 });
+
+test('level 26: the review shows the buildings outside the Regions, and a slow DNS loses with a hint about the TTL', async ({ page }) => {
+  await openLevel(page, '26-worldwide-launch', 'guided');
+  await expect(page.locator('[data-region="global"]')).toContainText('Outside the Regions');
+  for (const name of ['API Gateway', 'DNS', 'CDN', 'Object Storage']) await expect(page.locator('[data-region="global"] .play-unit', { hasText: name })).toBeVisible();
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('DNS TTL');
+});
+
+test('level 26: with everything in place and a short DNS TTL the base survives all four problems', async ({ page }) => {
+  await openLevel(page, '26-worldwide-launch', 'guided');
+  await page.locator('[data-node-id="dns"]').first().click();
+  await page.getByRole('button', { name: 'Shorter TTL' }).click(); // 30 → 10
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});
