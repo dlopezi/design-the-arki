@@ -16,6 +16,7 @@ export const componentArt: Record<string, { color: string }> = {
   readReplica: { color: '#7c8cff' },
   objectStorage: { color: '#e0794a' },
   cdn: { color: '#2dd4bf' },
+  apiGateway: { color: '#a3e635' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -147,6 +148,14 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <IsoBox cx={41} cy={44} w={9} h={11} p={p} />
     <IsoBox cx={32} cy={35} w={9} h={11} p={p} />
     <path d="M32 12 L32 22 M27 17 L32 12 L37 17" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </>,
+  // A gate in a wall: every request passes through one door, and the wrong ones are stopped at the bar.
+  apiGateway: p => <>
+    <IsoBox cx={18} cy={50} w={10} h={26} p={p} />
+    <IsoBox cx={46} cy={50} w={10} h={26} p={p} />
+    <path d="M18 30 L46 30" stroke={p.top} strokeWidth={3} strokeLinecap="round" />
+    <path d="M25 49 L39 49" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" />
+    <path d="M32 34 L32 46" stroke={p.glow} strokeWidth={1.4} strokeLinecap="round" opacity={0.7} />
   </>,
   // A dish on a mast: answers downloads close to the users, so the origin behind it stays calm.
   cdn: p => <>

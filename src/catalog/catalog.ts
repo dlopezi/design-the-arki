@@ -11,7 +11,9 @@ export const UPLOAD = 'upload';
 export const READ_YOUR_WRITES = 'readYourWrites';
 /** A video file a user downloads: the CDN answers a share of them, and Object Storage serves the rest, with a limit on how many (ADR-0008). */
 export const DOWNLOAD = 'download';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD];
+/** A request with no token, or junk: whoever receives it turns it away, and an app server wastes capacity on it (ADR-0008). */
+export const INVALID = 'invalid';
+export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -26,6 +28,8 @@ export const catalog: Catalog = {
     primitive: 'station', workers: 4, meanServiceMs: 20, monthlyCost: 40, endsRequests: false, scalesOut: true, acceptsClients: true, buildS: 5,
     // Carrying a big file keeps an app server busy as long as ten normal requests.
     effort: { [UPLOAD]: 10 },
+    // An app server that gets a request with no token turns it away itself, using its own capacity.
+    rejects: [INVALID],
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
       medium: { workers: 4, monthlyCost: 40, vcpu: 2 },
@@ -90,6 +94,13 @@ export const catalog: Catalog = {
     // Sending a big file out is a lot of work: a viral video passes its limit (about 200 downloads a second), which a CDN in front prevents (ADR-0008).
     effort: { [DOWNLOAD]: 5000 },
     presentation: { zone: 'data', technology: 'Amazon S3', hideCapacity: true },
+  },
+  // Chapter 4 (Edge). The one door for the users: it checks every request and turns away the invalid ones (no token, junk)
+  // at a tiny cost, so the app servers behind it see only valid requests. Everything else goes on to the load balancer or the app servers.
+  apiGateway: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: false, acceptsClients: true, distributes: false,
+    rejects: [INVALID], buildS: 4,
+    presentation: { zone: 'edge', technology: 'Kong', hideCapacity: true },
   },
   // Chapter 4 (Edge). Sits in front of Object Storage: a share of downloads is answered at the edge (the hit share grows with
   // the TTL, as in the cache), and the rest goes on to the origin. Users connect straight to it, for downloads only.

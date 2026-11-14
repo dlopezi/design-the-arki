@@ -113,6 +113,7 @@ export const en = {
     worker: 'The Workers cannot keep up with the jobs: add Workers or use bigger ones.',
     readReplica: 'The Read Replicas cannot keep up with the reads: add Read Replica instances or use bigger ones.',
     cdn: 'The CDN is saturated.',
+    apiGateway: 'The API Gateway is saturated.',
   } as Record<string, string>,
   /** Hints when the bottleneck cannot be resized in this level. */
   fixedHints: {
@@ -131,6 +132,8 @@ export const en = {
   uploadHint: 'A file sent through the app server keeps it busy as long as ten normal requests. Connect the users straight to Object Storage (the pre-signed URL pattern): the app server only hands out the signed address, and the file goes to Object Storage.',
   /** Lost with downloads in the wave while Object Storage, which has a limit, serves them all. */
   cdnHint: 'Object Storage can only send out so many big files each second, and a viral video passes that limit. Put a CDN in front of it and connect the users to the CDN: it answers a share of the downloads at the edge, and a longer TTL answers more of them.',
+  /** Lost with invalid requests in the wave while no API Gateway turns them away first. */
+  gatewayHint: 'Invalid requests (no token, junk) went all the way to your app servers, and each one used capacity before being refused. Put an API Gateway at the door and connect the users to it: it checks every request first and turns the invalid ones away at a tiny cost, so the app servers see only valid requests.',
   /** Lost while a CDN kept copies longer than the level allows. */
   staleHint: 'Your CDN kept each copy of the file longer than users may see old content, so they were shown the old video after the edit. Lower the CDN TTL to the limit or under it. A shorter TTL means fresher content but more downloads reaching Object Storage.',
   /** Lost with downloads in the wave and a CDN whose TTL is too short for Object Storage. */
@@ -155,6 +158,7 @@ export const en = {
     readReplica: 'a copy of the primary database that answers reads only; add instances to answer more reads each second.',
     objectStorage: 'stores big files, with a fixed price and no settings. Users upload to it straight (the pre-signed URL pattern), so the app servers stay free. It can send out only so many big files each second.',
     cdn: 'answers a share of the video downloads close to the users, so Object Storage behind it stays calm; a longer TTL means more hits.',
+    apiGateway: 'the one door for the users: it checks every request, turns away the invalid ones (no token, junk) at a tiny cost, and passes the rest on.',
   } as Record<string, string>,
   incident: (label: string, instance: number, atS: number) => `${label} instance ${instance} goes down at ${atS} s`,
   down: 'Down',
@@ -219,7 +223,7 @@ export const en = {
   clients: 'Clients',
   /** The fields a level can offer as a Shard Key. */
   shardKeyNames: { userId: 'User id', videoId: 'Video id', country: 'Country', date: 'Date' } as Record<string, string>,
-  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN' } as Record<string, string>,
+  componentTypes: { loadBalancer: 'Load balancer', appServer: 'App server', cache: 'Cache', database: 'Database', messageQueue: 'Message queue', worker: 'Worker', readReplica: 'Read Replica', objectStorage: 'Object Storage', cdn: 'CDN', apiGateway: 'API Gateway' } as Record<string, string>,
   person: 'Person',
   systemName: 'Your system',
   softwareSystem: 'Software system',
@@ -352,6 +356,14 @@ export const en = {
         diff: 'Real object storage also has buckets, access rules, storage classes, versioning, and a price per gigabyte stored and transferred. Its limits are far higher, but the origin is still the part you protect with a CDN.',
         read: { label: 'AWS · Amazon S3 pre-signed URLs', url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html' },
       },
+      apiGateway: {
+        role: 'The one door to your system. Every request from the users comes in through it: it checks the request (for example, that it has a valid token), turns away the invalid ones with an error such as 401, and passes the valid ones on to the load balancer or the app servers.',
+        when: 'When many requests are junk or have no valid token (bots, scanners, broken clients) and they waste the capacity of the app servers.',
+        tools: ['Kong', 'AWS API Gateway', 'Nginx', 'Envoy'],
+        same: 'It turns away every invalid request at a tiny cost, so the app servers see only valid requests. The users connect to it, and it connects to the load balancer or the app servers. It has a fixed price and no settings yet.',
+        diff: 'A real API Gateway also routes by path to many services, limits how many requests each client may send, adds logs and metrics, and can check tokens with an identity provider. A later mission adds the limit per client.',
+        read: { label: 'Kong · What is an API gateway?', url: 'https://konghq.com/learning-center/api-gateway/' },
+      },
       cdn: {
         role: 'A network of servers close to the users. It answers a share of the video downloads itself, with very low latency, and sends the rest to Object Storage, the origin. Users connect to it straight for downloads.',
         when: 'When many people download the same files, such as a viral video, and the origin cannot send out so many files each second.',
@@ -474,7 +486,7 @@ export const en = {
     },
     waveShort: (rps: number, s: number) => `One wave: ${rps} req/s for ${s} s`,
     /** The mix of Request Types in a wave, as shares: "70% watches · 30% uploads". */
-    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads' } as Record<string, string>)[type] ?? type}`).join(' · '),
+    mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads', invalid: 'invalid requests' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     replicationLag: 'Replication Lag', lagShort: 'Lag',
     freshness: 'Content age',
@@ -489,6 +501,7 @@ export const en = {
     help: 'Drag the ground to move · wheel to zoom · drag from one building to another to connect them · click a line and press Delete to remove it',
     contextSummary: (n: number, upkeep: string) => `${n} building${n === 1 ? '' : 's'} · maintenance $${upkeep}/s · switch to layer 3 to see each one`,
     live: 'Live results', errors: 'Errors',
+    rejected: 'Turned away',
     fixedIncome: 'Fixed income', visitsIncome: 'Answered visits', upkeep: 'Maintenance',
     inspector: {
       empty: 'Select a building or a line. Buildings connect themselves when you build them; to change that, drag from one building to another, or select a line and press Delete.',

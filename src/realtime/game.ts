@@ -161,15 +161,25 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0];
+  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0], gateway = ofType('apiGateway')[0];
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
   const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
-  if (b.type === 'loadBalancer') {
+  // The API Gateway is the one door: when there is one, the users reach the load balancer or the app servers through it.
+  if (b.type === 'apiGateway') {
     next = addLink(next, CLIENT, b.id);
+    if (lb) next = addLink(next, b.id, lb.id);
+    else for (const a of apps) next = addLink(next, b.id, a.id);
+  } else if (b.type === 'loadBalancer') {
+    if (gateway) {
+      // The load balancer takes over from the app servers behind the gateway.
+      next = { ...next, links: next.links.filter(l => !(l.from === gateway.id && typeOf(next, l.to) === 'appServer')) };
+      next = addLink(next, gateway.id, b.id);
+    } else next = addLink(next, CLIENT, b.id);
     for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'appServer') {
     if (lb) next = addLink(next, lb.id, b.id);
+    else if (gateway) next = addLink(next, gateway.id, b.id);
     else if (!hasGeneralEntrance(next)) next = addLink(next, CLIENT, b.id);
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
