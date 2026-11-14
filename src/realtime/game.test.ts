@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -878,5 +878,123 @@ describe('edge: the Client Limit stops abusive clients without refusing normal o
   it('a level with no counted clients ignores the limit', () => {
     const l: GameLevel = { ...limitLevel, play: { ...limitLevel.play, clients: undefined, wave: { rps: 300, lengthS: 30, mix: { watch: 1 } } } };
     expect(run(callNow(createGame(l, withLimit(1))), 5, l).flow!.errors).toBe(0);
+  });
+});
+
+describe('edge: a standby Region, the DNS and a Region that falls', () => {
+  const regionLevel: GameLevel = {
+    allowedComponents: ['dns', 'loadBalancer', 'appServer', 'database', 'readReplica'],
+    componentOptions: { appServer: { maxInstances: 2 }, readReplica: { maxInstances: 1 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 160, lengthS: 60, mix: { read: 0.6, write: 0.4 } }, incident: { atS: 20, region: 'main' }, starMoney: [100, 190] },
+  };
+  const main = [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }];
+  const standby = [{ id: 'lb2', type: 'loadBalancer', params: { region: 'standby' } }, { id: 'api2', type: 'appServer', params: { instances: 2, region: 'standby' } }, { id: 'rep', type: 'readReplica', params: { region: 'standby' } }];
+  const design = (ttlS: number, withStandby = true): Design => ({
+    components: withStandby ? [{ id: 'dns', type: 'dns', params: { ttlS } }, ...main, ...standby] : [{ id: 'dns', type: 'dns', params: { ttlS } }, ...main],
+    connections: [['client', 'dns'], ['dns', 'lb'], ['lb', 'api'], ['api', 'db'], ...(withStandby ? [['dns', 'lb2'], ['lb2', 'api2'], ['api2', 'rep'], ['rep', 'db']] : [])] as [string, string][],
+  });
+  const at = (seconds: number, d: Design) => run(callNow(createGame(regionLevel, d)), seconds, regionLevel);
+  // The incident is at 20 s into the wave.
+
+  it('before anything fails the DNS sends every request to the main Region, and the standby sits idle', () => {
+    const s = at(10, design(10));
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.inflow.lb).toBeCloseTo(160);
+    expect(s.flow!.inflow.lb2 ?? 0).toBe(0);
+  });
+
+  it('when the main Region falls every building in it is down, the standby stays up, and every request fails until the DNS switches', () => {
+    const s = at(22, design(10)); // 2 s after the fall, the TTL is 10 s
+    expect(s.incidentDone).toBe(true);
+    expect(s.buildings.filter(b => b.region !== 'standby' && b.type !== 'dns').every(b => b.instances.every(i => i.down))).toBe(true);
+    expect(s.buildings.filter(b => b.region === 'standby').every(b => b.instances.every(i => !i.down))).toBe(true);
+    expect(s.failover.switched).toBe(false);
+    expect(s.flow!.errors).toBe(1);
+    expect(s.reputation).toBeLessThan(100);
+  });
+
+  it('switches the users after the TTL: the standby serves them, and its Read Replica becomes the primary database', () => {
+    const s = at(35, design(10)); // the fall at 20 s, the switch at 30 s
+    expect(s.failover.switched).toBe(true);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.inflow.lb2).toBeCloseTo(160);
+    expect(s.buildings.find(b => b.id === 'rep')!.type).toBe('promotedReplica');
+    expect(s.events.map(e => e.kind)).toContain('failover');
+  });
+
+  it('a Read Replica that answers reads only could not take the writes: promoting it is what lets the standby serve everything', () => {
+    const s = at(35, design(10));
+    expect(s.flow!.inflow.rep).toBeCloseTo(160); // reads and writes alike
+    expect(s.flow!.drop.rep ?? 0).toBe(0);
+  });
+
+  it('a shorter TTL switches sooner, and costs more each second', () => {
+    const switchedAt = (ttlS: number) => at(70, design(ttlS)).failover.switchAt! - (BUILD_PHASE_S + 20);
+    expect(switchedAt(5)).toBeCloseTo(5, 0);
+    expect(switchedAt(30)).toBeCloseTo(30, 0);
+    const price = (ttlS: number) => upkeepPerS(createGame(regionLevel, design(ttlS)));
+    expect(price(5)).toBeGreaterThan(price(10));
+    expect(price(10)).toBeGreaterThan(price(30));
+  });
+
+  it('waiting 30 s for the DNS loses the base: reputation falls too fast, while 10 s survives', () => {
+    expect(runToEnd(callNow(createGame(regionLevel, design(30))), regionLevel).phase).toBe('lost');
+    expect(runToEnd(callNow(createGame(regionLevel, design(10))), regionLevel).phase).toBe('won');
+  });
+
+  it('with no standby Region nothing can take the users, however fast the DNS is', () => {
+    const s = at(60, design(5, false));
+    expect(s.failover.switchAt).toBeNull();
+    expect(s.flow!.errors).toBe(1);
+  });
+
+  it('a DNS that is not connected to the standby Region switches the users to nothing', () => {
+    const d = design(5);
+    const s = at(40, { ...d, connections: d.connections.filter(([a, b]) => !(a === 'dns' && b === 'lb2')) });
+    expect(s.failover.switched).toBe(true);
+    expect(s.flow!.errors).toBe(1);
+  });
+
+  it('a building goes into the Region chosen when it is built, and a new Region has its own copy of each type', () => {
+    let s = createGame(regionLevel, { components: [], connections: [] });
+    s = build(s, 'appServer', regionLevel, undefined, 'standby');
+    s = build(s, 'appServer', regionLevel, undefined, 'main');
+    expect(s.buildings.map(b => [b.type, b.region ?? 'main'])).toEqual([['appServer', 'standby'], ['appServer', 'main']]);
+    const more = build(s, 'appServer', regionLevel, undefined, 'standby');
+    expect(more.buildings.find(b => b.region === 'standby')!.instances).toHaveLength(2);
+  });
+
+  it('there is one DNS for the whole design, wherever it is built', () => {
+    let s = build(createGame(regionLevel, { components: [], connections: [] }), 'dns', regionLevel, undefined, 'standby');
+    expect(s.buildings[0]!.region).toBeUndefined();
+    expect(buildProblem(s, 'dns', regionLevel, undefined, 'main')).toBe('built');
+    s = build(s, 'dns', regionLevel);
+    expect(s.buildings).toHaveLength(1);
+  });
+
+  it('a Region is a group: buildings connect inside it, and only the DNS and replication cross to the other', () => {
+    const s = createGame(regionLevel, design(10));
+    expect(connect(s, 'api', 'rep').events.at(-1)).toMatchObject({ kind: 'refused', reason: 'otherRegion' });
+    expect(connect(s, 'lb2', 'api').events.at(-1)).toMatchObject({ kind: 'refused', reason: 'otherRegion' });
+    expect(ids(s)).toContain('rep>db'); // replication crosses Regions
+    expect(ids(s)).toContain('dns>lb2'); // and so does the DNS
+  });
+
+  it('new buildings wire themselves inside their Region, the DNS reaches each Region, and the standby Read Replica copies the primary database', () => {
+    const l = regionLevel;
+    const order: [string, string][] = [['loadBalancer', 'main'], ['appServer', 'main'], ['database', 'main'], ['loadBalancer', 'standby'], ['appServer', 'standby'], ['readReplica', 'standby'], ['dns', 'main']];
+    const s = order.reduce((acc, [type, region]) => build(acc, type, l, undefined, region), createGame(l, { components: [], connections: [] }));
+    expect(named(s).sort()).toEqual(['appServer>database', 'appServer>readReplica', 'client>dns', 'dns>loadBalancer', 'dns>loadBalancer', 'loadBalancer>appServer', 'loadBalancer>appServer', 'readReplica>database']);
+    // The same buildings in the other order give the same wiring.
+    const reversed = [...order].reverse().reduce((acc, [type, region]) => build(acc, type, l, undefined, region), createGame(l, { components: [], connections: [] }));
+    expect(named(reversed).sort()).toEqual(named(s).sort());
+  });
+
+  it('a Region that falls where there is no DNS is not switched, and the design is saved with each building\'s Region', () => {
+    const s = createGame(regionLevel, design(10));
+    const saved = toDesign(s);
+    expect(saved.components.find(c => c.id === 'rep')!.params).toMatchObject({ region: 'standby' });
+    expect(saved.components.find(c => c.id === 'lb')!.params?.region).toBeUndefined();
   });
 });

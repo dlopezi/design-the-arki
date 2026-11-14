@@ -1,0 +1,346 @@
+{
+  "id": "25-region-falls",
+  "chapter": "Edge",
+  "title": "The Region falls",
+  "brief": "A whole Region, a data centre with all its power and network, goes down 20 seconds into the wave. Everything you built in Region 1 fails at once. You need a standby Region: a second load balancer, app servers and a Read Replica in Region 2, always on and paid for. Put a DNS in front of both Regions. It sends the users to Region 1, and when Region 1 fails it switches them to Region 2, but only after its TTL has passed. Until then every request fails, and your reputation falls fast. A shorter TTL switches sooner and costs more. When the DNS switches, the Read Replica in Region 2 becomes the primary database (failover). Use the Build in switch to build in Region 2, and connect the DNS to both Regions.",
+  "durationS": 60,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 60,
+      "rps": 160
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 600,
+  "starCostThresholds": [
+    500,
+    400
+  ],
+  "allowedComponents": [
+    "dns",
+    "loadBalancer",
+    "appServer",
+    "database",
+    "readReplica"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 2
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "readReplica": {
+      "sizes": [
+        "small"
+      ],
+      "maxInstances": 1
+    }
+  },
+  "guidedHint": "When a whole Region fails, requests keep going to it until the DNS switches the users, and that takes the TTL. Your reputation falls about 6% each second until then, so you cannot wait 30 seconds. Select the DNS and choose a shorter TTL: 10 seconds is enough, 5 costs more. The Read Replica in Region 2 becomes the primary database when the DNS switches.",
+  "play": {
+    "startMoney": 500,
+    "wave": {
+      "rps": 160,
+      "lengthS": 60,
+      "mix": {
+        "read": 0.6,
+        "write": 0.4
+      }
+    },
+    "incident": {
+      "atS": 20,
+      "region": "main"
+    },
+    "starMoney": [
+      100,
+      190
+    ]
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        {
+          "id": "dns",
+          "type": "dns",
+          "params": {
+            "ttlS": 30
+          }
+        },
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "lb2",
+          "type": "loadBalancer",
+          "params": {
+            "region": "standby"
+          }
+        },
+        {
+          "id": "api2",
+          "type": "appServer",
+          "params": {
+            "region": "standby",
+            "instances": 2
+          }
+        },
+        {
+          "id": "rep",
+          "type": "readReplica",
+          "params": {
+            "region": "standby"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "dns"
+        ],
+        [
+          "dns",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "lb2",
+          "api2"
+        ],
+        [
+          "api2",
+          "rep"
+        ],
+        [
+          "rep",
+          "db"
+        ],
+        [
+          "dns",
+          "lb2"
+        ]
+      ]
+    },
+    "normal": {
+      "components": [
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ]
+      ]
+    },
+    "hard": {
+      "components": [
+        {
+          "id": "dns",
+          "type": "dns",
+          "params": {
+            "ttlS": 10
+          }
+        },
+        {
+          "id": "lb",
+          "type": "loadBalancer"
+        },
+        {
+          "id": "api",
+          "type": "appServer",
+          "params": {
+            "instances": 2
+          }
+        },
+        {
+          "id": "db",
+          "type": "database"
+        },
+        {
+          "id": "lb2",
+          "type": "loadBalancer",
+          "params": {
+            "region": "standby"
+          }
+        },
+        {
+          "id": "api2",
+          "type": "appServer",
+          "params": {
+            "region": "standby",
+            "instances": 2
+          }
+        },
+        {
+          "id": "rep",
+          "type": "readReplica",
+          "params": {
+            "region": "standby"
+          }
+        }
+      ],
+      "connections": [
+        [
+          "client",
+          "dns"
+        ],
+        [
+          "dns",
+          "lb"
+        ],
+        [
+          "lb",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "lb2",
+          "api2"
+        ],
+        [
+          "api2",
+          "rep"
+        ],
+        [
+          "rep",
+          "db"
+        ]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      {
+        "id": "dns",
+        "type": "dns",
+        "params": {
+          "ttlS": 10
+        }
+      },
+      {
+        "id": "lb",
+        "type": "loadBalancer"
+      },
+      {
+        "id": "api",
+        "type": "appServer",
+        "params": {
+          "instances": 2
+        }
+      },
+      {
+        "id": "db",
+        "type": "database"
+      },
+      {
+        "id": "lb2",
+        "type": "loadBalancer",
+        "params": {
+          "region": "standby"
+        }
+      },
+      {
+        "id": "api2",
+        "type": "appServer",
+        "params": {
+          "region": "standby",
+          "instances": 2
+        }
+      },
+      {
+        "id": "rep",
+        "type": "readReplica",
+        "params": {
+          "region": "standby"
+        }
+      }
+    ],
+    "connections": [
+      [
+        "client",
+        "dns"
+      ],
+      [
+        "dns",
+        "lb"
+      ],
+      [
+        "lb",
+        "api"
+      ],
+      [
+        "api",
+        "db"
+      ],
+      [
+        "lb2",
+        "api2"
+      ],
+      [
+        "api2",
+        "rep"
+      ],
+      [
+        "rep",
+        "db"
+      ],
+      [
+        "dns",
+        "lb2"
+      ]
+    ]
+  }
+}

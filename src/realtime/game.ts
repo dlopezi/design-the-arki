@@ -1,6 +1,6 @@
 import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, DOWNLOAD, UPLOAD } from '../catalog/catalog';
 import type { Catalog, Design } from '../engine/types';
-import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
+import { CLIENT, MAIN, STANDBY, instancePrice, regionOf, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
 /**
  * Real-time play (ADR-0005): a build phase, then one wave of users. Money grows by itself and with every answered
@@ -28,8 +28,8 @@ export type Play = {
   startMoney: number;
   /** `mix`: the share of each Request Type in the wave (adds up to 1); left out, all traffic is one type. */
   wave: { rps: number; lengthS: number; mix?: Record<string, number> };
-  /** At `atS` seconds into the wave, one serving instance of the first `componentType` goes down. */
-  incident?: { atS: number; componentType: string };
+  /** At `atS` seconds into the wave, one serving instance of the first `componentType` goes down, or every building of a whole `region` does (ADR-0008). */
+  incident?: { atS: number; componentType?: string; region?: string };
   /** Money left at the end for the 2nd, 3rd… star. */
   starMoney: number[];
   /** Levels with abusive clients: how many clients send each Request Type, so a Client Limit can be applied to each one's rate (ADR-0008). */
@@ -47,7 +47,7 @@ export type GameLevel = {
 };
 
 /** What happened, for the message log; the UI turns each kind into text. */
-export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
+export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'regionDown' | 'failover' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
 /** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them. */
 export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number };
@@ -74,6 +74,8 @@ export type GameState = {
   /** Writes each Read Replica has not applied yet, and how far behind the primary database that puts it, in seconds (ADR-0007). */
   unapplied: Record<string, number>;
   lag: Record<string, number>;
+  /** A Region failure and the switch to the standby Region: when it fell, when the DNS will switch (null: nothing will), and whether it has. */
+  failover: { downAt: number | null; switchAt: number | null; switched: boolean };
   history: Sample[];
   events: GameEvent[];
   nextId: number;
@@ -94,13 +96,13 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 /** A new game: the level's money, and the mode's starting design already built and connected. */
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
-    id: c.id, type: c.type,
+    id: c.id, type: c.type, ...(c.params?.region && c.params.region !== MAIN ? { region: String(c.params.region) } : {}),
     params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
-    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -108,7 +110,7 @@ export function createGame(level: GameLevel, design: Design): GameState {
 /** The design on the map, to save it or show it in the player's Base. */
 export function toDesign(s: GameState): Design {
   return {
-    components: s.buildings.map(b => ({ id: b.id, type: b.type, params: { ...b.params, ...(defaultCatalog[b.type]?.scalesOut || (defaultCatalog[b.type]?.shardable && b.instances.length > 1) ? { instances: b.instances.length } : {}) } })),
+    components: s.buildings.map(b => ({ id: b.id, type: b.type, params: { ...b.params, ...(b.region && b.region !== MAIN ? { region: b.region } : {}), ...(defaultCatalog[b.type]?.scalesOut || (defaultCatalog[b.type]?.shardable && b.instances.length > 1) ? { instances: b.instances.length } : {}) } })),
     connections: s.links.map(l => [l.from, l.to]),
   };
 }
@@ -128,6 +130,10 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (from !== CLIENT && !typeOf(s, from)) return 'missing';
   if (!typeOf(s, to)) return 'missing';
   const spec = catalog[typeOf(s, from) ?? ''];
+  // A Region is a group of buildings: they connect inside it. Only the DNS (it stands in front of the Regions) and a Read Replica keeping
+  // a copy of the primary database (replication) cross from one Region to another.
+  const a = s.buildings.find(b => b.id === from), z = s.buildings.find(b => b.id === to);
+  if (a && z && regionOf(a) !== regionOf(z) && !spec?.global && !catalog[z.type]?.global && !(spec?.follows && spec.follows === z.type)) return 'otherRegion';
   // A Read Replica ends requests, but it may be connected to the database it keeps a copy of (replication, no requests).
   if (spec && spec.endsRequests && !spec.shortcut && !(spec.follows && spec.follows === typeOf(s, to))) return 'endsRequests';
   if (s.links.some(l => l.from === from && l.to === to)) return 'exists';
@@ -160,7 +166,10 @@ export function disconnect(s: GameState, from: string, to: string): GameState {
 }
 /** The default wiring for a new building: what a player almost always wants. */
 function autoLink(s: GameState, b: Building): GameState {
-  const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
+  // A building is wired to the ones in its own Region (and to the DNS, which belongs to none); only replication reaches another Region.
+  const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id && (defaultCatalog[x.type]?.global || regionOf(x) === regionOf(b)));
+  const anyOfType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
+  const dns = anyOfType('dns')[0];
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
   const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0], gateway = ofType('apiGateway')[0];
@@ -168,21 +177,32 @@ function autoLink(s: GameState, b: Building): GameState {
   const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
   // The API Gateway is the one door: when there is one, the users reach the load balancer or the app servers through it.
-  if (b.type === 'apiGateway') {
+  if (b.type === 'dns') {
+    // The DNS is the users' way in, and sends them to the load balancer (or the app servers) of each Region.
+    next = addLink(next, CLIENT, b.id);
+    for (const region of new Set(s.buildings.filter(x => !defaultCatalog[x.type]?.global).map(regionOf))) {
+      const inRegion = (type: string) => s.buildings.filter(x => x.type === type && regionOf(x) === region);
+      const entry = inRegion('loadBalancer')[0];
+      if (entry) next = addLink(next, b.id, entry.id);
+      else for (const a of inRegion('appServer')) next = addLink(next, b.id, a.id);
+    }
+  } else if (b.type === 'apiGateway') {
     next = addLink(next, CLIENT, b.id);
     if (lb) next = addLink(next, b.id, lb.id);
     else for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'loadBalancer') {
-    if (gateway) {
-      // The load balancer takes over from the app servers behind the gateway.
-      next = { ...next, links: next.links.filter(l => !(l.from === gateway.id && typeOf(next, l.to) === 'appServer')) };
-      next = addLink(next, gateway.id, b.id);
-    } else next = addLink(next, CLIENT, b.id);
+    // The load balancer takes over from the app servers behind the DNS or the gateway.
+    const door = dns ?? gateway;
+    if (door) {
+      next = { ...next, links: next.links.filter(l => !(l.from === door.id && typeOf(next, l.to) === 'appServer' && regionOf(next.buildings.find(x => x.id === l.to)!) === regionOf(b))) };
+      next = addLink(next, door.id, b.id);
+    } else if (regionOf(b) === MAIN) next = addLink(next, CLIENT, b.id);
     for (const a of apps) next = addLink(next, b.id, a.id);
   } else if (b.type === 'appServer') {
     if (lb) next = addLink(next, lb.id, b.id);
+    else if (dns) next = addLink(next, dns.id, b.id);
     else if (gateway) next = addLink(next, gateway.id, b.id);
-    else if (!hasGeneralEntrance(next)) next = addLink(next, CLIENT, b.id);
+    else if (regionOf(b) === MAIN && !hasGeneralEntrance(next)) next = addLink(next, CLIENT, b.id);
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);
@@ -197,11 +217,13 @@ function autoLink(s: GameState, b: Building): GameState {
     if (cache && !outOf(cache.id)) next = addLink(next, cache.id, b.id);
     else for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
     for (const w of workers) if (!outOf(w.id)) next = addLink(next, w.id, b.id);
-    for (const r of readReplicas) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
+    for (const r of anyOfType('readReplica')) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
   } else if (b.type === 'readReplica') {
     // Reads come from the app servers; the link to the database is the replication.
     for (const a of apps) next = addLink(next, a.id, b.id);
-    if (db) next = addLink(next, b.id, db.id);
+    // The copy comes from the primary database, wherever it stands (replication crosses Regions).
+    const primary = anyOfType('database')[0];
+    if (primary) next = addLink(next, b.id, primary.id);
   } else if (b.type === 'objectStorage') {
     // Files reach it through the app servers by default; connecting the users straight to it is the player's move.
     for (const a of apps) next = addLink(next, a.id, b.id);
@@ -230,10 +252,13 @@ export const setAutoLink = (s: GameState, on: boolean): GameState => ({ ...s, au
 
 // ───────── Building ─────────
 /** Why the player cannot build this type now, or null. */
-export function buildProblem(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog): string | null {
+/** The building of a type in a Region (the DNS, which belongs to none, is one for the whole design). */
+const existingIn = (s: Pick<GameState, 'buildings'>, type: string, region: string, catalog: Catalog) =>
+  s.buildings.find(b => b.type === type && (catalog[type]?.global || regionOf(b) === region));
+export function buildProblem(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN): string | null {
   if (s.phase === 'won' || s.phase === 'lost') return 'over';
   if (!level.allowedComponents.includes(type)) return 'notInLevel';
-  const existing = s.buildings.find(b => b.type === type);
+  const existing = existingIn(s, type, region, catalog);
   // A database can have several instances only as Shards, in a level that offers Shard Keys.
   if (existing && !catalog[type]!.scalesOut && !(catalog[type]!.shardable && level.play.shardKeys)) return 'built';
   const max = level.componentOptions[type]?.maxInstances ?? 8;
@@ -242,17 +267,17 @@ export function buildProblem(s: GameState, type: string, level: GameLevel, catal
   return null;
 }
 /** Builds one more of a type: a new building, or one more instance of an app server that already exists. */
-export function build(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog): GameState {
-  if (buildProblem(s, type, level, catalog)) return s;
+export function build(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN): GameState {
+  if (buildProblem(s, type, level, catalog, region)) return s;
   const time = buildTime(type, catalog);
   const instance: Instance = { buildLeftS: time, buildTotalS: time, down: false };
-  const existing = s.buildings.find(b => b.type === type);
+  const existing = existingIn(s, type, region, catalog);
   if (existing) {
     return { ...s, money: s.money - instancePrice(existing, catalog),
       buildings: s.buildings.map(b => (b === existing ? { ...b, instances: [...b.instances, instance] } : b)),
       events: log(s, { kind: 'building', type, id: existing.id }) };
   }
-  const b: Building = { id: `${type}-${s.nextId}`, type, params: {}, instances: [instance] };
+  const b: Building = { id: `${type}-${s.nextId}`, type, params: {}, ...(region !== MAIN && !catalog[type]?.global ? { region } : {}), instances: [instance] };
   const next: GameState = { ...s, money: s.money - instancePrice(b, catalog), nextId: s.nextId + 1, buildings: [...s.buildings, b],
     events: log(s, { kind: 'building', type, id: b.id }) };
   return s.autoLink ? autoLink(next, b) : next;
@@ -333,7 +358,17 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   if (s.phase === 'build' && s.t >= BUILD_PHASE_S) { s.phase = 'wave'; events.push({ kind: 'wave' }); }
   // The scripted incident.
   const incident = level.play.incident;
-  if (s.phase === 'wave' && incident && !s.incidentDone && s.t >= BUILD_PHASE_S + incident.atS) {
+  if (s.phase === 'wave' && incident?.region && !s.incidentDone && s.t >= BUILD_PHASE_S + incident.atS) {
+    // A whole Region falls: every instance of every building in it goes down for good. The DNS, if there is one and a Region to go to,
+    // will switch the users after its TTL (ADR-0008).
+    s.buildings = s.buildings.map(b => (regionOf(b) === incident.region && !catalog[b.type]?.global ? { ...b, instances: b.instances.map(i => ({ ...i, down: true })) } : b));
+    const door = s.buildings.find(b => catalog[b.type]?.failover);
+    const hasStandby = s.buildings.some(b => regionOf(b) !== incident.region && !catalog[b.type]?.global);
+    const ttl = door ? Number(door.params.ttlS ?? catalog[door.type]!.failover!.defaultValue) : null;
+    s.failover = { downAt: s.t, switchAt: door && hasStandby && ttl !== null ? s.t + ttl : null, switched: false };
+    events.push({ kind: 'regionDown' });
+    s.incidentDone = true;
+  } else if (s.phase === 'wave' && incident?.componentType && !s.incidentDone && s.t >= BUILD_PHASE_S + incident.atS) {
     const target = s.buildings.find(b => b.type === incident.componentType && b.instances.some(i => i.buildLeftS <= 0 && !i.down));
     if (target) {
       const k = target.instances.findIndex(i => i.buildLeftS <= 0 && !i.down);
@@ -342,9 +377,15 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
     }
     s.incidentDone = true;
   }
+  // The DNS switches the users to the standby Region once its TTL has passed; the standby Read Replica becomes the primary database.
+  if (s.failover.switchAt !== null && !s.failover.switched && s.t >= s.failover.switchAt) {
+    s.failover = { ...s.failover, switched: true };
+    s.buildings = s.buildings.map(b => (b.type === 'readReplica' && regionOf(b) === STANDBY ? { ...b, type: 'promotedReplica' } : b));
+    events.push({ kind: 'failover' });
+  }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys, level.play.clients);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN });
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;
