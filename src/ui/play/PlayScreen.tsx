@@ -3,10 +3,10 @@ import { ABUSIVE, catalog, DOWNLOAD, INVALID, POST, READ_YOUR_WRITES, UPLOAD } f
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
-import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, type Building as Bld, type Link } from '../../realtime/flow';
+import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, partitionsOf, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
-  demolish, disconnect, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
+  demolish, disconnect, maxPartitions, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -429,7 +429,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const ageShare = isQueue && maxAge ? Math.min(1, age / maxAge) : 0;
     // The Shard that gets most of the traffic while the others have room says so on the map.
     const hotNote = hotShard === k ? `⚠ ${t.rt.inspector.hotShard}` : '';
-    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? t.rt.inspector.idle : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
+    // A Worker instance with no Partition left to read stands idle (ADR-0009).
+    const fedByTopic = game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub);
+    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? (fedByTopic ? t.rt.inspector.noPartition : t.rt.inspector.idle) : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
     const selected = selectedBuilding?.id === b.id;
     return (
       <button key={`${b.id}-${k}`} className={`play-unit ${inst.buildLeftS > 0 ? 'building' : ''} ${inst.down ? 'down' : ''} ${selected ? 'selected' : ''} ${warn ? 'warn' : ''} ${tutorialType === b.type ? 'tutorial-target' : ''}`}
@@ -438,7 +440,8 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {inst.buildLeftS > 0 && <span className="play-progress"><span style={{ width: `${100 - (inst.buildLeftS / Math.max(1, inst.buildTotalS)) * 100}%` }} /></span>}
         <span className="name">{label}</span>
         {sub && <span className="sub">{sub}</span>}
-        {active && !inst.down && (isQueue && maxAge
+        {active && !inst.down && catalog[b.type]!.partitions && <span className="play-partitions">{partitionRows(b)}</span>}
+        {active && !inst.down && !catalog[b.type]!.partitions && (isQueue && maxAge
           ? <span className={`play-load play-age-gauge ${loadClass(ageShare)}`} role="meter" aria-label={`${t.rt.queueAge}: ${t.rt.queueAgeOf(age, maxAge)}`} aria-valuemin={0} aria-valuemax={maxAge} aria-valuenow={Math.round(age)}><span style={{ width: `${Math.round(ageShare * 100)}%` }} /></span>
           : <span className={`play-load ${loadClass(load)}`}><span style={{ width: `${Math.round(load * 100)}%` }} /></span>)}
       </button>
@@ -468,6 +471,13 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           {hasTopic && b.params.subscription && endsHere(b) && !game.links.some(l => l.from === b.id) && <span className="play-exit">{t.rt.inspector.exit(t.subscriptionExits[b.params.subscription] ?? '')}</span>}
         </div>
       : piece(b, 0, 64)));
+  }
+  /** Under a Topic: one load bar for each Partition (the busiest Worker instance that reads it). */
+  function partitionRows(b: Bld) {
+    const loads = flow?.partitions[b.id] ?? new Array<number>(partitionsOf(b)).fill(0);
+    return loads.map((l, p) => (
+      <span key={p} className="play-prow"><i>P{p + 1}</i><span className={`play-load ${loadClass(l)}`}><span style={{ width: `${Math.round(l * 100)}%` }} /></span></span>
+    ));
   }
   /** Under a Worker that serves a Subscription: its Consumer Lag, as a gauge that fills towards the level's maximum. */
   function subscriptionGauge(sub: string) {
@@ -560,6 +570,18 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           ))}
         </fieldset>
       )}
+      {spec.partitions && (() => {
+        const count = partitionsOf(b), most = maxPartitions(level);
+        return (
+          <div className="play-ttl"><span className="muted">{i.partitions}{!building && <> · {i.partitionsLocked}</>}</span>
+            <span className="stepper">
+              <button aria-label={i.fewerPartitions} disabled={!building || count <= 1} onClick={() => setGame(g => setPartitions(g, b.id, count - 1, level))}>−</button>
+              <b>{count}</b>
+              <button aria-label={i.morePartitions} disabled={!building || count >= most} onClick={() => setGame(g => setPartitions(g, b.id, count + 1, level))}>+</button>
+            </span>
+          </div>
+        );
+      })()}
       {spec.subscribes && hasTopic && (
         <fieldset className="play-sizes" aria-label={i.subscription}>
           <legend className="muted">{i.subscription}{!building && <> · {i.subscriptionLocked}</>}</legend>

@@ -905,6 +905,10 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .play-container .play-sub-name { color: var(--fg); }
 .play-sub-lag { display: grid; justify-items: center; gap: 2px; font: 700 10.5px var(--mono); color: var(--muted); }
 .play-sub-lag .bad { color: var(--bad); }
+.play-partitions { display: grid; gap: 2px; margin-top: 3px; }
+.play-prow { display: grid; grid-template-columns: 18px auto; align-items: center; gap: 4px; font: 700 9.5px var(--mono); color: var(--muted); }
+.play-prow .play-load { margin-top: 0; }
+.play-prow.hot i { color: var(--bad); }
 .play-exit { font: 10.5px var(--mono); color: var(--muted); border: 1px dashed #2a3d41; padding: 1px 6px; }
 .play-chart.play-chart-subs { grid-template-columns: 70px 1fr; }
 .play-chart-subs .play-sub-legend { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; }

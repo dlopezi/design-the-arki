@@ -47,3 +47,13 @@ test('level 28: Notifications falls behind with one Worker; one more instance ho
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 29: a Worker instance with no Partition stands idle; one more Partition, set in the build phase, lets all three work', async ({ page }) => {
+  await openLevel(page, '29-too-much-for-one-worker', 'guided');
+  await page.locator('.play-unit').filter({ hasText: 'Topic' }).click();
+  await expect(page.locator('.play-unit').filter({ hasText: 'Topic' }).locator('.play-prow')).toHaveCount(2);
+  await page.getByRole('button', { name: 'More Partitions' }).click();
+  await expect(page.locator('.play-unit').filter({ hasText: 'Topic' }).locator('.play-prow')).toHaveCount(3);
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});

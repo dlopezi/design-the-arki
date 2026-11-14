@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setClientLimit, setShardKey, setSubscription, setTtl, starsOf, type GameState } from '../realtime/game';
+import { build, BUILD_PHASE_S, connect, createGame, demolish, resize, rewire, runToEnd, setClientLimit, setPartitions, setShardKey, setSubscription, setTtl, starsOf, type GameState } from '../realtime/game';
 import { MAIN, regionOf } from '../realtime/flow';
 import { allLevels, type LevelDefinition } from './levels';
 import { MODES, startingDesign, type Mode } from './modes';
@@ -49,6 +49,7 @@ function playToReference(level: LevelDefinition, mode: Mode): { state: GameState
     if (c.params?.ttlS !== undefined) s = setTtl(s, b()!.id, Number(c.params.ttlS));
     if (c.params?.limitRps !== undefined) s = setClientLimit(s, b()!.id, Number(c.params.limitRps));
     if (c.params?.shardKey !== undefined) s = setShardKey(s, b()!.id, String(c.params.shardKey), level);
+    if (c.params?.partitions !== undefined) s = setPartitions(s, b()!.id, Number(c.params.partitions), level);
   }
   s = rewire(s);
   // A player also draws the connections the default wiring does not make (the users straight to Object Storage).
