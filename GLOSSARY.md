@@ -32,7 +32,7 @@ _Avoid_: Goals, objectives
 
 **Queue Age**:
 How long the oldest Message in a Message Queue has been waiting; async levels set a maximum.
-_Avoid_: Processing deadline, delay (consumer lag is the Kafka name, usually counted in messages)
+_Avoid_: Processing deadline, delay, Consumer Lag (reserved for Topic Subscriptions)
 
 **Budget**:
 The maximum monthly cost a design may have in a level.
@@ -75,8 +75,44 @@ A component that accepts async requests, answers the caller at once and holds th
 _Avoid_: Broker, queue (alone)
 
 **Worker**:
-A component that takes Messages from a Message Queue and processes them in the background; several Workers share one queue without a load balancer.
+A component that takes Messages from a Message Queue or a Topic and processes them in the background; several Workers share one queue without a load balancer. On a Topic, one Worker building with its Subscription is one consumer group.
 _Avoid_: Consumer, job runner
+
+**Topic**:
+A component that accepts posts as Messages and keeps a copy of each one for every Subscription (pub/sub), split over Partitions, like a Kafka topic.
+_Avoid_: Stream, event bus, broker, queue
+
+**Partition**:
+One ordered slice of a Topic. Only as many Worker instances of one Subscription as there are Partitions can work at once.
+_Avoid_: Shard (reserved for the database)
+
+**Partition Key**:
+The field that decides which Partition of a Topic gets a Message (for example user id or post id).
+_Avoid_: Shard Key (reserved for the database), routing key
+
+**Hot Partition**:
+A Partition that gets far more Messages than the others, usually because of a poor Partition Key.
+_Avoid_: Hot Shard (reserved for the database), hotspot
+
+**Subscription**:
+One system that reads every Message of a Topic (for example notifications, search, analytics or the feed); a Worker setting. Each Subscription has its own Backlog and Consumer Lag.
+_Avoid_: Subscriber, listener, consumer group (the Worker building is the group)
+
+**Consumer Lag**:
+How long the oldest Message a Subscription has not processed has been waiting, in seconds; a level sets a maximum for each Subscription.
+_Avoid_: Queue Age (reserved for the Message Queue), delay
+
+**Fan-out on write**:
+Building each user's feed ahead: a Feed Worker writes every post into the feed of every follower, so reading a feed is one read.
+_Avoid_: Push model (alone), precomputed feed
+
+**Fan-out on read**:
+Building a feed when it is read, by gathering the posts of every followed account; there is no Feed Worker.
+_Avoid_: Pull model (alone)
+
+**Celebrity Limit**:
+A setting of the Feed Worker: posts of accounts with more followers than the limit are not fanned out on write but merged when a feed is read (the hybrid model).
+_Avoid_: Influencer cap, threshold (alone)
 
 **Read Replica**:
 A copy of the database that answers reads only and is always a little behind the primary database.
@@ -92,7 +128,7 @@ _Avoid_: Partition (reserved for message streams), segment
 
 **Shard Key**:
 The field that decides which Shard holds a piece of data (for example user id, country or date).
-_Avoid_: Partition key, split key
+_Avoid_: Partition Key (reserved for Topics), split key
 
 **Hot Shard**:
 A Shard that gets far more traffic than the others, usually because of a poor Shard Key.
@@ -137,11 +173,11 @@ A read that must show the user's own latest change, so it goes to the primary da
 _Avoid_: Fresh read, strong read
 
 **Message**:
-An async request while it sits in a Message Queue or is processed by a Worker; it is not lost when a Worker goes down.
+An async request while it sits in a Message Queue or a Topic or is processed by a Worker; it is not lost when a Worker goes down.
 _Avoid_: Job, event, task
 
 **Backlog**:
-The Messages waiting in a Message Queue at a given moment.
+The Messages waiting in a Message Queue, or for one Subscription of a Topic, at a given moment.
 _Avoid_: Queue length, lag
 
 **Building**:
