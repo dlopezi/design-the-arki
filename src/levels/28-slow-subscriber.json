@@ -1,0 +1,138 @@
+{
+  "id": "28-slow-subscriber",
+  "chapter": "Events",
+  "title": "A slow subscriber",
+  "brief": "Six posts arrive each second. Notifications must reach the followers fast: its Consumer Lag may be 5 s at most. Analytics only builds a report, so it may fall behind up to 30 s and catch up after the wave. Each Subscription has its own Workers and its own Backlog, so a slow Analytics never slows Notifications. One Worker instance takes 4 posts a second. Give each Subscription the Workers it needs, and no more.",
+  "durationS": 50,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 50,
+      "rps": 30
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01
+  },
+  "budget": 400,
+  "starCostThresholds": [
+    300,
+    250
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database",
+    "topic",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 3
+    }
+  },
+  "guidedHint": "Notifications falls behind: one Worker instance takes 4 posts a second, and 6 arrive. Add an instance to the Notifications Worker. Analytics may wait up to 30 s, so one instance is enough for it.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 30,
+      "lengthS": 50,
+      "mix": {
+        "post": 0.2,
+        "readFeed": 0.8
+      }
+    },
+    "starMoney": [
+      100,
+      170
+    ],
+    "subscriptions": {
+      "notifications": {
+        "maxLagS": 5
+      },
+      "analytics": {
+        "maxLagS": 30
+      }
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "topic", "type": "topic" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } },
+        { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["api", "topic"],
+        ["topic", "notify"],
+        ["topic", "stats"]
+      ]
+    },
+    "normal": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "topic", "type": "topic" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } },
+        { "id": "stats", "type": "worker", "params": { "subscription": "analytics", "instances": 2 } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["api", "topic"],
+        ["topic", "notify"],
+        ["topic", "stats"]
+      ]
+    },
+    "hard": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "topic", "type": "topic" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "analytics", "instances": 2 } },
+        { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["api", "topic"],
+        ["topic", "notify"],
+        ["topic", "stats"]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      { "id": "api", "type": "appServer" },
+      { "id": "db", "type": "database" },
+      { "id": "topic", "type": "topic" },
+      { "id": "notify", "type": "worker", "params": { "subscription": "notifications", "instances": 2 } },
+      { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+    ],
+    "connections": [
+      ["client", "api"],
+      ["api", "db"],
+      ["api", "topic"],
+      ["topic", "notify"],
+      ["topic", "stats"]
+    ]
+  }
+}

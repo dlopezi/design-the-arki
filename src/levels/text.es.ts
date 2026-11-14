@@ -159,4 +159,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Tu nueva red social ya está en marcha. Cuando alguien publica, tres sistemas deben reaccionar: Notifications avisa a sus seguidores, Search indexa el post y Analytics lo cuenta. Llegan tres posts por segundo, y cada sistema necesita todos. Una cola de mensajes da cada mensaje a un solo Worker, así que cada sistema perdería casi todos los posts. Un Topic guarda una copia de cada post para cada Subscription, y cada Subscription tiene su propio Worker.',
     guidedHint: 'El Topic y un Worker para cada Subscription ya están listos, pero ningún post llega al Topic. Conecta el app server al Topic: así cada Subscription recibe su propia copia de cada post.',
   },
+  '28-slow-subscriber': {
+    title: 'Un suscriptor lento',
+    brief: 'Llegan seis posts por segundo. Notifications debe llegar rápido a los seguidores: su Consumer Lag puede ser de 5 s como mucho. Analytics solo prepara un informe, así que puede quedarse atrás hasta 30 s y ponerse al día después de la oleada. Cada Subscription tiene sus propios Workers y su propio Backlog, así que un Analytics lento nunca frena a Notifications. Una instancia de Worker toma 4 posts por segundo. Da a cada Subscription los Workers que necesita, y ni uno más.',
+    guidedHint: 'Notifications se queda atrás: una instancia de Worker toma 4 posts por segundo, y llegan 6. Añade una instancia al Worker de Notifications. Analytics puede esperar hasta 30 s, así que le basta una instancia.',
+  },
 };

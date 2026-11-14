@@ -37,3 +37,13 @@ test('level 27: connecting the app server to the Topic gives every Subscription 
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 28: Notifications falls behind with one Worker; one more instance holds it, while Analytics may lag up to its own maximum', async ({ page }) => {
+  await openLevel(page, '28-slow-subscriber', 'guided');
+  const notifications = page.locator('.play-container').filter({ hasText: 'Notifications' });
+  await notifications.locator('.play-unit').first().click();
+  await page.getByRole('button', { name: /\+ Instance/ }).click();
+  await expect(notifications).toContainText('2 instances');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});
