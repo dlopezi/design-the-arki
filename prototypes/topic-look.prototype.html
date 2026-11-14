@@ -1,0 +1,161 @@
+<!doctype html>
+<!--
+  PROTOTYPE (throwaway, not part of the build): ticket #91.
+  Question: how should the map and the console show a Topic, its Partitions (and a Hot Partition), each Subscription's
+  Consumer Lag against its own maximum, Worker instances left idle above the number of Partitions, and where each
+  Subscription's work goes?
+  Three variants on one page, switch with ?variant=A|B|C, the bar at the bottom, or the left/right arrow keys.
+    A  Gauges on the map : a load bar per Partition under the Topic, a lag gauge under each Worker, an exit label, the
+                           worst Subscription in the top bar, one lag chart (as % of each maximum) in the console
+    B  The Topic as a log: each Partition is a lane of Messages; each Subscription is a marker on the log, and its
+                           distance to the newest Message is its lag (the Kafka offset picture)
+    C  Console table     : the map shows only buildings; the console has a consumer-group table and Partition bars
+  Switches: Partition Key (user id / country), Analytics (normal / slow), Notifications instances (3 / 5), Reset.
+  State is in memory only.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Prototype: Topic and Subscriptions look</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#0b1214; --panel:#101b1e; --line:#27393d; --fg:#d7e6e8; --muted:#7b9296; --ok:#3ee0c8; --warn:#fbbf24; --bad:#f87171; --idle:#4b5d61; font-family: ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--fg); }
+  .top { display:flex; gap:10px; align-items:center; padding:8px 14px; background:#142226; border-bottom:2px solid var(--line); font-size:13px; flex-wrap:wrap; }
+  .pill { padding:3px 10px; border:1px solid var(--line); background:#060b0c; font-weight:800; }
+  .bad { color:var(--bad); } .warn { color:var(--warn); } .ok { color:var(--ok); } .muted { color:var(--muted); }
+  .stage { display:grid; grid-template-rows: 1fr auto; gap:12px; padding:12px; min-height: calc(100vh - 110px); }
+  .map, .console { background:var(--panel); border:1px solid var(--line); padding:14px; }
+  .controls { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; align-items:center; font-size:12px; }
+  .controls button { background:#16262a; color:var(--fg); border:1px solid var(--line); padding:4px 9px; cursor:pointer; font:inherit; }
+  .controls button.on { border-color:var(--ok); color:var(--ok); } .controls .sep { width:12px; }
+  .h2 { font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; margin:0 0 8px; }
+  .flow { display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
+  .unit { text-align:center; width:110px; } .unit .glyph { font-size:30px; line-height:1; } .unit .name { font-size:11px; margin-top:4px; } .unit .sub { font-size:10px; min-height:13px; }
+  .bar { height:6px; background:#0a1112; border:1px solid var(--line); } .bar > span { display:block; height:100%; }
+  .prow { display:grid; grid-template-columns: 24px 1fr 34px; gap:6px; align-items:center; font-size:10px; margin-top:4px; text-align:left; }
+  .subs { display:flex; flex-direction:column; gap:10px; border-left:1px dashed var(--line); padding-left:18px; }
+  .sub-row { display:grid; grid-template-columns: 170px 150px 110px; gap:12px; align-items:center; font-size:11px; }
+  .dots { display:flex; gap:3px; margin-top:3px; } .dot { width:12px; height:12px; border:1px solid var(--line); background:var(--ok); } .dot.idle { background:var(--idle); opacity:.6; }
+  .exit { color:var(--muted); font-size:11px; border:1px dashed var(--line); padding:2px 6px; }
+  .console h3 { margin:0 0 6px; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
+  .cgrid { display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; font-size:12px; }
+  .chart { position:relative; height:90px; border:1px solid var(--line); background:#060b0c; } .chart svg { width:100%; height:100%; display:block; }
+  .limit { position:absolute; left:0; right:0; border-top:1px dashed var(--bad); } .legend { display:flex; gap:10px; flex-wrap:wrap; font-size:10px; margin-top:4px; }
+  .insp { line-height:1.8; } .insp select, .insp .step { background:#060b0c; color:var(--fg); border:1px solid var(--line); font:inherit; padding:1px 4px; }
+  table { border-collapse:collapse; width:100%; font-size:12px; } td, th { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; } th { color:var(--muted); font-weight:400; }
+  .log { display:flex; flex-direction:column; gap:6px; position:relative; width:620px; }
+  .lane { display:grid; grid-template-columns: 34px 1fr 46px; gap:6px; align-items:center; font-size:10px; }
+  .cells { display:flex; gap:1px; height:16px; border:1px solid var(--line); background:#060b0c; padding:1px; } .cell { flex:1; }
+  .markers { position:relative; height:100px; margin-left:40px; width:calc(100% - 92px); }
+  .marker { position:absolute; top:0; transform:translateX(-50%); font-size:10px; text-align:center; white-space:nowrap; transition:left .25s; }
+  .switcher { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:10px; align-items:center; background:#fff; color:#111; padding:7px 14px; border-radius:999px; box-shadow:0 6px 24px rgba(0,0,0,.5); font-weight:800; font-size:13px; }
+  .switcher button { border:0; background:#e5e7eb; border-radius:50%; width:26px; height:26px; cursor:pointer; font-weight:800; }
+  .note { color:var(--muted); font-size:11px; margin-top:12px; line-height:1.5; max-width:900px; }
+</style></head>
+<body>
+<div class="top" id="top"></div>
+<div class="stage"><div class="map" id="map"></div><div class="console" id="console"></div></div>
+<div class="switcher"><button id="prev">←</button><span id="label"></span><button id="next">→</button></div>
+<script>
+  // ---- state (in memory only) ----
+  const VARIANTS = { A: 'Gauges on the map', B: 'The Topic as a log', C: 'Console table' };
+  const RATE = 300, PARTS = 3, PART_COMFORT = 150; // posts/s into the Topic, Partitions, a Partition's comfortable rate (for its bar)
+  const KEYS = { user: [1/3, 1/3, 1/3], country: [0.6, 0.25, 0.15] };
+  const SUBS = [ // perInstance = Messages/s one instance processes
+    { id: 'notifications', name: 'Notifications', exit: '→ push service', max: 5, perInstance: 120, color: '#3ee0c8' },
+    { id: 'search', name: 'Search', exit: '→ search index', max: 20, perInstance: 150, color: '#a78bfa' },
+    { id: 'analytics', name: 'Analytics', exit: '→ data warehouse', max: 60, perInstance: 110, color: '#fbbf24' },
+    { id: 'feed', name: 'Feed', exit: '→ Database', max: 10, perInstance: 220, color: '#60a5fa' },
+  ];
+  const s = { key: 'country', analyticsSlow: false, notifInstances: 3, t: 0, backlog: {}, hist: [] };
+  const params = new URLSearchParams(location.search); let variant = params.get('variant') in VARIANTS ? params.get('variant') : 'A';
+  const instancesOf = sub => sub.id === 'notifications' ? s.notifInstances : sub.id === 'feed' ? 2 : 3;
+  const speedOf = sub => sub.id === 'analytics' && s.analyticsSlow ? 70 : sub.perInstance;
+  function reset() { s.t = 0; s.hist = []; SUBS.forEach(sub => s.backlog[sub.id] = [0, 0, 0, 0, 0]); }
+
+  // ---- tiny simulation, one game second per tick: Partition p goes to working instance p % working (Kafka's range assignment, simplified) ----
+  const partRate = p => RATE * KEYS[s.key][p];
+  function owners(sub) { const working = Math.min(instancesOf(sub), PARTS); return [...Array(PARTS).keys()].map(p => p % working); }
+  function tick() {
+    s.t++;
+    SUBS.forEach(sub => {
+      const own = owners(sub), b = s.backlog[sub.id];
+      for (let i = 0; i < instancesOf(sub); i++) {
+        const demand = own.reduce((sum, o, p) => sum + (o === i ? partRate(p) : 0), 0);
+        b[i] = Math.max(0, b[i] + demand - speedOf(sub));
+      }
+    });
+    s.hist.push(Object.fromEntries(SUBS.map(sub => [sub.id, lagOf(sub)]))); if (s.hist.length > 90) s.hist.shift();
+    render();
+  }
+  const lagOf = sub => Math.max(...s.backlog[sub.id].map(b => b / speedOf(sub))); // seconds the oldest unprocessed Message has waited
+  const backlogOf = sub => Math.round(s.backlog[sub.id].reduce((a, b) => a + b, 0));
+  const working = sub => Math.min(instancesOf(sub), PARTS);
+  const ratio = sub => lagOf(sub) / sub.max;
+  const col = r => (r >= .9 ? 'var(--bad)' : r >= .7 ? 'var(--warn)' : 'var(--ok)'), cls = r => (r >= .9 ? 'bad' : r >= .7 ? 'warn' : 'ok');
+  const hotPart = () => { const shares = KEYS[s.key], m = Math.max(...shares); return m > 1.5 / PARTS ? shares.indexOf(m) : -1; };
+  const worst = () => SUBS.reduce((w, sub) => ratio(sub) > ratio(w) ? sub : w, SUBS[0]);
+  const lagText = sub => `${lagOf(sub).toFixed(0)} s / ${sub.max} s`;
+
+  const controls = () => `<div class="controls">Partition Key: <button data-k="user" class="${s.key==='user'?'on':''}">user id (even)</button><button data-k="country" class="${s.key==='country'?'on':''}">country (skewed)</button>
+    <span class="sep"></span>Analytics: <button data-a="0" class="${!s.analyticsSlow?'on':''}">normal</button><button data-a="1" class="${s.analyticsSlow?'on':''}">slow</button>
+    <span class="sep"></span>Notifications instances: <button data-n="3" class="${s.notifInstances===3?'on':''}">3</button><button data-n="5" class="${s.notifInstances===5?'on':''}">5</button>
+    <span class="sep"></span><button data-reset>Reset</button><span class="muted">&nbsp; game time ${s.t} s</span></div>`;
+  const topBar = extra => `<span class="pill">$540 +0.4/s</span><span class="pill">⏱ Wave · 0:${String(s.t % 60).padStart(2, '0')}</span>${extra}<span class="pill">❤ 86%</span>`;
+  const partBars = () => KEYS[s.key].map((_, p) => { const l = partRate(p) / PART_COMFORT; return `<div class="prow"><span>P${p + 1}</span><div class="bar"><span style="width:${Math.min(100, l * 100)}%;background:${col(l)}"></span></div><span class="${hotPart()===p?'bad':'muted'}">${hotPart()===p?'HOT':Math.round(partRate(p))+'/s'}</span></div>`; }).join('');
+  const dots = sub => `<div class="dots">${[...Array(instancesOf(sub)).keys()].map(i => `<span class="dot ${i >= working(sub) ? 'idle' : ''}" title="${i >= working(sub) ? 'idle: no Partition left' : 'working'}"></span>`).join('')}${instancesOf(sub) > working(sub) ? `<span class="muted" style="font-size:10px">&nbsp;${instancesOf(sub) - working(sub)} idle</span>` : ''}</div>`;
+  const gauge = sub => { const r = ratio(sub); return `<div class="bar"><span style="width:${Math.min(100, r * 100)}%;background:${col(r)}"></span></div><div class="${cls(r)}" style="font-size:10px;margin-top:2px">⏳ ${lagText(sub)}</div>`; };
+  const lagChart = () => {
+    const H = 90, lim = 1.2; // the chart shows 0 to 120 % of each maximum; the red line is 100 %
+    const lines = SUBS.map(sub => `<polyline fill="none" stroke="${sub.color}" stroke-width="1.4" vector-effect="non-scaling-stroke" points="${s.hist.map((h, i) => `${i},${40 - Math.min(lim, h[sub.id] / sub.max) / lim * 40}`).join(' ')}"/>`).join('');
+    return `<div class="chart"><svg viewBox="0 0 90 40" preserveAspectRatio="none">${lines}</svg><div class="limit" style="top:${H - H / lim}px"></div></div>
+      <div class="legend">${SUBS.map(sub => `<span style="color:${sub.color}">■ ${sub.name} ${lagText(sub)}</span>`).join('')}<span class="bad">- - max</span></div>`;
+  };
+  const inspectors = () => `<div class="insp"><b>Inspector · Topic</b><br>Partitions <span class="step">− ${PARTS} +</span> &nbsp; Partition Key <select><option>${s.key === 'user' ? 'user id' : 'country'}</option></select> 🔒 <span class="muted">locked in the wave</span><br>
+    <b>Inspector · Worker</b><br>Subscription <select><option>Feed</option><option>Notifications</option><option>Search</option><option>Analytics</option></select> &nbsp; Celebrity Limit <select><option>100 k followers</option></select> <span class="muted">(Feed only)</span><br>
+    Instances 2 · working 2 · Consumer Lag ${lagText(SUBS[3])}</div>`;
+
+  // ---- the three variants: structurally different, not just recoloured ----
+  const A = {
+    top: () => { const w = worst(); return topBar(`<span class="pill ${cls(ratio(w))}">📨 ${w.name} ${lagText(w)}</span>`); },
+    map: () => `${controls()}<div class="flow"><div class="unit"><div class="glyph">🌍</div><div class="name">Users</div></div><div class="unit"><div class="glyph">🖥</div><div class="name">app server</div></div>
+      <div class="unit" style="width:150px"><div class="glyph">📨</div><div class="name">Topic</div><div class="sub ${hotPart()>=0?'bad':''}">${hotPart()>=0?`⚠ Hot Partition P${hotPart()+1}`:''}</div>${partBars()}</div>
+      <div class="subs">${SUBS.map(sub => `<div class="sub-row"><div>⚙ Worker · <b>${sub.name}</b>${dots(sub)}</div><div>${gauge(sub)}</div><div><span class="exit">${sub.exit}</span></div></div>`).join('')}</div></div>
+      <p class="note">Same grammar as the Queue Age and the Shards: a gauge on each building, one warning word where it matters, the worst number in the top bar. Each Worker building is one consumer group; grey squares are instances with no Partition left. Kafka dashboards (Grafana, Confluent) show lag per consumer group and load per Partition the same way.</p>`,
+    con: () => `<div class="cgrid"><div><h3>Consumer Lag · % of each maximum</h3>${lagChart()}</div><div>${inspectors()}</div></div>`,
+  };
+  const B = {
+    top: () => topBar(''),
+    map: () => {
+      const W = 40; // the log shows the last 40 s of Messages, the newest on the right
+      const lanes = KEYS[s.key].map((_, p) => { const l = partRate(p) / PART_COMFORT; return `<div class="lane"><span>P${p + 1}</span><div class="cells">${[...Array(W).keys()].map(() => `<span class="cell" style="background:color-mix(in srgb, ${col(l)} ${Math.round(Math.min(1, l) * 70)}%, #060b0c)"></span>`).join('')}</div><span class="${hotPart()===p?'bad':'muted'}">${hotPart()===p?'HOT':Math.round(partRate(p))+'/s'}</span></div>`; }).join('');
+      const markers = SUBS.map((sub, i) => { const pos = Math.max(0, 100 - lagOf(sub) / W * 100); return `<div class="marker ${cls(ratio(sub))}" style="left:${pos}%;top:${i * 24}px">▲ ${sub.name} · ${lagOf(sub).toFixed(0)} s</div>`; }).join('');
+      return `${controls()}<div class="flow"><div class="unit"><div class="glyph">🖥</div><div class="name">app server</div></div><div><p class="h2">Topic · newest Messages enter on the right →</p><div class="log">${lanes}<div class="markers">${markers}</div></div></div></div>
+        <p class="note">The real Kafka picture: an append-only log per Partition, and each Subscription is an offset on it. The distance from a marker to the right end is its Consumer Lag. Workers would stand under their marker. Brighter lanes carry more Messages.</p>`;
+    },
+    con: () => `<div class="cgrid"><div><h3>Consumer Lag · % of each maximum</h3>${lagChart()}</div><div>${inspectors()}</div></div>`,
+  };
+  const C = {
+    top: () => topBar(''),
+    map: () => `${controls()}<div class="flow"><div class="unit"><div class="glyph">🖥</div><div class="name">app server</div></div><div class="unit"><div class="glyph">📨</div><div class="name">Topic</div></div>
+      <div class="subs">${SUBS.map(sub => `<div>⚙ Worker · ${sub.name}</div>`).join('')}</div></div>
+      <p class="note">The map stays calm and shows only buildings; every number lives in the console, like the consumer-group page of Confluent Control Center.</p>`,
+    con: () => `<div class="cgrid"><div><h3>Consumer groups</h3><table><tr><th>Subscription</th><th>Workers working / total</th><th>Backlog</th><th>Lag / max</th></tr>
+      ${SUBS.map(sub => `<tr><td>${sub.name}</td><td>${working(sub)} / ${instancesOf(sub)}${instancesOf(sub) > working(sub) ? ` <span class="muted">(${instancesOf(sub) - working(sub)} idle)</span>` : ''}</td><td>${backlogOf(sub)}</td><td class="${cls(ratio(sub))}">${lagText(sub)}${ratio(sub) >= 1 ? ' ⚠' : ''}</td></tr>`).join('')}</table></div>
+      <div><h3>Load per Partition</h3>${partBars()}<br>${inspectors()}</div></div>`,
+  };
+  const V = { A, B, C };
+
+  function render() {
+    document.getElementById('top').innerHTML = V[variant].top();
+    document.getElementById('map').innerHTML = V[variant].map();
+    document.getElementById('console').innerHTML = V[variant].con();
+    document.getElementById('label').textContent = `${variant} (${VARIANTS[variant]})`;
+    document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { s.key = b.dataset.k; reset(); render(); });
+    document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { s.analyticsSlow = b.dataset.a === '1'; render(); });
+    document.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { s.notifInstances = Number(b.dataset.n); render(); });
+    document.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { reset(); render(); });
+  }
+  const go = d => { const keys = Object.keys(VARIANTS); variant = keys[(keys.indexOf(variant) + d + keys.length) % keys.length]; history.replaceState(null, '', `?variant=${variant}`); render(); };
+  document.getElementById('prev').onclick = () => go(-1); document.getElementById('next').onclick = () => go(1);
+  addEventListener('keydown', e => { if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+  reset(); render(); setInterval(tick, 400);
+</script></body></html>
