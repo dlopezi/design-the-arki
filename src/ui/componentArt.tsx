@@ -15,6 +15,7 @@ export const componentArt: Record<string, { color: string }> = {
   worker: { color: '#22b8cf' },
   readReplica: { color: '#7c8cff' },
   objectStorage: { color: '#e0794a' },
+  cdn: { color: '#2dd4bf' },
 };
 
 /** The name players see for a component type: its real name (load balancer, app server…), never a made-up one. */
@@ -146,6 +147,15 @@ export const buildings: Record<string, (p: Palette) => ReactNode> = {
     <IsoBox cx={41} cy={44} w={9} h={11} p={p} />
     <IsoBox cx={32} cy={35} w={9} h={11} p={p} />
     <path d="M32 12 L32 22 M27 17 L32 12 L37 17" fill="none" stroke={p.glow} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </>,
+  // A dish on a mast: answers downloads close to the users, so the origin behind it stays calm.
+  cdn: p => <>
+    <IsoBox cx={32} cy={54} w={12} h={6} p={p} />
+    <path d="M32 48 L32 30" stroke={p.dark} strokeWidth={3} strokeLinecap="round" />
+    <path d="M18 24 Q32 40 46 24 Z" fill={p.light} stroke={p.dark} strokeWidth={1} strokeLinejoin="round" />
+    <path d="M32 31 L32 15" stroke={p.glow} strokeWidth={1.6} strokeLinecap="round" />
+    <circle cx={32} cy={13} r={2.4} fill={p.glow} />
+    <path d="M22 12 Q32 4 42 12" fill="none" stroke={p.glow} strokeWidth={1.4} strokeLinecap="round" opacity={0.8} />
   </>,
   // A copy of the database: two small silos side by side, with an arrow that carries the copy to the new one.
   readReplica: p => <>

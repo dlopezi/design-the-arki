@@ -94,7 +94,30 @@ Settled in a grilling session; engine rules in ADR-0007. Same rule as chapter 2:
   6. *Release day*: the review. Everything together, plus a maximum Replication Lag, and chapter 1 and 2 buildings (load balancer, cache, queue and Workers; the processing job points to the stored file).
 - **Manual**: Buildings entries for Read Replica and Object Storage with *In real life* (PostgreSQL or MySQL read replicas, Amazon RDS, Amazon S3, Google Cloud Storage); Concepts for replication lag, read-your-writes, sharding, shard key, hot shard, pre-signed URL, and failover (explained, not simulated).
 - **Look (decided with a prototype, `prototypes/shard-lag-look.prototype.html`, 2026-11-13)**: three variants were compared: bars under each building (A), heat tiles with a ghost copy for the lag (B), and a console with per-Shard bars and a lag chart (C). Chosen: **A on the map plus the lag chart of C in the console**, the same grammar as the Queue Age (a gauge on the building, a chart in the console). Each Shard has its own load bar, the Hot Shard gets a "Hot Shard" mark on the map and a row in the inspector, and the Replication Lag shows next to its maximum in the top bar, the Read Replica inspector and a chart with the maximum as a red line. B was left out: it replaces the building art and the idea of an instance, which is too big a change for one value.
-- **Out of scope**: failover and promotion of a replica (Manual only; chapter 4 multi-region uses replicas), resharding during the wave, consistent hashing, cross-shard transactions (chapter 8), CDN (chapter 4), object storage settings and cost per GB.
+- **Out of scope**: failover and promotion of a replica (taught in chapter 4), resharding during the wave, consistent hashing, cross-shard transactions (chapter 8), CDN (chapter 4), object storage settings and cost per GB.
+
+## Chapter 4: Edge (planned 2026-11-13)
+
+Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2 and 3: a real problem with the real solution and the real names. Built after chapters 2 and 3 are merged (it uses Request Types, Read Replicas and the stateful rules of ADR-0006 and ADR-0007).
+
+- **Story**: the video app goes global. A viral video, a client that abuses the API, and a whole Region that fails. It closes the video story (chapters 2–4); chapter 5 starts a social network.
+- **New buildings**: **CDN**, **API Gateway** (with the setting **Client Limit**), **DNS** (with the setting TTL). A second **Region** is a copy of the base (a standby, always on and paid for, with a Read Replica) that the player builds like any other building group.
+- **Rules**:
+  - A new Request Type, *download a video file*, goes to the CDN, which answers a share of requests at the edge (hit share grows with TTL, like the cache) and sends the rest to Object Storage. Users connect straight to the CDN. Object Storage now has a fixed output capacity (not shown to the player) that a viral video exceeds; chapter 2 and 3 levels stay under it.
+  - The API Gateway is the entry for API requests. A new Request Type, *invalid* (no token, or junk), is rejected at the gateway at low cost, so app servers see only valid requests.
+  - A level can have an *abusive* Request Type: a few clients that send many requests. The Client Limit rejects what one client sends above the limit. A limit that is too low also rejects normal clients, which counts as an error (a false positive).
+  - A new Failure Event, *Region down*, takes down every building of the main Region at a set time. The DNS detects it and sends users to the standby Region after a delay set by its TTL (30 s, 60 s or 300 s); until then requests to the dead Region fail. At that moment the standby Region's Read Replica becomes the primary database. A short TTL switches faster and costs a little more.
+  - Only a warm standby is modelled. Cold standby and the loss of the last writes at failover (RPO) are in the Manual only.
+- **Unlock**: after the last level of chapter 3.
+- **Six levels**, each with one lesson:
+  1. *Far away videos*: a viral video overloads Object Storage; a CDN in front protects it.
+  2. *Old content*: a video was edited; the CDN TTL trades speed against freshness (purging is in the Manual).
+  3. *One door*: invalid requests flood the app servers; the API Gateway rejects them first.
+  4. *Abusive client*: a few clients send most requests; set the Client Limit to stop them and let normal clients pass.
+  5. *The Region falls*: build a standby Region and a DNS; choose the TTL; the Read Replica is promoted.
+  6. *Worldwide launch*: the review, one wave with three problems in order (viral video, abusive client, main Region down near the end). It also needs chapter 1–3 buildings (load balancer, several app servers, cache, Read Replica) and the upload route through Object Storage, queue and Workers.
+- **Manual**: Buildings entries for CDN, API Gateway and DNS with *In real life* (Cloudflare, Amazon CloudFront, Kong, AWS API Gateway, Nginx, Amazon Route 53); Concepts for CDN and cache purge, TTL, token bucket and rate limiting, authentication at the gateway, active-passive and active-active, warm and cold standby, RPO and RTO.
+- **Out of scope**: geography and latency by distance, active-active Regions, loss of writes at failover, cold standby, WAF and DDoS protection, edge computing, routing by path to several services, cache purge.
 
 ## Game screen
 

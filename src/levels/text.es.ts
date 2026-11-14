@@ -13,6 +13,7 @@ export const chaptersEs: Record<string, string> = {
   Core: 'Fundamentos',
   Async: 'Asíncrono',
   'Data scale': 'Escala de datos',
+  Edge: 'Borde',
 };
 
 export const levelTextEs: Record<string, LevelText> = {
@@ -121,5 +122,10 @@ export const levelTextEs: Record<string, LevelText> = {
     title: 'Día de lanzamiento de datos',
     brief: 'Día de lanzamiento de la app de vídeo, y todo tiene que funcionar junto. Llegan 440 peticiones por segundo: visionados, lecturas y escrituras, subidas grandes y trabajos de procesamiento. Necesitas un load balancer delante de varios app servers, una caché para los visionados, Read Replicas para las lecturas, Object Storage para los archivos y una cola de mensajes con Workers para el procesamiento. Los usuarios deben ver sus propios cambios, así que esas lecturas van a la base de datos primaria. Hay un límite nuevo: el Replication Lag. Muchas escrituras hacen que una Read Replica se quede atrás, y el lag no puede pasar de 2 segundos. Una Read Replica más grande aplica las escrituras más rápido. Mira el lag junto a los demás objetivos.',
     guidedHint: 'El Replication Lag no puede pasar de 2 segundos. Una Read Replica pequeña aplica 100 escrituras por segundo, pero llegan 167: se queda más atrás cada segundo. Usa una Read Replica mediana. Cada pieza tiene su trabajo: subidas directo a Object Storage, Read-your-writes a la base de datos primaria, trabajos por la cola.',
+  },
+  '21-far-away-videos': {
+    title: 'Vídeos lejanos',
+    brief: 'Tu app de vídeo se vuelve global y un vídeo se hace viral: llegan 280 descargas del archivo de vídeo y 120 visitas a la página por segundo. Cada descarga la sirve Object Storage, que solo puede enviar un número limitado de archivos grandes por segundo, así que se llena y las descargas empiezan a fallar. Pon una CDN delante. La CDN responde una parte de las descargas cerca de los usuarios, y solo el resto llega a Object Storage. Conecta a los usuarios a la CDN para las descargas, y la CDN a Object Storage.',
+    guidedHint: 'Object Storage solo puede enviar un número limitado de archivos grandes por segundo, y un vídeo viral pasa ese límite. Conecta a los usuarios directo a la CDN: responde una parte de las descargas en el borde, y solo el resto sigue hacia Object Storage.',
   },
 };

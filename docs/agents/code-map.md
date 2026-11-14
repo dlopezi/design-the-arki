@@ -16,7 +16,7 @@ Navigation for the jobs that touch many files. Tests enforce part of each list; 
 1. `src/levels/NN-slug.json`, validated by `src/levels/levels.ts`; its chapter name in `chaptersEs` and its Spanish text in `levelTextEs` (`src/levels/text.es.ts`).
 2. Tune it: `LEVEL=<id> npm run level-report` prints the numbers for `starMoney` and checks the starting designs lose.
 3. Add the id to the ordered list in `src/levels/levels.test.ts`. `winnable.test.ts` plays the Reference Design from every mode by itself.
-4. One browser test in `e2e/<chapter>.spec.ts` (helpers: `openLevel`, `maxStars` in `e2e/helpers.ts`).
+4. One browser test in `e2e/<chapter>.spec.ts` (helpers: `openLevel`, `maxStars` in `e2e/helpers.ts`). A level that opens a new chapter also changes the "last chapter" heading in `e2e/home.spec.ts`.
 
 ## Check it in the browser
 

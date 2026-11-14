@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, createGame, demolish, disconnect, resize, run, setShardKey, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, createGame, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -653,5 +653,82 @@ describe('data scale: Replication Lag grows while writes are higher than a Read 
     const behind = play(withReplica('small'), 15);
     const calmer: GameLevel = { ...lagLevel, play: { ...lagLevel.play, wave: { ...lagLevel.play.wave, mix: { read: 0.95, write: 0.05 } } } };
     expect(lagOf(run(behind, 15, calmer))).toBeLessThan(lagOf(behind));
+  });
+});
+
+describe('edge: the CDN answers a share of the downloads in front of Object Storage', () => {
+  const cdnLevel = (mix: Record<string, number>): GameLevel => ({
+    allowedComponents: ['cdn', 'loadBalancer', 'appServer', 'database', 'objectStorage'],
+    componentOptions: { appServer: { maxInstances: 4 }, cdn: { limits: { ttlS: 120 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 800, wave: { rps: 400, lengthS: 30, mix }, starMoney: [100, 200] },
+  });
+  const base = [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }, { id: 'files', type: 'objectStorage' }];
+  const design = (withCdn: boolean, users: boolean): Design => ({
+    components: withCdn ? [...base, { id: 'cdn', type: 'cdn' }] : base,
+    connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db'], ['api', 'files'], ...(withCdn ? [['cdn', 'files']] : []), ...(users ? [['client', 'cdn']] : [])] as [string, string][],
+  });
+  const play = (l: GameLevel, d: Design, seconds = 5) => run(callNow(createGame(l, d)), seconds, l);
+  const mix = { watch: 0.3, download: 0.7 };
+
+  it('Object Storage cannot send out a viral video on its own: the downloads that pass its limit are errors', () => {
+    const l = cdnLevel(mix);
+    const s = play(l, design(false, false));
+    expect(s.flow!.errors).toBeGreaterThan(0.1);
+    expect(s.flow!.drop.files).toBeGreaterThan(0);
+  });
+
+  it('a CDN in front answers a share of the downloads, so only the rest reaches Object Storage', () => {
+    const l = cdnLevel(mix);
+    const s = play(l, design(true, true));
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.inflow.cdn).toBeCloseTo(280); // every download goes to the CDN, none through the app servers
+    expect(s.flow!.inflow.files).toBeCloseTo(280 * 0.25); // the default TTL of 60 s answers 75 %
+  });
+
+  it('a longer TTL answers more downloads and a shorter one lets more through to Object Storage', () => {
+    const l = cdnLevel(mix);
+    const reach = (ttlS: number) => run(setTtl(callNow(createGame(l, design(true, true))), 'cdn', ttlS), 3, l).flow!.inflow.files!;
+    expect(reach(120)).toBeLessThan(reach(60));
+    expect(reach(60)).toBeLessThan(reach(5));
+  });
+
+  it('a CDN with no connection to Object Storage drops what it does not answer', () => {
+    const l = cdnLevel(mix);
+    const d = design(true, true);
+    const s = play(l, { ...d, connections: d.connections.filter(([a, b]) => !(a === 'cdn' && b === 'files')) });
+    expect(s.flow!.drop.cdn).toBeGreaterThan(0);
+    expect(s.flow!.errors).toBeGreaterThan(0.1);
+  });
+
+  it('the users cannot connect to the CDN in a level with no downloads: it takes downloads only', () => {
+    const l = cdnLevel({ watch: 1 });
+    const s = createGame(l, design(true, false));
+    const refused = connect(s, 'client', 'cdn');
+    expect(refused.links).toBe(s.links);
+    expect(refused.events.at(-1)).toMatchObject({ kind: 'refused', reason: 'downloadsOnly' });
+    expect(named(connect(createGame(cdnLevel(mix), design(true, false)), 'client', 'cdn'))).toContain('client>cdn');
+  });
+
+  it('the users can reach the CDN, Object Storage and the load balancer at once: a direct entrance does not replace another', () => {
+    const l = cdnLevel({ watch: 0.4, upload: 0.2, download: 0.4 });
+    let s = createGame(l, design(true, false));
+    s = connect(connect(s, 'client', 'files'), 'client', 'cdn');
+    expect(named(s).filter(x => x.startsWith('client>')).sort()).toEqual(['client>cdn', 'client>loadBalancer', 'client>objectStorage']);
+  });
+
+  it('a new CDN connects itself to the users and to Object Storage, in any order, and a new Object Storage goes behind an existing CDN', () => {
+    const l = cdnLevel(mix);
+    const built = (order: string[]) => named(order.reduce((acc, type) => build(acc, type, l), createGame(l, empty))).sort();
+    expect(built(['objectStorage', 'cdn'])).toEqual(['cdn>objectStorage', 'client>cdn']);
+    expect(built(['cdn', 'objectStorage'])).toEqual(['cdn>objectStorage', 'client>cdn']);
+  });
+
+  it('chapters 2 and 3 uploads stay far under the limit of Object Storage', () => {
+    const l = cdnLevel({ watch: 0.3, upload: 0.7 });
+    const d = design(false, false);
+    const s = play(l, { ...d, connections: [...d.connections, ['client', 'files']] });
+    expect(s.flow!.errors).toBe(0);
+    expect(s.flow!.load.files ?? 0).toBeLessThan(0.1);
   });
 });
