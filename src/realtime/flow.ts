@@ -16,7 +16,7 @@ export type Instance = { buildLeftS: number; buildTotalS: number; down: boolean 
 export const MAIN = 'main', STANDBY = 'standby';
 /** The Region a building stands in: the main one unless it says otherwise. */
 export const regionOf = (b: Pick<Building, 'region'>) => b.region ?? MAIN;
-export type Building = { id: string; region?: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number; subscription?: string; partitions?: number; partitionKey?: string }; instances: Instance[] };
+export type Building = { id: string; region?: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number; subscription?: string; partitions?: number; partitionKey?: string; celebrityLimit?: number }; instances: Instance[] };
 /** How traffic spreads over the values of each Shard Key: per key, the share of requests for each value (adds up to 1). */
 export type ShardKeys = Record<string, number[]>;
 /** Each value of a key lives on shard `value mod shards`; a Shard's share is the sum over its values. */
@@ -54,7 +54,12 @@ function serveShards(b: Building, rps: number, keys: ShardKeys, capacityPerShard
  * The news feed of a level (ADR-0009): the Subscription whose Workers write each post into every follower's feed, how many
  * followers an account has, and how many accounts a user follows.
  */
-export type FeedModel = { subscription: string; followers: number; follows: number };
+export type FeedModel = { subscription: string; followers: number; follows: number;
+  /**
+   * Celebrities: `share` of the posts arriving now are theirs (0 outside the celebrity's moment), each with `followers` followers;
+   * a user follows `followed` of them, so a hybrid feed read merges that many more reads.
+   */
+  celebrity?: { share: number; followers: number; followed: number } };
 /** A connection; `client` is the users on the Internet. */
 export type Link = { from: string; to: string };
 
@@ -170,9 +175,15 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
    * Fan-out on write (ADR-0009): a Worker serving the feed's Subscription, fed posts and with a way to a building that stores feeds.
    * Without one, every feed read gathers the posts of each followed account (fan-out on read).
    */
-  const fanOutOnWrite = !!feed && buildings.some(b => b.params.subscription === feed.subscription && links.some(l => l.to === b.id)
-    && links.some(l => l.from === b.id && !!catalog[byId.get(l.to)?.type ?? '']?.feedStore));
-  const feedReadCost = (spec: Catalog[string]) => (feed && spec.feedStore && !fanOutOnWrite ? feed.follows : 1);
+  const feedWorker = feed ? buildings.find(b => b.params.subscription === feed.subscription && links.some(l => l.to === b.id)
+    && links.some(l => l.from === b.id && !!catalog[byId.get(l.to)?.type ?? '']?.feedStore)) : undefined;
+  // The Celebrity Limit: accounts above it are not fanned out on write. Set under a normal account's followers, nobody is.
+  const celebrityLimit = feedWorker?.params.celebrityLimit ?? Infinity;
+  const fanOutOnWrite = !!feedWorker && feed!.followers <= celebrityLimit;
+  // A hybrid feed read also gathers the posts of the celebrities the user follows, which were not written into the feed.
+  const mergedCelebrities = fanOutOnWrite && feed?.celebrity && feed.celebrity.followers > celebrityLimit ? feed.celebrity.followed : 0;
+  const readCost = !feed ? 1 : fanOutOnWrite ? 1 + mergedCelebrities : feed.follows;
+  const feedReadCost = (spec: Catalog[string]) => (feed && spec.feedStore ? readCost : 1);
   /** The capacity the requests reaching a building use, in normal requests per second: each Request Type weighs by its effort. */
   const demandOn = (id: string, spec: Catalog[string], requests: number) => {
     const weighted = Object.entries(inflowBy[id] ?? {}).reduce((sum, [channel, x]) => sum + x * (typeOfChannel(channel) === READ_FEED ? feedReadCost(spec) : spec.effort?.[typeOfChannel(channel)] ?? 1), 0);
@@ -350,7 +361,12 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
         const sub = b.params.subscription;
         if (sub) processed[sub] = (processed[sub] ?? 0) + taken(c);
         // A Feed Worker writes the post into the feed of every follower: background work, never the users' own requests.
-        if (feed && sub === feed.subscription && typeOfChannel(c) === POST) send(id, FEED_WRITE + BACKGROUND, taken(c) * feed.followers);
+        if (feed && sub === feed.subscription && typeOfChannel(c) === POST) {
+          // Each post goes into its followers' feeds, unless its account has more followers than the Celebrity Limit.
+          const limit = b.params.celebrityLimit ?? Infinity, c0 = feed.celebrity?.share ?? 0;
+          const perPost = (1 - c0) * (feed.followers <= limit ? feed.followers : 0) + c0 * (feed.celebrity && feed.celebrity.followers <= limit ? feed.celebrity.followers : 0);
+          if (perPost > 0) send(id, FEED_WRITE + BACKGROUND, taken(c) * perPost);
+        }
         continue;
       }
       // A Client Limit passes at most so many requests per second for each client of a type the level counts clients for.
@@ -413,7 +429,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog, fanOutOnWrite, feedReadCost: feed && !fanOutOnWrite ? feed.follows : 1,
+    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog, fanOutOnWrite, feedReadCost: readCost,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };
