@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, partitionsOf, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
-  demolish, disconnect, maxPartitions, resize, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
+  demolish, disconnect, maxPartitions, resize, setCelebrityLimit, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -70,6 +70,8 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'drain': return ev.drain;
     case 'early': return ev.early(e.amount ?? 0);
     case 'incident': return ev.incident(name);
+    case 'rebalance': return ev.rebalance(nameOf(g, e.id));
+    case 'celebrity': return ev.celebrity;
     case 'regionDown': return ev.regionDown;
     case 'failover': return ev.failover;
     case 'removed': return ev.removed(name, e.amount ?? 0);
@@ -81,7 +83,7 @@ function eventText(g: GameState, e: GameEvent, rps: number): string {
     case 'lost': return ev.lost[e.reason ?? 'reputation'] ?? '';
   }
 }
-const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'regionDown' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' || e.kind === 'failover' ? 'ok' : '');
+const eventTone = (e: GameEvent) => (e.kind === 'incident' || e.kind === 'regionDown' || e.kind === 'lost' ? 'bad' : e.kind === 'wave' || e.kind === 'drain' || e.kind === 'rebalance' || e.kind === 'celebrity' || e.kind === 'refused' || e.kind === 'resized' ? 'warn' : e.kind === 'ready' || e.kind === 'linked' || e.kind === 'early' || e.kind === 'won' || e.kind === 'failover' ? 'ok' : '');
 
 /** The colour of each Subscription's line in the Consumer Lag chart, in the level's order. */
 const SUBSCRIPTION_COLORS = ['#3ee0c8', '#a78bfa', '#fbbf24', '#60a5fa'];
@@ -360,7 +362,13 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       const topicFed = game.links.some(l => typeOfId(l.from) === 'appServer' && catalog[typeOfId(l.to) ?? '']?.pubSub);
       if (!topicFed) return t.topicHint;
       // News feed: without a Feed Worker writing the feeds into the database, every feed read gathers each followed account.
+      // A Feed Worker whose Celebrity Limit is under a normal account's followers fans out nobody.
+      const feedWorker = level.play.feed && game.buildings.find(b => b.params.subscription === level.play.feed!.subscription);
+      if (feedWorker && level.play.feed && (feedWorker.params.celebrityLimit ?? Infinity) < level.play.feed.followers) return t.celebrityLowHint;
       if (level.play.feed && !flow?.fanOutOnWrite) return t.fanOutHint(level.play.feed.follows);
+      // A celebrity fanned out on write floods the database with writes.
+      const celeb = level.play.feed?.celebrity;
+      if (celeb && feedWorker && (feedWorker.params.celebrityLimit ?? Infinity) >= celeb.followers && game.t >= BUILD_PHASE_S + celeb.atS) return t.celebrityHint;
       if (subs.some(sub => !game.buildings.some(b => b.params.subscription === sub && game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub)))) return t.subscriptionHint;
       if (Object.values(flow?.partitions ?? {}).some(loads => hotShardOf(loads) !== null)) return t.hotPartitionHint;
       if (subs.some(subBehind)) return t.consumerLagHint;
@@ -436,7 +444,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const hotNote = hotShard === k ? `⚠ ${t.rt.inspector.hotShard}` : hotPartition !== null ? `⚠ ${t.rt.inspector.hotPartition} P${hotPartition + 1}` : '';
     // A Worker instance with no Partition left to read stands idle (ADR-0009).
     const fedByTopic = game.links.some(l => l.to === b.id && catalog[typeOfId(l.from) ?? '']?.pubSub);
-    const sub = inst.down ? t.rt.inspector.down : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? (fedByTopic ? t.rt.inspector.noPartition : t.rt.inspector.idle) : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
+    const sub = inst.down ? t.rt.inspector.down : (game.rebalance[b.id] ?? -1) > game.t && active ? t.rt.inspector.rebalancing : inst.buildLeftS > 0 ? t.rt.inspector.building(Math.ceil(inst.buildLeftS)) : idle ? (fedByTopic ? t.rt.inspector.noPartition : t.rt.inspector.idle) : hotNote || (warn ? `⚠ ${warn}` : backlogNote);
     const selected = selectedBuilding?.id === b.id;
     return (
       <button key={`${b.id}-${k}`} className={`play-unit ${inst.buildLeftS > 0 ? 'building' : ''} ${inst.down ? 'down' : ''} ${selected ? 'selected' : ''} ${warn ? 'warn' : ''} ${tutorialType === b.type ? 'tutorial-target' : ''}`}
@@ -601,6 +609,15 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
           </fieldset>
         );
       })()}
+      {spec.celebrityLimit && level.play.feed?.celebrity && b.params.subscription === level.play.feed.subscription && (
+        <fieldset className="play-sizes" aria-label={i.celebrityLimit}>
+          <legend className="muted">{i.celebrityLimit}</legend>
+          {[...spec.celebrityLimit.options, undefined].map(limit => (
+            <button key={limit ?? 'none'} className={`btn ${limit === b.params.celebrityLimit ? 'on' : ''}`} aria-pressed={limit === b.params.celebrityLimit} disabled={limit === b.params.celebrityLimit || over}
+              onClick={() => setGame(g => setCelebrityLimit(g, b.id, limit))}>{limit === undefined ? i.noLimit : limit.toLocaleString()}</button>
+          ))}
+        </fieldset>
+      )}
       {spec.subscribes && hasTopic && (
         <fieldset className="play-sizes" aria-label={i.subscription}>
           <legend className="muted">{i.subscription}{!building && <> · {i.subscriptionLocked}</>}</legend>
@@ -836,6 +853,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
         {level.requirements.maxStaleS !== undefined && <li><span aria-hidden="true">🕒</span> {t.objectiveFreshness(level.requirements.maxStaleS)}</li>}
               {hasTopic && <li><span aria-hidden="true">📨</span> {t.objectiveConsumerLag(subs.map(sub => [subName(sub), subMax(sub)]))}</li>}
               <li><span aria-hidden="true">👥</span> {t.rt.waveShort(level.play.wave.rps, level.play.wave.lengthS)}{level.play.wave.mix ? ` · ${t.rt.mixShort(level.play.wave.mix)}` : ''}</li>
+              {level.play.feed?.celebrity && <li><span aria-hidden="true">⭐</span> {t.rt.celebrityInfo(level.play.feed.celebrity.atS, level.play.feed.celebrity.lengthS, level.play.feed.celebrity.followers)}</li>}
               {level.play.incident && <li><span aria-hidden="true">⚡</span> {level.play.incident.region ? t.rt.regionIncidentInfo(level.play.incident.atS) : t.rt.incidentInfo(buildingName(level.play.incident.componentType ?? ''), level.play.incident.atS)}</li>}
             </ul>
             {newTypes.length > 0 && (

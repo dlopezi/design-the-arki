@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
 import { hotShardOf } from './flow';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setClientLimit, setPartitionKey, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setCelebrityLimit, setClientLimit, setPartitionKey, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -1282,5 +1282,94 @@ describe('events: the news feed is built when posts are written (fan-out on writ
     const notifyWorker = s.buildings.find(b => b.params.subscription === 'notifications')!.id;
     expect(s.links.some(l => l.from === feedWorker && l.to === 'db')).toBe(true);
     expect(s.links.some(l => l.from === notifyWorker)).toBe(false);
+  });
+});
+
+describe('events: a celebrity makes fan-out on write explode; the Celebrity Limit merges their posts on read (the hybrid feed)', () => {
+  // 10 posts/s, 100 feed reads/s, a small database (400 req/s). An account has 15 followers; from 5 s into the wave, for 20 s,
+  // 30% of the posts are a celebrity's, with 3000 followers. A user follows one celebrity.
+  const level: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 }, topic: { limits: { partitions: 6 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 110, lengthS: 40, mix: { post: 10 / 110, readFeed: 100 / 110 } }, starMoney: [100, 200],
+      subscriptions: { feed: { maxLagS: 20 } },
+      feed: { subscription: 'feed', followers: 15, follows: 20, celebrity: { atS: 5, lengthS: 20, share: 0.3, followers: 3000, followed: 1 } } },
+  };
+  const design = (celebrityLimit?: number): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic', params: { partitions: 3 } },
+      { id: 'wf', type: 'worker', params: { subscription: 'feed', instances: 3, ...(celebrityLimit !== undefined ? { celebrityLimit } : {}) } }],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'wf'], ['wf', 'db']],
+  });
+  const at = (d: Design, seconds: number) => run(callNow(createGame(level, d)), seconds, level);
+
+  it('before the celebrity posts, fan-out on write is calm: 150 writes and 100 reads a second', () => {
+    const s = at(design(), 4);
+    expect(s.flow!.edge['wf>db']).toBeCloseTo(150);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('with no limit, each celebrity post is written into 3000 feeds: the database is flooded and feed reads fail', () => {
+    const s = at(design(), 10);
+    expect(s.events.some(e => e.kind === 'celebrity')).toBe(true);
+    expect(s.flow!.edge['wf>db']).toBeGreaterThan(5000);
+    expect(s.flow!.errors).toBeGreaterThan(0.3);
+  });
+
+  it('a Celebrity Limit of 1000 followers skips their fan-out; each feed read merges one more read for the celebrity', () => {
+    const s = at(design(1000), 10);
+    expect(s.flow!.edge['wf>db']).toBeCloseTo(7 * 15); // only the normal accounts' posts are written
+    expect(s.flow!.feedReadCost).toBe(2);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('a limit under a normal account\'s followers skips everyone: back to fan-out on read, and the database is flooded by reads', () => {
+    const s = at(design(10), 3);
+    expect(s.flow!.fanOutOnWrite).toBe(false);
+    expect(s.flow!.feedReadCost).toBe(20);
+    expect(s.flow!.errors).toBeGreaterThan(0.3);
+  });
+
+  it('the limit is free and can change at any time; none removes it', () => {
+    let s = at(design(), 2);
+    s = setCelebrityLimit(s, 'wf', 1000);
+    expect(s.buildings.find(b => b.id === 'wf')!.params.celebrityLimit).toBe(1000);
+    expect(setCelebrityLimit(s, 'wf', 999)).toBe(s);
+    expect(setCelebrityLimit(s, 'wf', undefined).buildings.find(b => b.id === 'wf')!.params.celebrityLimit).toBeUndefined();
+  });
+});
+
+describe('events: a Worker instance that goes down makes its group rebalance; a spare instance takes over its Partitions', () => {
+  // 10 posts/s over 3 Partitions; the first instance of the Notifications Worker goes down 10 s into the wave.
+  const level: GameLevel = {
+    allowedComponents: ['appServer', 'database', 'topic', 'worker'],
+    componentOptions: { worker: { maxInstances: 4 }, topic: { limits: { partitions: 6 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 900, wave: { rps: 50, lengthS: 40, mix: { post: 0.2, readFeed: 0.8 } }, starMoney: [100, 200],
+      subscriptions: { notifications: { maxLagS: 10 } }, incident: { atS: 10, componentType: 'worker' } },
+  };
+  const design = (instances: number): Design => ({
+    components: [{ id: 'api', type: 'appServer' }, { id: 'db', type: 'database' }, { id: 't', type: 'topic', params: { partitions: 3 } }, { id: 'w', type: 'worker', params: { subscription: 'notifications', instances } }],
+    connections: [['client', 'api'], ['api', 'db'], ['api', 't'], ['t', 'w']],
+  });
+  const at = (instances: number, seconds: number) => run(callNow(createGame(level, design(instances))), seconds, level);
+
+  it('the group stops for 2 s: nothing is read, and posts wait', () => {
+    const s = at(4, 11);
+    expect(s.events.some(e => e.kind === 'rebalance' && e.id === 'w')).toBe(true);
+    expect(s.flow!.subRelease['notifications'] ?? 0).toBe(0);
+    expect(s.subBacklog['notifications']).toBeGreaterThan(5);
+  });
+
+  it('then the spare instance, idle until now, reads the Partition of the fallen one, and the group catches up', () => {
+    const s = at(4, 25);
+    expect(s.flow!.usable['w']).toBe(3);
+    expect(s.subBacklog['notifications']).toBeLessThan(1);
+    expect(s.reputation).toBe(100);
+  });
+
+  it('without a spare, two instances read three Partitions: one reads two and falls behind', () => {
+    const s = at(3, 30);
+    expect(s.subBacklog['notifications']).toBeGreaterThan(20);
   });
 });

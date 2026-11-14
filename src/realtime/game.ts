@@ -21,6 +21,8 @@ export const REFUND = 0.5;
 export const REPUTATION = { failing: -6, slow: -4, fine: 1 };
 /** Bonus per second of build phase skipped by calling the users early. */
 export const EARLY_BONUS_PER_S = PASSIVE_INCOME * 2;
+/** Seconds a consumer group stops to rebalance after one of its instances goes down. */
+export const REBALANCE_S = 2;
 /** A Backlog under this (half a Message) counts as empty. */
 export const EMPTY_BACKLOG = 0.5;
 
@@ -47,7 +49,9 @@ export type Play = {
    * News-feed levels (ADR-0009): the Subscription whose Workers write each post into every follower's feed (fan-out on write),
    * the followers of an account, and the accounts a user follows (what a feed read gathers without fan-out on write).
    */
-  feed?: { subscription: string; followers: number; follows: number };
+  feed?: { subscription: string; followers: number; follows: number;
+    /** A celebrity: from `atS` seconds into the wave, for `lengthS`, `share` of the posts are by accounts with `followers` followers; a user follows `followed` celebrities. */
+    celebrity?: { atS: number; lengthS: number; share: number; followers: number; followed: number } };
 };
 export type GameLevel = {
   allowedComponents: string[];
@@ -59,7 +63,7 @@ export type GameLevel = {
 };
 
 /** What happened, for the message log; the UI turns each kind into text. */
-export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'regionDown' | 'failover' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
+export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'rebalance' | 'celebrity' | 'regionDown' | 'failover' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
 /** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them, `consumerLag` each Subscription's lag (s). */
 export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number; consumerLag?: Record<string, number> };
@@ -93,6 +97,8 @@ export type GameState = {
   consumerLag: Record<string, number>;
   /** What waits in each Partition of a Topic for each Subscription (`topicId|subscription`). */
   partBacklog: Record<string, number[]>;
+  /** Worker buildings whose group is rebalancing after an instance went down, and until when (ADR-0009): none of their instances reads. */
+  rebalance: Record<string, number>;
   /** A Region failure and the switch to the standby Region: when it fell, when the DNS will switch (null: nothing will), and whether it has. */
   failover: { downAt: number | null; switchAt: number | null; switched: boolean };
   history: Sample[];
@@ -124,13 +130,13 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
     id: c.id, type: c.type, ...(c.params?.region && c.params.region !== MAIN ? { region: String(c.params.region) } : {}),
-    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}), ...(c.params?.subscription ? { subscription: String(c.params.subscription) } : {}), ...(c.params?.partitions !== undefined ? { partitions: Number(c.params.partitions) } : {}), ...(c.params?.partitionKey ? { partitionKey: String(c.params.partitionKey) } : {}) },
+    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}), ...(c.params?.subscription ? { subscription: String(c.params.subscription) } : {}), ...(c.params?.partitions !== undefined ? { partitions: Number(c.params.partitions) } : {}), ...(c.params?.partitionKey ? { partitionKey: String(c.params.partitionKey) } : {}), ...(c.params?.celebrityLimit !== undefined ? { celebrityLimit: Number(c.params.celebrityLimit) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
     ...(level.play.feed ? { feedSubscription: level.play.feed.subscription } : {}),
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
-    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, partBacklog: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, partBacklog: {}, rebalance: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -412,6 +418,12 @@ export function setPartitionKey(s: GameState, id: string, key: string, level: Ga
   if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'partitionKeyLocked' }) };
   return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, partitionKey: key } } : b)) };
 }
+/** Sets the Celebrity Limit of a Feed Worker, in followers, or none (undefined): free and immediate, a change of configuration. */
+export function setCelebrityLimit(s: GameState, id: string, limit: number | undefined): GameState {
+  const b = s.buildings.find(x => x.id === id), spec = b && defaultCatalog[b.type]?.celebrityLimit;
+  if (!spec || (limit !== undefined && !spec.options.includes(limit))) return s;
+  return { ...s, buildings: s.buildings.map(x => { if (x.id !== id) return x; const { celebrityLimit: _old, ...params } = x.params; return { ...x, params: limit === undefined ? params : { ...params, celebrityLimit: limit } }; }) };
+}
 /** Changes the Client Limit of an API Gateway, in requests per second for each client: free and immediate. */
 export const setClientLimit = (s: GameState, id: string, limitRps: number): GameState =>
   ({ ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, limitRps } } : b)) });
@@ -462,6 +474,8 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
       const k = target.instances.findIndex(i => i.buildLeftS <= 0 && !i.down);
       s.buildings = s.buildings.map(b => (b === target ? { ...b, instances: b.instances.map((i, n) => (n === k ? { ...i, down: true } : i)) } : b));
       events.push({ kind: 'incident', type: target.type, id: target.id });
+      // A consumer group that loses an instance stops for a moment while the others take over its Partitions (a rebalance).
+      if (target.params.subscription) { s.rebalance = { ...s.rebalance, [target.id]: s.t + REBALANCE_S }; events.push({ kind: 'rebalance', id: target.id }); }
     }
     s.incidentDone = true;
   }
@@ -471,10 +485,19 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
     s.buildings = s.buildings.map(b => (b.type === 'readReplica' && regionOf(b) === STANDBY ? { ...b, type: 'promotedReplica' } : b));
     events.push({ kind: 'failover' });
   }
+  // The celebrity's moment: for a while, a share of the posts come from accounts with a huge number of followers.
+  const celeb = level.play.feed?.celebrity;
+  const celebNow = !!celeb && s.phase === 'wave' && s.t >= BUILD_PHASE_S + celeb.atS && s.t < BUILD_PHASE_S + celeb.atS + celeb.lengthS;
+  if (celeb && s.phase === 'wave' && s0.t < BUILD_PHASE_S + celeb.atS && s.t >= BUILD_PHASE_S + celeb.atS) events.push({ kind: 'celebrity' });
+  const feed = level.play.feed && { subscription: level.play.feed.subscription, followers: level.play.feed.followers, follows: level.play.feed.follows,
+    ...(celeb ? { celebrity: { share: celebNow ? celeb.share : 0, followers: celeb.followers, followed: celeb.followed } } : {}) };
+  // While a group rebalances, none of its instances reads.
+  const rebalancing = (b: Building) => (s.rebalance[b.id] ?? -1) > s.t;
+  const working = s.buildings.map(b => (rebalancing(b) ? { ...b, instances: b.instances.map(i => ({ ...i, down: true })) } : b));
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
   const subs = subscriptionsOf(level);
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys, level.play.feed);
+  const flow = solve(working, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys, feed);
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;

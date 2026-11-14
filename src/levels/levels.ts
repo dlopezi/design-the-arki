@@ -65,7 +65,8 @@ const levelSchema = z.object({
     /** Levels that teach the Partition Key: the keys on offer (the first is the default) and how posts spread over each one's values. */
     partitionKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Partition Keys needs at least one key').optional(),
     /** News-feed levels: the Subscription that writes the feeds (fan-out on write), an account's followers, and the accounts a user follows. */
-    feed: z.object({ subscription: z.string().min(1), followers: z.number().positive(), follows: z.number().positive() }).optional(),
+    feed: z.object({ subscription: z.string().min(1), followers: z.number().positive(), follows: z.number().positive(),
+      celebrity: z.object({ atS: z.number().min(0), lengthS: z.number().positive(), share: z.number().positive().max(1), followers: z.number().positive(), followed: z.number().min(0) }).optional() }).optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),

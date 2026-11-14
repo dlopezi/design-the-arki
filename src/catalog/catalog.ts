@@ -88,7 +88,7 @@ export const catalog: Catalog = {
   // one of them (a consumer group, ADR-0009): it processes posts and their work leaves the system (a push service, a search index).
   worker: {
     primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: ['job', POST], emits: RESULT_TYPE, buildS: 5,
-    ends: [POST], subscribes: true,
+    ends: [POST], subscribes: true, celebrityLimit: { options: [10, 100, 1000, 10000] },
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
       medium: { workers: 4, monthlyCost: 40, vcpu: 2 },

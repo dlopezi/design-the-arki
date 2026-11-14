@@ -162,6 +162,10 @@ export const en = {
   hotPartitionHint: 'One Partition got most of the posts while the others had room: a Hot Partition. Your Partition Key spreads the posts badly, and more Partitions or instances would not fix it, because one key value always goes to one Partition. Pick a better Partition Key in the Build Phase, one with many values used evenly, such as user id.',
   /** Lost in a news-feed level while no Feed Worker wrote the feeds: every feed read gathered each followed account. */
   fanOutHint: (follows: number) => `Every feed read gathered the posts of the ${follows} accounts the user follows (fan-out on read), and the database could not keep up: a bigger tier would not be enough. Build a Worker for the Feed Subscription, connect the Topic to it and it to the Database: it writes each post into every follower's feed (fan-out on write), so reading a feed becomes one read.`,
+  /** Lost while a celebrity's posts were fanned out on write into every follower's feed. */
+  celebrityHint: 'Each celebrity post was written into the feed of every one of their thousands of followers, and the writes flooded the database. Set a Celebrity Limit on the Feed Worker: posts of accounts with more followers than the limit are not written into each feed but merged when a feed is read (the hybrid feed, as Twitter does). Keep the limit above a normal account\'s followers.',
+  /** Lost with a Celebrity Limit under a normal account's followers. */
+  celebrityLowHint: 'Your Celebrity Limit was lower than the followers of a normal account, so no post was written into the feeds: every feed read gathered each followed account again (fan-out on read). Raise the limit above a normal account\'s followers and under a celebrity\'s.',
   /** Lost with a Subscription that no Worker serves. */
   subscriptionHint: 'One Subscription had no Worker, so nobody processed its copy of the posts and its Consumer Lag kept growing. Build a Worker for it (a new Worker serves the first Subscription without one) and connect the Topic to it.',
   /** Lost while a Subscription's Consumer Lag was over its maximum. */
@@ -549,6 +553,7 @@ export const en = {
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,
     incidentInfo: (type: string, s: number) => `${s} s into the wave, one ${type} instance goes down.`,
+    celebrityInfo: (atS: number, lengthS: number, followers: number) => `${atS} s into the wave, a celebrity posts for ${lengthS} s: ${followers.toLocaleString('en')} followers for each post.`,
     regionIncidentInfo: (s: number) => `${s} s into the wave, the whole main Region goes down.`,
     regions: { global: 'Outside the Regions', main: 'Region 1 · main', standby: 'Region 2 · standby', live: 'LIVE', down: 'DOWN', standbyTag: 'STANDBY', promoted: 'LIVE · promoted', empty: 'Empty standby Region: build here the same way as the main one.', buildIn: 'Build in', dnsTtl: (s: number) => `DNS TTL ${s} s`, failoverIn: (s: number) => `Failover in ${s} s`, switched: 'Switched to Region 2' },
     map: 'Map', zoomIn: 'Zoom in', zoomOut: 'Zoom out', center: 'Center',
@@ -579,6 +584,7 @@ export const en = {
       partitions: 'Partitions', partitionsLocked: 'Locked during the wave', fewerPartitions: 'Fewer Partitions', morePartitions: 'More Partitions',
       noPartition: 'idle · no Partition',
       partitionKey: 'Partition Key', hotPartition: 'Hot Partition',
+      celebrityLimit: 'Celebrity Limit (followers)', noLimit: 'None', rebalancing: 'rebalancing…',
       feedRead: 'One feed read', feedReadCost: (reads: number, onWrite: boolean) => `${reads} read${reads === 1 ? '' : 's'} · fan-out on ${onWrite ? 'write' : 'read'}`,
       subscription: 'Subscription', subscriptionLocked: 'Locked during the wave',
       exit: (to: string) => `→ ${to}`,
@@ -597,6 +603,8 @@ export const en = {
       drain: 'The users are gone. The Workers now empty the Backlog.',
       early: (bonus: number) => `Released early! Bonus +$${bonus}`,
       incident: (name: string) => `${name} went down!`,
+      rebalance: (name: string) => `${name} lost an instance: its group rebalances, and the others take its Partitions in 2 s.`,
+      celebrity: 'A celebrity is posting! Each of their posts has thousands of followers.',
       regionDown: 'Region 1 is down! Requests to it fail until the DNS switches.',
       failover: 'The DNS switched the users to Region 2. Its Read Replica is now the primary database.',
       removed: (name: string, back: number) => `${name} removed: +$${back}`,

@@ -107,6 +107,11 @@ export type StationPrimitive = {
    * read per followed account; with fan-out on write, one read.
    */
   feedStore?: boolean;
+  /**
+   * The Celebrity Limit of a Feed Worker (param `celebrityLimit`, one of `options`, in followers; left out, no limit): posts of
+   * accounts with more followers are not written into every feed but merged when a feed is read (the hybrid feed, ADR-0009).
+   */
+  celebrityLimit?: { options: number[] };
   /** Request Types it finishes itself: their work leaves the system from here (a Worker sends a notification to a push service). */
   ends?: string[];
   /** In a level with Subscriptions, each building of this type serves one of them (param `subscription`): a consumer group (ADR-0009). */

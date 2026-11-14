@@ -90,3 +90,19 @@ test('level 31: connecting the Feed Worker to the Database makes a feed read one
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 32: with no Celebrity Limit the celebrity floods the database, and the hint says to set one', async ({ page }) => {
+  await openLevel(page, '32-celebrity-joins', 'guided');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('Celebrity Limit');
+});
+
+test('level 32: a Celebrity Limit of 1000 followers and a spare Notifications instance hold the launch', async ({ page }) => {
+  await openLevel(page, '32-celebrity-joins', 'guided');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.locator('.play-container').filter({ hasText: 'Feed' }).locator('.play-unit').first().click();
+  await page.getByRole('group', { name: /Celebrity Limit/ }).getByRole('button', { name: '1,000' }).click();
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});
