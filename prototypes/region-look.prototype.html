@@ -1,0 +1,95 @@
+<!doctype html>
+<!--
+  PROTOTYPE (throwaway, not part of the build): ticket #78.
+  Question: how should the game show a second Region, the DNS switch and the failover?
+  Three variants on one page, switch with ?variant=A|B|C, the bar at the bottom, or the left/right arrow keys.
+    A  Two plots side by side : the main Region and a dimmed standby Region on one map, the DNS between the users and both;
+                                the switch is a countdown on the DNS and in the top bar, then the traffic line moves (what the game ships)
+    B  Region tabs            : one map at a time, a tab for each Region; the standby is out of sight until you open its tab
+    C  Console first          : the map stays as it is; a "Regions" table in the console shows state and traffic of each Region
+  Play with the switch: Normal → Main Region down (waiting for the DNS) → Switched to standby. State is in memory only.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Prototype: Regions and failover look</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#0b1214; --panel:#101b1e; --line:#27393d; --fg:#d7e6e8; --muted:#7b9296; --ok:#3ee0c8; --warn:#fbbf24; --bad:#f87171; font-family: ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--fg); }
+  .top { display:flex; gap:10px; align-items:center; padding:8px 14px; background:#142226; border-bottom:2px solid var(--line); font-size:13px; flex-wrap:wrap; }
+  .pill { padding:3px 10px; border:1px solid var(--line); background:#060b0c; font-weight:800; }
+  .bad { color:var(--bad); } .warn { color:var(--warn); } .ok { color:var(--ok); } .muted { color:var(--muted); }
+  .stage { display:grid; grid-template-columns: 1fr 340px; gap:12px; padding:12px; min-height: calc(100vh - 120px); }
+  .map, .console { background:var(--panel); border:1px solid var(--line); padding:14px; }
+  .controls { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; } .controls button, .tabs button { background:#16262a; color:var(--fg); border:1px solid var(--line); padding:5px 10px; cursor:pointer; font:inherit; }
+  .controls button.on, .tabs button.on { border-color:var(--ok); color:var(--ok); }
+  .row { display:flex; gap:14px; align-items:stretch; }
+  .internet { width:90px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:30px; } .internet small { font-size:10px; color:var(--muted); }
+  .dns { width:90px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; font-size:11px; } .dns .glyph { font-size:30px; }
+  .ring { margin-top:6px; width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; border:4px solid var(--line); }
+  .ring.wait { border-color:var(--warn); color:var(--warn); } .ring.done { border-color:var(--ok); color:var(--ok); }
+  .regions { flex:1; display:flex; gap:14px; }
+  .region { flex:1; border:2px solid var(--line); padding:10px; position:relative; min-height:190px; }
+  .region h4 { margin:0 0 8px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .region .tag { position:absolute; top:8px; right:8px; font-size:10px; padding:2px 6px; border:1px solid var(--line); }
+  .region.standby { opacity:.6; border-style:dashed; } .region.live { border-color:var(--ok); opacity:1; } .region.dead { border-color:var(--bad); filter:grayscale(.8); opacity:.8; }
+  .units { display:flex; gap:14px; flex-wrap:wrap; } .unit { width:72px; text-align:center; font-size:10px; } .unit .glyph { font-size:26px; }
+  .smoke { color:#9aa3b2; }
+  .line { height:4px; margin:10px 0; background:var(--line); } .line.on { background:var(--ok); } .line.cut { background:var(--bad); }
+  .tabs { display:flex; gap:6px; margin-bottom:8px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; } th, td { text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.1em; }
+  .switcher { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:10px; align-items:center; background:#fff; color:#111; padding:7px 14px; border-radius:999px; box-shadow:0 6px 24px rgba(0,0,0,.5); font-weight:800; font-size:13px; }
+  .switcher button { border:0; background:#e5e7eb; border-radius:50%; width:26px; height:26px; cursor:pointer; font-weight:800; }
+  .note { color:var(--muted); font-size:11px; margin-top:12px; line-height:1.5; }
+</style></head>
+<body>
+<div class="top" id="top"></div>
+<div class="stage"><div class="map" id="map"></div><div class="console" id="console"></div></div>
+<div class="switcher"><button id="prev">‹</button><span id="vname"></span><button id="next">›</button></div>
+<script>
+  const VARIANTS = { A: 'A · Two plots side by side', B: 'B · Region tabs', C: 'C · Console first' };
+  const keys = Object.keys(VARIANTS);
+  let variant = (new URLSearchParams(location.search).get('variant') || 'A').toUpperCase(); if (!VARIANTS[variant]) variant = 'A';
+  let phase = 'normal'; // normal | waiting | switched
+  let tab = 'main';
+  const TTL = 60;
+  const mainState = () => (phase === 'normal' ? 'live' : 'dead');
+  const standbyState = () => (phase === 'switched' ? 'live' : 'standby');
+  const units = (dead, extra) => ['⚖ Load balancer', '🖥 app-1', '🖥 app-2', '🗄 ' + (extra || 'Database')].map(u => `<div class="unit"><div class="glyph ${dead ? 'smoke' : ''}">${u.split(' ')[0]}</div>${u.slice(2)}${dead ? '<br><span class="bad">down</span>' : ''}</div>`).join('');
+  const region = (id, name, state, tag, dbName) => `<div class="region ${state}"><h4>${name}</h4><span class="tag ${state === 'dead' ? 'bad' : state === 'live' ? 'ok' : ''}">${tag}</span><div class="units">${units(state === 'dead', dbName)}</div></div>`;
+  const tagFor = (id) => id === 'main' ? (phase === 'normal' ? 'LIVE' : 'DOWN') : (phase === 'switched' ? 'LIVE · promoted' : 'STANDBY');
+  const dbOf = (id) => id === 'standby' ? (phase === 'switched' ? 'Primary (was replica)' : 'Read Replica') : 'Database';
+  const dns = () => `<div class="dns"><div class="glyph">🧭</div>DNS · TTL ${TTL} s<div class="ring ${phase === 'waiting' ? 'wait' : phase === 'switched' ? 'done' : ''}">${phase === 'waiting' ? '42 s' : phase === 'switched' ? '✔' : '—'}</div></div>`;
+  const wire = (to) => { const on = (to === 'main' && phase === 'normal') || (to === 'standby' && phase === 'switched'); const cut = to === 'main' && phase === 'waiting'; return `<div class="line ${on ? 'on' : cut ? 'cut' : ''}" title="${to}"></div>`; };
+
+  function mapA() {
+    return `<div class="row"><div class="internet">🌍<small>Users</small></div>${dns()}
+      <div class="regions"><div style="flex:1">${wire('main')}${region('main', 'Region 1 · main', mainState(), tagFor('main'), dbOf('main'))}</div>
+      <div style="flex:1">${wire('standby')}${region('standby', 'Region 2 · standby', standbyState(), tagFor('standby'), dbOf('standby'))}</div></div></div>`;
+  }
+  function mapB() {
+    const id = tab, st = id === 'main' ? mainState() : standbyState();
+    return `<div class="tabs"><button data-tab="main" class="${tab === 'main' ? 'on' : ''}">Region 1 · main ${phase === 'normal' ? '' : '⚠'}</button><button data-tab="standby" class="${tab === 'standby' ? 'on' : ''}">Region 2 · standby ${phase === 'switched' ? '●' : ''}</button></div>
+      <div class="row"><div class="internet">🌍<small>Users</small></div>${dns()}<div class="regions">${region(id, id === 'main' ? 'Region 1 · main' : 'Region 2 · standby', st, tagFor(id), dbOf(id))}</div></div>
+      <div class="note">Only one Region is on screen: a player who watches the main Region sees it fail but not where the traffic went.</div>`;
+  }
+  function mapC() {
+    return `<div class="row"><div class="internet">🌍<small>Users</small></div>${dns()}<div class="regions">${region('main', 'Your base', mainState(), tagFor('main'), dbOf('main'))}</div></div>
+      <div class="note">The map stays as in chapters 1 to 3: the standby Region only appears in the console table.</div>`;
+  }
+  function consoleA() { return `<h3 class="muted">Console</h3><div class="note">Req/s, p95 and errors as always. ${phase === 'waiting' ? '<b class="bad">Requests to Region 1 fail until the DNS switches.</b>' : ''}</div>`; }
+  function consoleC() {
+    const row = (name, st, tag, share) => `<tr><td>${name}</td><td class="${st === 'dead' ? 'bad' : st === 'live' ? 'ok' : 'muted'}">${tag}</td><td>${share}</td></tr>`;
+    return `<table><tr><th>Region</th><th>State</th><th>Traffic</th></tr>${row('Region 1 · main', mainState(), tagFor('main'), phase === 'normal' ? '100%' : '0%')}${row('Region 2 · standby', standbyState(), tagFor('standby'), phase === 'switched' ? '100%' : '0%')}</table>`;
+  }
+  function render() {
+    const gauge = phase === 'waiting' ? '<span class="pill warn">🧭 Failover in 42 s</span>' : phase === 'switched' ? '<span class="pill ok">🧭 Switched to Region 2</span>' : '<span class="pill">🧭 DNS TTL 60 s</span>';
+    document.getElementById('top').innerHTML = `<span class="pill">$287 +0.5/s</span>${variant === 'C' ? '' : gauge}<span class="pill ${phase === 'normal' ? 'ok' : 'bad'}">❤ ${phase === 'normal' ? '100' : phase === 'waiting' ? '72' : '88'}%</span><span class="muted">${VARIANTS[variant]}</span>`;
+    document.getElementById('map').innerHTML = `<div class="controls">${[['normal', 'Normal'], ['waiting', 'Main Region down (waiting for DNS)'], ['switched', 'Switched to standby']].map(([k, l]) => `<button data-phase="${k}" class="${phase === k ? 'on' : ''}">${l}</button>`).join('')}</div>${variant === 'A' ? mapA() : variant === 'B' ? mapB() : mapC()}`;
+    document.getElementById('console').innerHTML = variant === 'C' ? consoleC() : consoleA();
+    document.getElementById('vname').textContent = VARIANTS[variant];
+  }
+  document.addEventListener('click', e => { const p = e.target.closest('[data-phase]'); if (p) { phase = p.dataset.phase; render(); } const t = e.target.closest('[data-tab]'); if (t) { tab = t.dataset.tab; render(); } });
+  const go = d => { variant = keys[(keys.indexOf(variant) + d + keys.length) % keys.length]; render(); };
+  document.getElementById('prev').onclick = () => go(-1); document.getElementById('next').onclick = () => go(1);
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+  render();
+</script></body></html>

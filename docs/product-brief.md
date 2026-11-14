@@ -117,6 +117,14 @@ Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2
   5. *The Region falls*: build a standby Region and a DNS; choose the TTL; the Read Replica is promoted.
   6. *Worldwide launch*: the review, one wave with three problems in order (viral video, abusive client, main Region down near the end). It also needs chapter 1–3 buildings (load balancer, several app servers, cache, Read Replica) and the upload route through Object Storage, queue and Workers.
 - **Manual**: Buildings entries for CDN, API Gateway and DNS with *In real life* (Cloudflare, Amazon CloudFront, Kong, AWS API Gateway, Nginx, Amazon Route 53); Concepts for CDN and cache purge, TTL, token bucket and rate limiting, authentication at the gateway, active-passive and active-active, warm and cold standby, RPO and RTO.
+- **Look (decided 2026-11-14, without a human session)**: the owner asked for chapter 4 to be built without human intervention, so the choice was made by real practice, as for chapter 2 and chapter 3, with a prototype (`prototypes/region-look.prototype.html`, ticket #78). Cloud diagrams draw Regions as boxes side by side with the DNS in front, a dimmed standby, and a line that moves when a Failover happens. Three variants were compared: **A** two plots side by side with the DNS between the users and both, **B** one Region at a time with tabs, **C** the standby only in a console table. Chosen: **A**. It shows the failure and where the traffic goes at once, in the same map grammar as the C4 zones; B hides the standby, so a player who watches the main Region never sees the traffic move; C breaks the idea that the map is the system.
+  ```
+  top bar:  $287 +0.5/s   🧭 Failover in 42 s  [⏸ 1× 2× 4×]   ❤ 72%        (the DNS gauge shows only in a level with a DNS)
+  map:      🌍 Users ── 🧭 DNS (TTL 60 s, ring: countdown, then ✔) ──┬── Region 1 · main    LIVE / DOWN (grey, smoke, red line)
+                                                                  └── Region 2 · standby  STANDBY (dim, dashed) → LIVE · promoted
+  build:    the build card has a Region switch (Main | Standby); a new building goes into the Region shown selected
+  ```
+  The DNS ring counts down the TTL after the Region fails; the line to the main Region turns red and the line to the standby turns green at the switch; the standby Read Replica is renamed "Primary (was replica)". The Region ticket (#79) builds this; nothing else in the game screen changes.
 - **Out of scope**: geography and latency by distance, active-active Regions, loss of writes at failover, cold standby, WAF and DDoS protection, edge computing, routing by path to several services, cache purge.
 
 ## Game screen
