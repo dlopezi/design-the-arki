@@ -156,3 +156,25 @@ test('level 26: with everything in place and a short DNS TTL the base survives a
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('the Manual: the API Gateway and DNS entries are locked until their levels, and the Concepts tab explains the edge', async ({ page }) => {
+  await progressWith(page, chapterOne);
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /API Gateway/ }).click();
+  await expect(page.getByRole('region', { name: /API Gateway/ })).toContainText('Reach level 23 to unlock this building.');
+  await page.getByRole('button', { name: /DNS/ }).click();
+  await expect(page.getByRole('region', { name: /DNS/ })).toContainText('Reach level 25 to unlock this building.');
+  await page.goto('/#manual/concepts');
+  for (const title of ['CDN and cache purge', 'Rate limiting and the token bucket', 'Authentication at the gateway', 'Active-passive and active-active', 'Warm and cold standby', 'RPO and RTO', 'Failover']) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+});
+
+test('the Manual: once the levels are reached, the API Gateway and DNS entries say what they are in real life', async ({ page }) => {
+  await progressWith(page, [...chapterOne, ...chapterTwo, ...chapterThree, '21-far-away-videos', '22-old-content', '23-one-door', '24-abusive-client']);
+  await page.goto('/#manual/buildings');
+  await page.getByRole('button', { name: /API Gateway/ }).click();
+  await expect(page.getByText('Kong · AWS API Gateway · Nginx')).toBeVisible();
+  await page.getByRole('button', { name: /DNS/ }).click();
+  await expect(page.getByText('Amazon Route 53 · Cloudflare DNS')).toBeVisible();
+});

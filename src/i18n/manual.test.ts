@@ -28,6 +28,21 @@ describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, 
     expect(strings.manual.concepts.every(c => c.title && c.text && c.game)).toBe(true);
   });
 
+  it('explains the concepts of chapter 4', () => {
+    const ids = strings.manual.concepts.map(c => c.id);
+    for (const id of ['cdnPurge', 'rateLimit', 'gatewayAuth', 'activePassive', 'warmCold', 'rpoRto', 'failover']) expect(ids).toContain(id);
+  });
+
+  it('names the real tools of the CDN, the API Gateway and the DNS', () => {
+    const tools = (type: string) => strings.archive.buildings[type]!.tools.join(' ');
+    expect(tools('cdn')).toMatch(/Cloudflare/);
+    expect(tools('cdn')).toMatch(/CloudFront/);
+    expect(tools('apiGateway')).toMatch(/Kong/);
+    expect(tools('apiGateway')).toMatch(/AWS API Gateway/);
+    expect(tools('apiGateway')).toMatch(/Nginx/);
+    expect(tools('dns')).toMatch(/Route 53/);
+  });
+
   it('explains the concepts of chapter 3', () => {
     const ids = strings.manual.concepts.map(c => c.id);
     for (const id of ['replicationLag', 'readYourWrites', 'sharding', 'shardKey', 'hotShard', 'presignedUrl', 'failover']) expect(ids).toContain(id);
@@ -42,7 +57,7 @@ describe.each([['English', en], ['Spanish', es]] as const)('%s Manual', (_name, 
   });
 });
 
-describe.each([['English', en, /consistent hashing/, /cross-shard/, /not simulated/], ['Spanish', es, /hashing consistente/, /entre shards/, /no se simula/]] as const)(
+describe.each([['English', en, /consistent hashing/, /cross-shard/, /not simulated|is not in the game/], ['Spanish', es, /hashing consistente/, /entre shards/, /no se simula|no están? en el juego/]] as const)(
   '%s Manual: what the game does not simulate',
   (_name, strings, hashing, crossShard, notSimulated) => {
     const concept = (id: string) => strings.manual.concepts.find(c => c.id === id)!;
@@ -52,8 +67,12 @@ describe.each([['English', en, /consistent hashing/, /cross-shard/, /not simulat
       expect(concept('sharding').text).toMatch(crossShard);
     });
 
-    it('says failover is explained, not simulated', () => {
+    it('says what failover leaves out: the last writes lost, and health checks', () => {
       expect(`${concept('failover').text} ${concept('failover').game}`).toMatch(notSimulated);
+    });
+
+    it('says RPO, cold standby, active-active and the cache purge are not simulated', () => {
+      for (const id of ['rpoRto', 'warmCold', 'activePassive', 'cdnPurge']) expect(`${concept(id).text} ${concept(id).game}`, id).toMatch(notSimulated);
     });
   },
 );
