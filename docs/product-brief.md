@@ -125,6 +125,7 @@ Settled in a grilling session; engine rules in ADR-0008. Same rule as chapters 2
   build:    the build card has a Region switch (Main | Standby); a new building goes into the Region shown selected
   ```
   The DNS ring counts down the TTL after the Region fails; the line to the main Region turns red and the line to the standby turns green at the switch; the standby Read Replica is renamed "Primary (was replica)". The Region ticket (#79) builds this; nothing else in the game screen changes. As built, the two Regions are stacked one above the other (not side by side) because each Region is already wide, and the DNS stands between the Internet and them.
+- **Status (2026-11-14)**: the six missions (levels `21` to `26`), the CDN, API Gateway (with its Client Limit), DNS and standby Region, the freshness limit, the Manual entries and concepts are built, in English and Spanish. What was built, and where it differs from the plan (DNS TTLs of 5, 10 and 30 s, the review without a queue and Workers, the buildings that stand outside the Regions), is in ADR-0008.
 - **Out of scope**: geography and latency by distance, active-active Regions, loss of writes at failover, cold standby, WAF and DDoS protection, edge computing, routing by path to several services, cache purge.
 
 ## Game screen
