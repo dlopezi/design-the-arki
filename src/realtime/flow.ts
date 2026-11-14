@@ -1,4 +1,4 @@
-import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
+import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, POST } from '../catalog/catalog';
 import type { Catalog } from '../engine/types';
 
 /**
@@ -16,7 +16,7 @@ export type Instance = { buildLeftS: number; buildTotalS: number; down: boolean 
 export const MAIN = 'main', STANDBY = 'standby';
 /** The Region a building stands in: the main one unless it says otherwise. */
 export const regionOf = (b: Pick<Building, 'region'>) => b.region ?? MAIN;
-export type Building = { id: string; region?: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number }; instances: Instance[] };
+export type Building = { id: string; region?: string; type: string; params: { size?: string; ttlS?: number; shardKey?: string; limitRps?: number; subscription?: string }; instances: Instance[] };
 /** How traffic spreads over the values of each Shard Key: per key, the share of requests for each value (adds up to 1). */
 export type ShardKeys = Record<string, number[]>;
 /** Each value of a key lives on shard `value mod shards`; a Shard's share is the sum over its values. */
@@ -85,11 +85,20 @@ export type Flow = {
   lag: Record<string, number>;
   /** Share of capacity in use on each Shard (0–1), for each building that is split into several Shards. */
   shards: Record<string, number[]>;
+  /**
+   * Pub/sub (ADR-0009), per Subscription of the level: the posts it has not processed yet after this step (its Backlog), the posts
+   * per second released to it, and the posts per second its serving Workers can take (0 when none serves).
+   */
+  subBacklog: Record<string, number>;
+  subRelease: Record<string, number>;
+  subCapacity: Record<string, number>;
 };
 /** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
 export type Queues = { backlog: Record<string, number>; dt: number;
   /** Writes each Read Replica has not applied yet (ADR-0007), kept from the step before like the Backlog. */
-  unapplied?: Record<string, number> };
+  unapplied?: Record<string, number>;
+  /** The posts each Subscription has not processed yet (ADR-0009), kept from the step before like the Backlog. */
+  subBacklog?: Record<string, number> };
 
 const perInstance = (b: Building, catalog: Catalog) => {
   const spec = catalog[b.type]!;
@@ -120,10 +129,12 @@ const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slic
 /**
  * Sends `rps` requests from the users through the buildings along the links. `mix` is the share of each Request Type
  * (adds up to 1); left out, all requests are one type that every building accepts, as in chapter 1. `queues` holds the
- * Backlog of each queue from the step before; the result holds it after this one.
+ * Backlog of each queue from the step before; the result holds it after this one. `subscriptions` are the systems that must
+ * each process every post (ADR-0009): a post answered anywhere is owed to each of them until a Worker serving it processes it.
  */
 export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
-  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string }): Flow {
+  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string },
+  subscriptions: string[] = []): Flow {
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -141,6 +152,11 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   /** Whether a building is split into several Shards: a shardable one, with more than one instance, in a level that offers Shard Keys. */
   const isSharded = (b: Building) => !!catalog[b.type]?.shardable && !!keys && Object.keys(keys).length > 0 && b.instances.length > 1;
   let answered = 0, rejected = 0;
+  /** Pub/sub (ADR-0009): posts per second answered in this step, and how many of them each Subscription processed. */
+  let published = 0;
+  const processed: Record<string, number> = {};
+  const subRelease: Record<string, number> = {}, subCapacity: Record<string, number> = {};
+  const subBefore = (sub: string) => queues.subBacklog?.[sub] ?? 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
   let lostInBackground = 0;
 
@@ -172,7 +188,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (!finishable.has(key)) {
       finishable.set(key, false); // guards against a circle
       const out = links.filter(l => l.from === id), next = specOf(id)?.emits ?? type;
-      finishable.set(key, accepts(id, type) && (!!specOf(id)?.rejects?.includes(type) || !out.length || out.some(l => canFinish(l.to, next))));
+      finishable.set(key, accepts(id, type) && (!!specOf(id)?.rejects?.includes(type) || !!specOf(id)?.ends?.includes(type) || !out.length || out.some(l => canFinish(l.to, next))));
     }
     return finishable.get(key)!;
   };
@@ -199,7 +215,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   inflow[CLIENT] = rps;
   for (const id of order) {
     const f = inflow[id] ?? 0;
-    const waiting = specOf(id)?.queue ? queues.backlog[id] ?? 0 : 0;
+    // A Topic still has posts to release while any Subscription has a Backlog, even after the users are gone.
+    const waiting = specOf(id)?.queue ? queues.backlog[id] ?? 0 : specOf(id)?.pubSub ? Math.max(0, ...subscriptions.map(subBefore)) : 0;
     if (!f && !waiting) continue;
     if (id === CLIENT) { for (const t of types) send(id, t, rps * mix[t]!); continue; }
     const b = byId.get(id)!, spec = catalog[b.type]!;
@@ -216,11 +233,34 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };
     if (inflowBy[id]?.['write']) writesServed[id] = taken('write');
     for (const c of channels) if (isBackground(c) && inflowBy[id]?.[c]) lostInBackground += inflowBy[id]![c]! - taken(c);
+    if (spec.pubSub) {
+      // A post is answered when it enters the Topic. Every Subscription gets its own copy: the Topic releases to the Workers that
+      // serve it, at their total capacity, and what they cannot take yet waits in that Subscription's Backlog (ADR-0009).
+      answered += ok; published += ok;
+      const type = spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
+      const dt = queues.dt || 1;
+      for (const sub of subscriptions) {
+        const takers = links.filter(l => l.from === id && usable[l.to] && byId.get(l.to)?.params.subscription === sub && canFinish(l.to, type));
+        const capacities = takers.map(l => usable[l.to]! * capacityOf(byId.get(l.to)!, catalog));
+        const rate = capacities.reduce((a, v) => a + v, 0);
+        subCapacity[sub] = rate;
+        subRelease[sub] = Math.min(ok + subBefore(sub) / dt, rate);
+        // Each Worker building of the Subscription gets a share as big as its capacity.
+        takers.forEach((l, k) => {
+          const amount = rate ? (subRelease[sub]! * capacities[k]!) / rate : 0;
+          if (!amount) return;
+          add(edge, linkKey(l), amount); add(inflow, l.to, amount); add((inflowBy[l.to] ??= {}), type + BACKGROUND, amount);
+        });
+      }
+      continue;
+    }
     if (spec.queue) {
       // A job is answered when it enters the queue; the queue then releases Messages to its Workers at their total
       // capacity, and what is not released stays in the Backlog until the next step.
       answered += ok;
-      const type = spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
+      if (inflowBy[id]?.[POST]) published += taken(POST);
+      // The queue carries the type the wave sends it (jobs, or posts in a level that lets the player try a queue for pub/sub).
+      const type = spec.accepts?.find(a => types.includes(a)) ?? spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
       const takers = links.filter(l => l.from === id && usable[l.to] && canFinish(l.to, type));
       const rate = takers.reduce((sum, l) => sum + usable[l.to]! * capacityOf(byId.get(l.to)!, catalog), 0);
       const dt = queues.dt || 1;
@@ -236,6 +276,14 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
       const out = spec.emits ? spec.emits + (isBackground(c) ? BACKGROUND : '') : c;
       // A building that turns this type away answers with a refusal: the request goes no further and is no error.
       if (spec.rejects?.includes(typeOfChannel(c))) { rejected += taken(c); continue; }
+      // A building that finishes this type itself (a Worker sending a notification) answers it here; the work leaves the system.
+      // A post processed by a Worker counts for the Subscription that Worker serves (ADR-0009).
+      if (spec.ends?.includes(typeOfChannel(c))) {
+        if (!isBackground(c)) { answered += taken(c); if (typeOfChannel(c) === POST) published += taken(c); }
+        const sub = b.params.subscription;
+        if (sub) processed[sub] = (processed[sub] ?? 0) + taken(c);
+        continue;
+      }
       // A Client Limit passes at most so many requests per second for each client of a type the level counts clients for.
       let amount = taken(c);
       const type = typeOfChannel(c), count = clients?.[type];
@@ -263,6 +311,11 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     }
   }
 
+  // Each Subscription owes every post answered in this step, and has caught up with those its Workers processed (ADR-0009).
+  // A post a Message Queue gave to another Subscription's Worker never reaches this one, so its Backlog grows.
+  const subBacklog: Record<string, number> = {};
+  for (const sub of subscriptions) subBacklog[sub] = Math.max(0, subBefore(sub) + (published - (processed[sub] ?? 0)) * (queues.dt || 1));
+
   // Replication Lag (ADR-0007): each Read Replica must apply every write the database it follows has served. Writes it cannot
   // apply as fast as they come pile up, and the pile is how far behind it is. Under the pile it is zero; no replica, no lag.
   const unapplied: Record<string, number> = {}, lag: Record<string, number> = {};
@@ -286,12 +339,12 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   };
   const latency: Record<string, number> = {};
   for (const id of [...order].reverse()) {
-    const busy = specOf(id)?.queue ? [] : links.filter(l => l.from === id && (edge[linkKey(l)] ?? 0) > (inflow[id] || 1) * 0.05);
+    const busy = specOf(id)?.queue || specOf(id)?.pubSub ? [] : links.filter(l => l.from === id && (edge[linkKey(l)] ?? 0) > (inflow[id] || 1) * 0.05);
     latency[id] = own(id) + Math.max(0, ...busy.map(l => latency[l.to] ?? 0));
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag,
+    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

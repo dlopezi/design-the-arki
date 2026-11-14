@@ -48,7 +48,9 @@ const rules: Rule[] = [
   { term: 'Replication Lag', use: '"Replication Lag" (not "staleness")', files: isCode, avoid: /staleness/gi, baseline: {} },
   { term: 'Read-your-writes', use: '"Read-your-writes" (not "fresh read" or "strong read")', files: isCode, avoid: /fresh read|strong read/gi, baseline: {} },
   { term: 'Hot Shard', use: '"Hot Shard" (not "hotspot")', files: isCode, avoid: /hotspot|overloaded node/gi, baseline: {} },
-  { term: 'Shard Key', use: '"Shard Key" (not "partition key" or "split key")', files: isCode, avoid: /partition key|split key/gi, baseline: {} },
+  // "Partition Key" is a word of its own since chapter 5: the key of a Topic (ADR-0009).
+  { term: 'Shard Key', use: '"Shard Key" (not "split key")', files: isCode, avoid: /split key/gi, baseline: {} },
+  { term: 'Topic', use: '"Topic" (not "event bus")', files: isCode, avoid: /event bus/gi, baseline: {} },
   { term: 'Object Storage', use: '"Object Storage" (not "file server" or "blob store")', files: isCode, avoid: /file server|blob store/gi, baseline: {} },
   { term: 'Worker', use: '"Worker" (not "job runner")', files: isCode, avoid: /job runner/gi, baseline: {} },
   { term: 'Backlog', use: '"Backlog" (not "queue length")', files: isCode, avoid: /queue length/gi, baseline: {} },

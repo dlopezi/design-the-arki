@@ -59,6 +59,9 @@ const levelSchema = z.object({
     clients: z.record(z.string(), z.number().int().positive()).optional(),
     /** Levels that teach Sharding: the Shard Keys on offer (the first is the default) and how traffic spreads over each one's values. */
     shardKeys: z.record(z.string(), shardKey).refine(keys => Object.keys(keys).length > 0, 'A level that offers Shard Keys needs at least one key').optional(),
+    /** Pub/sub levels (ADR-0009): the systems that must each process every post, in order, with the longest their oldest unprocessed post may wait. */
+    subscriptions: z.record(z.string(), z.object({ maxLagS: z.number().positive() }))
+      .refine(subs => Object.keys(subs).length > 0, 'A level with Subscriptions needs at least one').optional(),
   }),
   /** Where each mode starts: guided is almost complete, normal is partial, hard is broken. God starts empty. */
   startingDesigns: z.object({ guided: designSchema, normal: designSchema, hard: designSchema }),
@@ -133,6 +136,25 @@ const levelSchema = z.object({
   // Downloads are served from Object Storage (ADR-0008): a wave with downloads needs one in the level.
   if ((mix?.download ?? 0) > 0 && !allowed.has('objectStorage')) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has downloads must allow an objectStorage' });
+  }
+  // Pub/sub (ADR-0009): posts are owed to Subscriptions, which Workers serve; a Topic needs Subscriptions to keep posts for.
+  const subs = Object.keys(level.play.subscriptions ?? {});
+  if ((mix?.post ?? 0) > 0 && !subs.length) {
+    ctx.addIssue({ code: 'custom', path: ['play', 'subscriptions'], message: 'A level whose wave has posts must list its Subscriptions' });
+  }
+  if (allowed.has('topic') && !subs.length) {
+    ctx.addIssue({ code: 'custom', path: ['play', 'subscriptions'], message: 'A level that allows a topic must list its Subscriptions (each with a maximum Consumer Lag)' });
+  }
+  if (subs.length && !allowed.has('worker')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level with Subscriptions must allow a worker (it serves them)' });
+  }
+  // In a level with Subscriptions every Worker of a design serves one the level lists.
+  for (const [path, design] of subs.length ? designs : []) {
+    for (const c of design.components) {
+      if (catalog[c.type]?.subscribes && !subs.includes(String(c.params?.subscription))) {
+        ctx.addIssue({ code: 'custom', path: path.split('.'), message: `Worker "${c.id}" must serve one of the level's Subscriptions (${subs.join(', ')})` });
+      }
+    }
   }
   // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
   if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {

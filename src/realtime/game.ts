@@ -36,6 +36,11 @@ export type Play = {
   clients?: Record<string, number>;
   /** Levels that teach Sharding: the Shard Keys on offer and how traffic spreads over the values of each (ADR-0007). The first is the default. */
   shardKeys?: ShardKeys;
+  /**
+   * Pub/sub levels (ADR-0009): the systems that must each process every post (Notifications, Search…), in order, with the longest
+   * their oldest unprocessed post may wait (the Consumer Lag), in seconds.
+   */
+  subscriptions?: Record<string, { maxLagS: number }>;
 };
 export type GameLevel = {
   allowedComponents: string[];
@@ -49,8 +54,8 @@ export type GameLevel = {
 /** What happened, for the message log; the UI turns each kind into text. */
 export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drain' | 'early' | 'incident' | 'regionDown' | 'failover' | 'removed' | 'resized' | 'linked' | 'unlinked' | 'refused' | 'won' | 'lost';
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
-/** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them. */
-export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number };
+/** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them, `consumerLag` each Subscription's lag (s). */
+export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number; consumerLag?: Record<string, number> };
 export type GameState = {
   t: number;
   /** build → wave → (drain, while Messages are still waiting after the wave) → won or lost. */
@@ -74,6 +79,9 @@ export type GameState = {
   /** Writes each Read Replica has not applied yet, and how far behind the primary database that puts it, in seconds (ADR-0007). */
   unapplied: Record<string, number>;
   lag: Record<string, number>;
+  /** Posts each Subscription has not processed yet, and how long the oldest of them has waited, in seconds (ADR-0009). */
+  subBacklog: Record<string, number>;
+  consumerLag: Record<string, number>;
   /** A Region failure and the switch to the standby Region: when it fell, when the DNS will switch (null: nothing will), and whether it has. */
   failover: { downAt: number | null; switchAt: number | null; switched: boolean };
   history: Sample[];
@@ -85,8 +93,16 @@ const buildTime = (type: string, catalog: Catalog) => catalog[type]?.buildS ?? 5
 const ready = (n: number): Instance[] => Array.from({ length: n }, () => ({ buildLeftS: 0, buildTotalS: 0, down: false }));
 const log = (s: GameState, e: Omit<GameEvent, 't'>): GameEvent[] => [...s.events, { t: s.t, ...e }].slice(-40);
 export const waveEnd = (level: GameLevel) => BUILD_PHASE_S + level.play.wave.lengthS;
-/** Messages waiting in all queues. */
-export const totalBacklog = (s: Pick<GameState, 'backlog'>) => Object.values(s.backlog).reduce((a, v) => a + v, 0);
+/** Messages waiting in all queues, and posts no Subscription has processed yet. */
+export const totalBacklog = (s: Pick<GameState, 'backlog'> & Partial<Pick<GameState, 'subBacklog'>>) =>
+  [...Object.values(s.backlog), ...Object.values(s.subBacklog ?? {})].reduce((a, v) => a + v, 0);
+/** The Subscriptions of a level, in order (none outside pub/sub levels). */
+export const subscriptionsOf = (level: Pick<GameLevel, 'play'>) => Object.keys(level.play.subscriptions ?? {});
+/** The Subscription whose Consumer Lag is closest to (or furthest over) its maximum, or null in a level without Subscriptions. */
+export function worstSubscription(s: Pick<GameState, 'consumerLag'>, level: Pick<GameLevel, 'play'>): string | null {
+  const subs = level.play.subscriptions ?? {};
+  return Object.keys(subs).reduce<string | null>((worst, sub) => (worst === null || (s.consumerLag[sub] ?? 0) / subs[sub]!.maxLagS > (s.consumerLag[worst] ?? 0) / subs[worst]!.maxLagS ? sub : worst), null);
+}
 /** The longest any CDN keeps a copy of a file, in seconds: the oldest content a user may be shown. 0 with no CDN. */
 export const contentAge = (s: Pick<GameState, 'buildings'>, catalog: Catalog = defaultCatalog) =>
   Math.max(0, ...s.buildings.flatMap(b => { const spec = catalog[b.type]; return spec?.shortcut && spec.accepts?.includes(DOWNLOAD) ? [Number(b.params.ttlS ?? spec.shortcut.defaultValue)] : []; }));
@@ -97,12 +113,12 @@ export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = d
 export function createGame(level: GameLevel, design: Design): GameState {
   const buildings: Building[] = design.components.map(c => ({
     id: c.id, type: c.type, ...(c.params?.region && c.params.region !== MAIN ? { region: String(c.params.region) } : {}),
-    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}) },
+    params: { ...(c.params?.size ? { size: String(c.params.size) } : {}), ...(c.params?.ttlS !== undefined ? { ttlS: Number(c.params.ttlS) } : {}), ...(c.params?.shardKey ? { shardKey: String(c.params.shardKey) } : {}), ...(c.params?.limitRps !== undefined ? { limitRps: Number(c.params.limitRps) } : {}), ...(c.params?.subscription ? { subscription: String(c.params.subscription) } : {}) },
     instances: ready(Math.max(1, Number(c.params?.instances ?? 1))),
   }));
   const s: GameState = { t: 0, phase: 'build', money: level.play.startMoney, reputation: 100, buildings, links: [], autoLink: true,
     waveTypes: Object.keys(level.play.wave.mix ?? { [DEFAULT_REQUEST_TYPE]: 1 }),
-    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
+    visits: 0, incidentDone: false, flow: null, backlog: {}, queueAge: {}, unapplied: {}, lag: {}, subBacklog: {}, consumerLag: {}, failover: { downAt: null, switchAt: null, switched: false }, history: [], events: [], nextId: design.components.length + 1 };
   // Keep the design's connections, in order, skipping any the rules refuse (a broken design may hold one).
   return design.connections.reduce((acc, [from, to]) => (linkProblem(acc, from, to) ? acc : { ...acc, links: [...acc.links, { from, to }] }), s);
 }
@@ -124,6 +140,8 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (to === CLIENT) return 'intoUsers';
   // Jobs reach a queue through an API, never straight from the users.
   if (from === CLIENT && catalog[typeOf(s, to) ?? '']?.queue) return 'queueNotPublic';
+  // Posts reach a Topic through an API too: the users never write to it straight (ADR-0009).
+  if (from === CLIENT && catalog[typeOf(s, to) ?? '']?.pubSub) return 'topicNotPublic';
   // The users reach Object Storage (uploads) and the CDN (downloads) straight, only for the files they carry: with none in the wave there is nothing to send.
   const direct = catalog[typeOf(s, to) ?? ''];
   if (from === CLIENT && direct?.acceptsClients && direct.accepts && !direct.accepts.some(type => s.waveTypes.includes(type))) return direct.accepts.includes(UPLOAD) ? 'uploadsOnly' : 'downloadsOnly';
@@ -172,9 +190,11 @@ function autoLink(s: GameState, b: Building): GameState {
   const dns = anyOfType('dns')[0];
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0], gateway = ofType('apiGateway')[0];
+  const queue = ofType('messageQueue')[0], topic = ofType('topic')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0], gateway = ofType('apiGateway')[0];
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
-  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
+  const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'topic', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
+  // A Worker that serves a Subscription finishes the posts itself (their work leaves the system), so it needs no way to the database.
+  const writesToDatabase = (w: Building) => !w.params.subscription;
   let next = s;
   // The API Gateway is the one door: when there is one, the users reach the load balancer or the app servers through it.
   if (b.type === 'dns') {
@@ -212,6 +232,7 @@ function autoLink(s: GameState, b: Building): GameState {
     const data = cache ?? db;
     if (data) next = addLink(next, b.id, data.id);
     if (queue) next = addLink(next, b.id, queue.id);
+    if (topic) next = addLink(next, b.id, topic.id);
     for (const r of readReplicas) next = addLink(next, b.id, r.id);
     if (storage) next = addLink(next, b.id, storage.id);
   } else if (b.type === 'cache') {
@@ -222,7 +243,7 @@ function autoLink(s: GameState, b: Building): GameState {
   } else if (b.type === 'database') {
     if (cache && !outOf(cache.id)) next = addLink(next, cache.id, b.id);
     else for (const a of apps) if (!sendsOn(next, a.id)) next = addLink(next, a.id, b.id);
-    for (const w of workers) if (!outOf(w.id)) next = addLink(next, w.id, b.id);
+    for (const w of workers) if (!outOf(w.id) && writesToDatabase(w)) next = addLink(next, w.id, b.id);
     for (const r of anyOfType('readReplica')) if (!outOf(r.id)) next = addLink(next, r.id, b.id);
   } else if (b.type === 'readReplica') {
     // Reads come from the app servers; the link to the database is the replication.
@@ -242,9 +263,13 @@ function autoLink(s: GameState, b: Building): GameState {
   } else if (b.type === 'messageQueue') {
     for (const a of apps) next = addLink(next, a.id, b.id);
     for (const w of workers) next = addLink(next, b.id, w.id);
+  } else if (b.type === 'topic') {
+    for (const a of apps) next = addLink(next, a.id, b.id);
+    for (const w of workers) if (w.params.subscription) next = addLink(next, b.id, w.id);
   } else if (b.type === 'worker') {
     if (queue) next = addLink(next, queue.id, b.id);
-    if (db) next = addLink(next, b.id, db.id);
+    if (topic && b.params.subscription) next = addLink(next, topic.id, b.id);
+    if (db && writesToDatabase(b)) next = addLink(next, b.id, db.id);
   }
   return next;
 }
@@ -261,10 +286,21 @@ export const setAutoLink = (s: GameState, on: boolean): GameState => ({ ...s, au
 /** The building of a type in a Region (the DNS, which belongs to none, is one for the whole design). */
 const existingIn = (s: Pick<GameState, 'buildings'>, type: string, region: string, catalog: Catalog) =>
   s.buildings.find(b => b.type === type && (catalog[type]?.global || regionOf(b) === region));
-export function buildProblem(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN): string | null {
+/** The first Subscription of the level that no building serves yet, or null when every one has its Workers. */
+const freeSubscription = (s: Pick<GameState, 'buildings'>, level: GameLevel) =>
+  subscriptionsOf(level).find(sub => !s.buildings.some(b => b.params.subscription === sub)) ?? null;
+/** In a level with Subscriptions, each building of a subscribing type serves one: building one makes a new building, not an instance. */
+const onePerSubscription = (type: string, level: GameLevel, catalog: Catalog) => !!catalog[type]?.subscribes && subscriptionsOf(level).length > 0;
+/**
+ * Why the player cannot build this type now, or null. `target` is the building to add an instance to (from its inspector);
+ * left out, the instance goes to the building of that type in the Region, or makes the first one.
+ */
+export function buildProblem(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN, target?: string): string | null {
   if (s.phase === 'won' || s.phase === 'lost') return 'over';
   if (!level.allowedComponents.includes(type)) return 'notInLevel';
-  const existing = existingIn(s, type, region, catalog);
+  const existing = target ? s.buildings.find(b => b.id === target && b.type === type) : onePerSubscription(type, level, catalog) ? undefined : existingIn(s, type, region, catalog);
+  // Every Subscription already has its Worker: more capacity is an instance of one of them, added from its inspector.
+  if (!existing && onePerSubscription(type, level, catalog) && !freeSubscription(s, level)) return 'allSubscribed';
   // A database can have several instances only as Shards, in a level that offers Shard Keys.
   if (existing && !catalog[type]!.scalesOut && !(catalog[type]!.shardable && level.play.shardKeys)) return 'built';
   const max = level.componentOptions[type]?.maxInstances ?? 8;
@@ -272,18 +308,22 @@ export function buildProblem(s: GameState, type: string, level: GameLevel, catal
   if (s.money < instancePrice(existing ?? { type, params: {} }, catalog)) return 'money';
   return null;
 }
-/** Builds one more of a type: a new building, or one more instance of an app server that already exists. */
-export function build(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN): GameState {
-  if (buildProblem(s, type, level, catalog, region)) return s;
+/**
+ * Builds one more of a type: a new building, or one more instance of an app server that already exists. In a level with
+ * Subscriptions a new Worker serves the first Subscription that has none; `target` adds an instance to a given building.
+ */
+export function build(s: GameState, type: string, level: GameLevel, catalog: Catalog = defaultCatalog, region: string = MAIN, target?: string): GameState {
+  if (buildProblem(s, type, level, catalog, region, target)) return s;
   const time = buildTime(type, catalog);
   const instance: Instance = { buildLeftS: time, buildTotalS: time, down: false };
-  const existing = existingIn(s, type, region, catalog);
+  const existing = target ? s.buildings.find(b => b.id === target) : onePerSubscription(type, level, catalog) ? undefined : existingIn(s, type, region, catalog);
   if (existing) {
     return { ...s, money: s.money - instancePrice(existing, catalog),
       buildings: s.buildings.map(b => (b === existing ? { ...b, instances: [...b.instances, instance] } : b)),
       events: log(s, { kind: 'building', type, id: existing.id }) };
   }
-  const b: Building = { id: `${type}-${s.nextId}`, type, params: {}, ...(region !== MAIN && !catalog[type]?.global ? { region } : {}), instances: [instance] };
+  const sub = onePerSubscription(type, level, catalog) ? freeSubscription(s, level) : null;
+  const b: Building = { id: `${type}-${s.nextId}`, type, params: sub ? { subscription: sub } : {}, ...(region !== MAIN && !catalog[type]?.global ? { region } : {}), instances: [instance] };
   const next: GameState = { ...s, money: s.money - instancePrice(b, catalog), nextId: s.nextId + 1, buildings: [...s.buildings, b],
     events: log(s, { kind: 'building', type, id: b.id }) };
   return s.autoLink ? autoLink(next, b) : next;
@@ -293,6 +333,8 @@ export function demolish(s: GameState, id: string, catalog: Catalog = defaultCat
   const b = s.buildings.find(x => x.id === id); if (!b) return s;
   // The Backlog is never dropped: a queue that still holds Messages stays until the Workers have taken them.
   if (catalog[b.type]?.queue && (s.backlog[id] ?? 0) >= EMPTY_BACKLOG) return { ...s, events: log(s, { kind: 'refused', reason: 'queueHoldsMessages' }) };
+  // Nor are the posts a Topic keeps for its Subscriptions.
+  if (catalog[b.type]?.pubSub && Object.values(s.subBacklog).some(v => v >= EMPTY_BACKLOG)) return { ...s, events: log(s, { kind: 'refused', reason: 'topicHoldsMessages' }) };
   const back = Math.round(instancePrice(b, catalog) * REFUND);
   // The instance that goes is the least useful one: a fallen one, then one still being built, then the last.
   const order = [b.instances.findIndex(i => i.down), b.instances.findIndex(i => i.buildLeftS > 0), b.instances.length - 1];
@@ -329,6 +371,15 @@ export function setShardKey(s: GameState, id: string, key: string, level: GameLe
   if (!level.play.shardKeys?.[key] || !s.buildings.some(b => b.id === id)) return s;
   if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'shardKeyLocked' }) };
   return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, shardKey: key } } : b)) };
+}
+/**
+ * Picks the Subscription a Worker serves (its consumer group). Only in the build phase: a group that changes its name in real life
+ * starts again from a new place in the Topic, so once the wave has started it is locked (ADR-0009).
+ */
+export function setSubscription(s: GameState, id: string, subscription: string, level: GameLevel): GameState {
+  if (!level.play.subscriptions?.[subscription] || !s.buildings.some(b => b.id === id && defaultCatalog[b.type]?.subscribes)) return s;
+  if (s.phase !== 'build') return { ...s, events: log(s, { kind: 'refused', reason: 'subscriptionLocked' }) };
+  return { ...s, buildings: s.buildings.map(b => (b.id === id ? { ...b, params: { ...b.params, subscription } } : b)) };
 }
 /** Changes the Client Limit of an API Gateway, in requests per second for each client: free and immediate. */
 export const setClientLimit = (s: GameState, id: string, limitRps: number): GameState =>
@@ -391,7 +442,8 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   }
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
-  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN });
+  const subs = subscriptionsOf(level);
+  const flow = solve(s.buildings, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs);
   s.unapplied = flow.unapplied;
   s.lag = flow.lag;
   s.flow = flow;
@@ -400,6 +452,13 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
     const rate = flow.releaseCapacity[id] ?? 0;
     return [id, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.queueAge[id] ?? 0) + dt];
   }));
+  // The Consumer Lag of each Subscription: its Backlog over the rate its Workers take posts, or growing with the clock when none takes them.
+  s.subBacklog = flow.subBacklog;
+  s.consumerLag = Object.fromEntries(subs.map(sub => {
+    const waiting = flow.subBacklog[sub] ?? 0, rate = flow.subCapacity[sub] ?? 0;
+    return [sub, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.consumerLag[sub] ?? 0) + dt];
+  }));
+  const consumersBehind = subs.some(sub => (s.consumerLag[sub] ?? 0) > level.play.subscriptions![sub]!.maxLagS);
   const maxAge = level.requirements.maxQueueAgeS;
   const tooOld = maxAge !== undefined && Object.values(s.queueAge).some(age => age > maxAge);
   const maxLag = level.requirements.maxReplicationLagS;
@@ -410,10 +469,10 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
   if (rps || s.phase === 'drain') {
-    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || lagTooHigh || tooStale ? REPUTATION.slow : REPUTATION.fine;
+    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || lagTooHigh || tooStale || consumersBehind ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
-  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s), lag: Math.max(0, ...Object.values(s.lag)) }];
+  if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s), lag: Math.max(0, ...Object.values(s.lag)), ...(subs.length ? { consumerLag: { ...s.consumerLag } } : {}) }];
   // End.
   if ((s.phase === 'wave' || s.phase === 'drain') && s.reputation <= 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'reputation' }); }
   else if (s.money < 0) { s.phase = 'lost'; events.push({ kind: 'lost', reason: 'money' }); }

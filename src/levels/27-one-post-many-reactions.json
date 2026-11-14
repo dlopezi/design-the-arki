@@ -1,0 +1,144 @@
+{
+  "id": "27-one-post-many-reactions",
+  "chapter": "Events",
+  "title": "One post, many reactions",
+  "brief": "Your new social network is live. When someone posts, three systems must react: Notifications tells their followers, Search indexes the post, and Analytics counts it. Three posts arrive each second, and each system needs every one of them. A Message Queue gives each Message to one Worker only, so each system would miss most posts. A Topic keeps a copy of every post for each Subscription, and each Subscription has its own Worker.",
+  "durationS": 45,
+  "traffic": [
+    {
+      "fromS": 0,
+      "toS": 45,
+      "rps": 15
+    }
+  ],
+  "requirements": {
+    "p95Ms": 300,
+    "maxErrorRate": 0.01,
+    "maxQueueAgeS": 30
+  },
+  "budget": 400,
+  "starCostThresholds": [
+    300,
+    250
+  ],
+  "allowedComponents": [
+    "appServer",
+    "database",
+    "messageQueue",
+    "topic",
+    "worker"
+  ],
+  "componentOptions": {
+    "appServer": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 1
+    },
+    "database": {
+      "sizes": [
+        "small"
+      ]
+    },
+    "worker": {
+      "sizes": [
+        "medium"
+      ],
+      "maxInstances": 2
+    }
+  },
+  "guidedHint": "The Topic and one Worker for each Subscription are ready, but no post reaches the Topic. Connect the app server to the Topic: every Subscription then gets its own copy of each post.",
+  "play": {
+    "startMoney": 400,
+    "wave": {
+      "rps": 15,
+      "lengthS": 45,
+      "mix": {
+        "post": 0.2,
+        "readFeed": 0.8
+      }
+    },
+    "starMoney": [
+      100,
+      180
+    ],
+    "subscriptions": {
+      "notifications": {
+        "maxLagS": 10
+      },
+      "search": {
+        "maxLagS": 20
+      },
+      "analytics": {
+        "maxLagS": 60
+      }
+    }
+  },
+  "startingDesigns": {
+    "guided": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "topic", "type": "topic" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } },
+        { "id": "search", "type": "worker", "params": { "subscription": "search" } },
+        { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["topic", "notify"],
+        ["topic", "search"],
+        ["topic", "stats"]
+      ]
+    },
+    "normal": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "queue", "type": "messageQueue" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } },
+        { "id": "search", "type": "worker", "params": { "subscription": "search" } },
+        { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["api", "queue"],
+        ["queue", "notify"],
+        ["queue", "search"],
+        ["queue", "stats"]
+      ]
+    },
+    "hard": {
+      "components": [
+        { "id": "api", "type": "appServer" },
+        { "id": "db", "type": "database" },
+        { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } }
+      ],
+      "connections": [
+        ["client", "api"],
+        ["api", "db"],
+        ["api", "notify"]
+      ]
+    }
+  },
+  "referenceDesign": {
+    "components": [
+      { "id": "api", "type": "appServer" },
+      { "id": "db", "type": "database" },
+      { "id": "topic", "type": "topic" },
+      { "id": "notify", "type": "worker", "params": { "subscription": "notifications" } },
+      { "id": "search", "type": "worker", "params": { "subscription": "search" } },
+      { "id": "stats", "type": "worker", "params": { "subscription": "analytics" } }
+    ],
+    "connections": [
+      ["client", "api"],
+      ["api", "db"],
+      ["api", "topic"],
+      ["topic", "notify"],
+      ["topic", "search"],
+      ["topic", "stats"]
+    ]
+  }
+}

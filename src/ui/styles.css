@@ -901,6 +901,14 @@ body { background: radial-gradient(1100px 600px at 50% 0%, #0c1c1e 0%, var(--bg)
 .play-load { width: 70px; height: 5px; background: #060b0c; border: 1px solid #1d2c2f; margin-top: 3px; }
 .play-load span { display: block; height: 100%; background: var(--ok); }
 .play-age-gauge { width: 96px; }
+/* A Worker that serves a Subscription (ADR-0009): its Consumer Lag under its instances, and where its work goes. */
+.play-container .play-sub-name { color: var(--fg); }
+.play-sub-lag { display: grid; justify-items: center; gap: 2px; font: 700 10.5px var(--mono); color: var(--muted); }
+.play-sub-lag .bad { color: var(--bad); }
+.play-exit { font: 10.5px var(--mono); color: var(--muted); border: 1px dashed #2a3d41; padding: 1px 6px; }
+.play-chart.play-chart-subs { grid-template-columns: 70px 1fr; }
+.play-chart-subs .play-sub-legend { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; }
+.play-chart-subs .play-sub-legend .bad { text-decoration: underline; }
 .play-load.medium span { background: var(--warn); } .play-load.high span { background: var(--bad); }
 .play-progress { position: absolute; left: 10px; right: 10px; top: 30px; height: 6px; background: #060b0c; border: 1px solid var(--warn); }
 .play-progress span { display: block; height: 100%; background: var(--warn); }
