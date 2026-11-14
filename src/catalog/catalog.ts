@@ -9,7 +9,9 @@ export const DEFAULT_REQUEST_TYPE = 'watch';
 export const UPLOAD = 'upload';
 /** A read that must show the user's own latest change: only the primary database can answer it (ADR-0007). */
 export const READ_YOUR_WRITES = 'readYourWrites';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD];
+/** A video file a user downloads: the CDN answers a share of them, and Object Storage serves the rest, with a limit on how many (ADR-0008). */
+export const DOWNLOAD = 'download';
+export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 
@@ -84,7 +86,17 @@ export const catalog: Catalog = {
   // levels. Users may connect to it straight to upload files (the pre-signed URL pattern); it takes uploads only.
   objectStorage: {
     primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 30, endsRequests: true, acceptsClients: true,
-    accepts: [UPLOAD], prefers: [UPLOAD], buildS: 4,
+    accepts: [UPLOAD, DOWNLOAD], prefers: [UPLOAD], buildS: 4,
+    // Sending a big file out is a lot of work: a viral video passes its limit (about 200 downloads a second), which a CDN in front prevents (ADR-0008).
+    effort: { [DOWNLOAD]: 5000 },
     presentation: { zone: 'data', technology: 'Amazon S3', hideCapacity: true },
+  },
+  // Chapter 4 (Edge). Sits in front of Object Storage: a share of downloads is answered at the edge (the hit share grows with
+  // the TTL, as in the cache), and the rest goes on to the origin. Users connect straight to it, for downloads only.
+  cdn: {
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 40, endsRequests: false, acceptsClients: true,
+    accepts: [DOWNLOAD], prefers: [DOWNLOAD], buildS: 4,
+    shortcut: { param: 'ttlS', defaultValue: 60, halfAt: 20, max: 0.95 },
+    presentation: { zone: 'edge', technology: 'Amazon CloudFront', hideCapacity: true },
   },
 };

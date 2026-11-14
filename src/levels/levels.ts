@@ -102,6 +102,10 @@ const levelSchema = z.object({
       }
     }
   }
+  // Downloads are served from Object Storage (ADR-0008): a wave with downloads needs one in the level.
+  if ((mix?.download ?? 0) > 0 && !allowed.has('objectStorage')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has downloads must allow an objectStorage' });
+  }
   // Without a maximum Queue Age a Backlog nobody empties would keep the Drain Phase going for ever.
   if (allowed.has('messageQueue') && level.requirements.maxQueueAgeS === undefined) {
     ctx.addIssue({ code: 'custom', path: ['requirements', 'maxQueueAgeS'], message: 'A level that allows a messageQueue must set a maximum Queue Age' });

@@ -1,4 +1,4 @@
-import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE } from '../catalog/catalog';
+import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, UPLOAD } from '../catalog/catalog';
 import type { Catalog, Design } from '../engine/types';
 import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
@@ -116,9 +116,9 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (to === CLIENT) return 'intoUsers';
   // Jobs reach a queue through an API, never straight from the users.
   if (from === CLIENT && catalog[typeOf(s, to) ?? '']?.queue) return 'queueNotPublic';
-  // The users reach Object Storage straight, for uploads only: with no uploads in the wave there is nothing to send it.
+  // The users reach Object Storage (uploads) and the CDN (downloads) straight, only for the files they carry: with none in the wave there is nothing to send.
   const direct = catalog[typeOf(s, to) ?? ''];
-  if (from === CLIENT && direct?.acceptsClients && direct.accepts && !direct.accepts.some(type => s.waveTypes.includes(type))) return 'uploadsOnly';
+  if (from === CLIENT && direct?.acceptsClients && direct.accepts && !direct.accepts.some(type => s.waveTypes.includes(type))) return direct.accepts.includes(UPLOAD) ? 'uploadsOnly' : 'downloadsOnly';
   if (from !== CLIENT && !typeOf(s, from)) return 'missing';
   if (!typeOf(s, to)) return 'missing';
   const spec = catalog[typeOf(s, from) ?? ''];
@@ -128,7 +128,7 @@ export function linkProblem(s: GameState, from: string, to: string, catalog: Cat
   if (reaches(s.links, to, from)) return 'circle';
   return null;
 }
-/** Whether the users may connect to this building for only some Request Types (Object Storage, for uploads), not as the way in. */
+/** Whether the users may connect to this building for only some Request Types (Object Storage for uploads, the CDN for downloads), not as the way in. */
 const isDirectEntrance = (s: GameState, id: string) => {
   const spec = defaultCatalog[typeOf(s, id) ?? ''];
   return !!spec?.acceptsClients && !!spec.accepts;
@@ -137,8 +137,9 @@ const hasGeneralEntrance = (s: GameState) => s.links.some(l => l.from === CLIENT
 function addLink(s: GameState, from: string, to: string): GameState {
   if (linkProblem(s, from, to)) return s;
   // The users reach the system through one general entrance (a new one replaces the old), and may also have a direct one
-  // to a building that takes only some Request Types (Object Storage, for uploads).
-  const links = from === CLIENT ? s.links.filter(l => l.from !== CLIENT || isDirectEntrance(s, l.to) !== isDirectEntrance(s, to)) : s.links;
+  // to each building that takes only some Request Types (Object Storage for uploads, the CDN for downloads).
+  const sameEntrance = (a: string, b: string) => isDirectEntrance(s, a) === isDirectEntrance(s, b) && (!isDirectEntrance(s, a) || typeOf(s, a) === typeOf(s, b));
+  const links = from === CLIENT ? s.links.filter(l => l.from !== CLIENT || !sameEntrance(l.to, to)) : s.links;
   return { ...s, links: [...links, { from, to }] };
 }
 /** The player connects two buildings (or the users to one). */
@@ -156,7 +157,7 @@ function autoLink(s: GameState, b: Building): GameState {
   const ofType = (type: string) => s.buildings.filter(x => x.type === type && x.id !== b.id);
   const outOf = (id: string) => s.links.some(l => l.from === id);
   const lb = ofType('loadBalancer')[0], apps = ofType('appServer'), cache = ofType('cache')[0], db = ofType('database')[0];
-  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0];
+  const queue = ofType('messageQueue')[0], workers = ofType('worker'), readReplicas = ofType('readReplica'), storage = ofType('objectStorage')[0], cdn = ofType('cdn')[0];
   // An app server that already sends to a queue, a Worker or a Read Replica still needs its way to the data (the primary).
   const sendsOn = (st: GameState, id: string) => st.links.some(l => l.from === id && !['messageQueue', 'worker', 'readReplica', 'objectStorage'].includes(typeOf(st, l.to) ?? ''));
   let next = s;
@@ -188,6 +189,12 @@ function autoLink(s: GameState, b: Building): GameState {
   } else if (b.type === 'objectStorage') {
     // Files reach it through the app servers by default; connecting the users straight to it is the player's move.
     for (const a of apps) next = addLink(next, a.id, b.id);
+    // A CDN already in place goes in front of it.
+    if (cdn) next = addLink(next, cdn.id, b.id);
+  } else if (b.type === 'cdn') {
+    // The users download through the CDN, and what it does not answer goes to Object Storage.
+    next = addLink(next, CLIENT, b.id);
+    if (storage) next = addLink(next, b.id, storage.id);
   } else if (b.type === 'messageQueue') {
     for (const a of apps) next = addLink(next, a.id, b.id);
     for (const w of workers) next = addLink(next, b.id, w.id);

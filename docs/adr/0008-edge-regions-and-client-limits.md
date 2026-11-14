@@ -14,3 +14,8 @@ The **API Gateway** is the entry for API requests. An *invalid* Request Type (no
 - Users may connect to the CDN and the API Gateway; the connection rules must send each Request Type to its own entry.
 - Level tests prove each Reference Design wins and each starting design, left unchanged, loses (ADR-0005), including a design with a TTL too long for the outage.
 - Geography, active-active Regions, cache purge and WAF are not modelled; the Manual mentions them.
+
+## As built
+
+- **CDN and download (level 21)**: `download` is a Request Type. The CDN is a station with the cache's shortcut (`ttlS`, default 60 s: 75 % hits, at most 95 %) that accepts and prefers downloads, so the users' downloads go to it and not through the load balancer. Users connect to it straight, only in a level with downloads (`downloadsOnly` refusal), as with Object Storage and uploads; a direct entrance replaces only another entrance of the same kind.
+- **Object Storage limit**: it accepts downloads too, and a download weighs 5000 in its `effort` (like an upload on an app server). Its capacity stays 1 000 000 and hidden, so it can send out about 200 downloads a second; uploads weigh 1, so chapter 3 levels are far under it.
