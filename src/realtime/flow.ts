@@ -56,6 +56,8 @@ export type Flow = {
   rps: number;
   /** Requests answered per second (by a cache hit, a component that ends requests, or a queue that takes a job). */
   answered: number;
+  /** Requests per second turned away on purpose (an invalid request refused by the gateway or the app server): not answered, and not errors. */
+  rejected: number;
   /** Share of requests not answered, 0–1. */
   errors: number;
   /** Estimated 95th percentile latency, in ms. */
@@ -132,7 +134,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   };
   /** Whether a building is split into several Shards: a shardable one, with more than one instance, in a level that offers Shard Keys. */
   const isSharded = (b: Building) => !!catalog[b.type]?.shardable && !!keys && Object.keys(keys).length > 0 && b.instances.length > 1;
-  let answered = 0;
+  let answered = 0, rejected = 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
   let lostInBackground = 0;
 
@@ -164,7 +166,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (!finishable.has(key)) {
       finishable.set(key, false); // guards against a circle
       const out = links.filter(l => l.from === id), next = specOf(id)?.emits ?? type;
-      finishable.set(key, accepts(id, type) && (!out.length || out.some(l => canFinish(l.to, next))));
+      finishable.set(key, accepts(id, type) && (!!specOf(id)?.rejects?.includes(type) || !out.length || out.some(l => canFinish(l.to, next))));
     }
     return finishable.get(key)!;
   };
@@ -224,6 +226,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     for (const c of channels) {
       if (!inflowBy[id]?.[c]) continue;
       const out = spec.emits ? spec.emits + (isBackground(c) ? BACKGROUND : '') : c;
+      // A building that turns this type away answers with a refusal: the request goes no further and is no error.
+      if (spec.rejects?.includes(typeOfChannel(c))) { rejected += taken(c); continue; }
       if (spec.shortcut) { if (!isBackground(c)) answered += taken(c) * hit; send(id, out, taken(c) - taken(c) * hit); }
       else if (spec.endsRequests) { if (!isBackground(c)) answered += taken(c); }
       else send(id, out, taken(c));
@@ -269,7 +273,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag,
+    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag,
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };

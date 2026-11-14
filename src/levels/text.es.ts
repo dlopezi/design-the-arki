@@ -133,4 +133,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Se editó el vídeo y los usuarios deben ver la versión nueva pronto: ninguna CDN puede guardar una copia más de 50 segundos. Pero llegan 510 descargas y 90 visitas a la página por segundo, y Object Storage solo puede enviar un número limitado de archivos. El TTL de la CDN es cuánto tiempo guarda una copia. Un TTL largo responde más descargas, pero muestra contenido más viejo. Un TTL corto muestra contenido fresco, pero deja pasar más descargas hasta Object Storage. Elige un TTL que cumpla las dos cosas: selecciona la CDN y cambia su TTL.',
     guidedHint: 'Un TTL más largo responde más descargas en el borde, pero muestra contenido más viejo. Object Storage necesita que la CDN responda cerca del 60 % de las descargas, y eso pide un TTL de unos 32 s o más. Los usuarios no deben ver contenido de más de 50 s. Elige un TTL entre los dos, por ejemplo 40 s.',
   },
+  '23-one-door': {
+    title: 'Una sola puerta',
+    brief: 'Un bot está escaneando tu API: llegan 360 peticiones inválidas (sin token, basura) por segundo, junto a 240 visitas reales a la página. Un app server tiene que leer cada petición antes de poder rechazarla, así que la basura gasta la capacidad que necesitan tus usuarios reales, y tus dos app servers no dan más. Pon un API Gateway en la puerta. Revisa cada petición primero y rechaza las inválidas con un coste mínimo, así los app servers solo ven peticiones válidas. Conecta a los usuarios al API Gateway, y el API Gateway al load balancer.',
+    guidedHint: 'Un app server tiene que leer una petición inválida antes de poder rechazarla, así que la basura gasta la capacidad que necesitan los usuarios reales. Conecta a los usuarios al API Gateway: rechaza primero las peticiones inválidas, con un coste mínimo, y pasa solo las válidas al load balancer.',
+  },
 };

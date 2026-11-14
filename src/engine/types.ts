@@ -60,6 +60,11 @@ export type StationPrimitive = {
    * uses, in normal requests (an upload on an app server).
    */
   effort?: Record<string, number>;
+  /**
+   * Request Types this building turns away itself (real-time play): it answers them with a refusal, such as 401 for a request
+   * with no token. They are neither answered nor errors, and they go no further, but they use some of its capacity.
+   */
+  rejects?: string[];
   /** Every serving instance works even when the building is reached directly, because the caller spreads its requests over them. */
   balanced?: boolean;
   /** Share of one instance's capacity that goes to applying the writes copied from the building it follows (Replication Lag). */

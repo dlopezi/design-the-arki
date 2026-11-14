@@ -104,6 +104,10 @@ const levelSchema = z.object({
       }
     }
   }
+  // Invalid requests are turned away at the gateway (ADR-0008): a wave with them needs an apiGateway in the level.
+  if ((mix?.invalid ?? 0) > 0 && !allowed.has('apiGateway')) {
+    ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has invalid requests must allow an apiGateway' });
+  }
   // A freshness limit is about the copies a CDN keeps: without one there is nothing to limit.
   if (level.requirements.maxStaleS !== undefined && !allowed.has('cdn')) {
     ctx.addIssue({ code: 'custom', path: ['requirements', 'maxStaleS'], message: 'A level with a freshness limit must allow a cdn' });

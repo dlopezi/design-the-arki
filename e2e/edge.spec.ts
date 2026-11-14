@@ -66,3 +66,17 @@ test('level 22: raising the TTL of a CDN that is too short, to a value under the
   const end = await playWave(page);
   await expect(end).toContainText('Base defended');
 });
+
+test('level 23: without an API Gateway the junk fills the app servers, and the hint says to put an API Gateway at the door', async ({ page }) => {
+  await openLevel(page, '23-one-door', 'normal');
+  const end = await playWave(page);
+  await expect(end).toContainText('Base lost');
+  await expect(end).toContainText('API Gateway');
+});
+
+test('level 23: building an API Gateway takes the users and passes the valid requests on, and the base lasts the wave', async ({ page }) => {
+  await openLevel(page, '23-one-door', 'normal');
+  await buildKeys(page, '1'); // the API Gateway is the first card of this level
+  const end = await playWave(page);
+  await expect(end).toContainText('Base defended');
+});

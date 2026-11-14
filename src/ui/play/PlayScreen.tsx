@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { catalog, DOWNLOAD, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
+import { catalog, DOWNLOAD, INVALID, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
@@ -42,7 +42,7 @@ type Drag = { kind: 'pan'; x: number; y: number; vx: number; vy: number; moved?:
 const WORLD = { w: 1700, h: 900 };
 const ZONES = ['edge', 'application', 'data'] as const;
 /** The order buildings stand in a zone: the way a request travels. */
-const ORDER = ['cdn', 'loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database', 'objectStorage'];
+const ORDER = ['cdn', 'apiGateway', 'loadBalancer', 'appServer', 'messageQueue', 'worker', 'cache', 'readReplica', 'database', 'objectStorage'];
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 const nameOf = (g: GameState, id?: string) => (!id ? '' : id === CLIENT ? t.rt.internet : buildingName(g.buildings.find(b => b.id === id)?.type ?? id));
 const GLOBE = (
@@ -327,6 +327,9 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       ?? Object.entries(flow?.load ?? {}).sort((a, b) => b[1] - a[1])[0];
     const type = worst ? typeOfId(worst[0]) : undefined;
     if (!type) return null;
+    // Invalid requests that no API Gateway turns away first all reach the app servers.
+    const hasInvalid = (level.play.wave.mix?.[INVALID] ?? 0) > 0;
+    if (hasInvalid && level.allowedComponents.includes('apiGateway') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'apiGateway')) return t.gatewayHint;
     // Downloads that do not go through a CDN all land on Object Storage, which has a limit.
     const hasDownloads = (level.play.wave.mix?.[DOWNLOAD] ?? 0) > 0;
     if (hasDownloads && level.allowedComponents.includes('cdn') && !game.links.some(l => l.from === CLIENT && typeOfId(l.to) === 'cdn')) return t.cdnHint;
@@ -588,6 +591,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
             <dt>{t.rt.fixedIncome}</dt><dd>+${PASSIVE_INCOME.toFixed(1)}/s</dd>
             <dt>{t.rt.visitsIncome}</dt><dd>+${(((flow?.answered ?? 0) / 100) * PER_100_VISITS).toFixed(1)}/s</dd>
             <dt>{t.rt.upkeep}</dt><dd>−${upkeepPerS(game).toFixed(1)}/s</dd>
+            {(flow?.rejected ?? 0) >= 0.5 && <><dt>{t.rt.rejected}</dt><dd>{Math.round(flow!.rejected)}/s</dd></>}
             {hasQueue && <>
               <dt>{t.rt.backlog}</dt><dd>{t.rt.messages(Math.round(totalBacklog(game)))}</dd>
             </>}

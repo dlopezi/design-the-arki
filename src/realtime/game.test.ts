@@ -771,3 +771,63 @@ describe('edge: a freshness limit caps how long a CDN may keep a copy', () => {
     expect(s.flow!.errors).toBeGreaterThan(0.01);
   });
 });
+
+describe('edge: the API Gateway turns invalid requests away before the app servers see them', () => {
+  const gatewayLevel: GameLevel = {
+    allowedComponents: ['apiGateway', 'loadBalancer', 'appServer', 'database'],
+    componentOptions: { appServer: { maxInstances: 2 } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01 },
+    play: { startMoney: 800, wave: { rps: 600, lengthS: 30, mix: { watch: 0.4, invalid: 0.6 } }, starMoney: [100, 200] },
+  };
+  const parts = [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' }];
+  const open: Design = { components: parts, connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db']] };
+  const doored: Design = { components: [...parts, { id: 'gw', type: 'apiGateway' }], connections: [['client', 'gw'], ['gw', 'lb'], ['lb', 'api'], ['api', 'db']] };
+  const play = (d: Design, mix = gatewayLevel.play.wave.mix, seconds = 5, rps = 600) => {
+    const l = { ...gatewayLevel, play: { ...gatewayLevel.play, wave: { ...gatewayLevel.play.wave, mix, rps } } };
+    return run(callNow(createGame(l, d)), seconds, l);
+  };
+
+  it('without a gateway the app servers read every invalid request first, and the junk uses the capacity real users need', () => {
+    const s = play(open);
+    expect(s.flow!.inflow.api).toBeCloseTo(600);
+    expect(s.flow!.errors).toBeGreaterThan(0.1);
+  });
+
+  it('with a gateway the app servers see only the valid requests', () => {
+    const s = play(doored);
+    expect(s.flow!.inflow.api).toBeCloseTo(240);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('a request turned away is neither answered nor an error, and the gateway counts it', () => {
+    const s = play(doored);
+    expect(s.flow!.rejected).toBeCloseTo(360);
+    expect(s.flow!.answered).toBeCloseTo(240);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('an app server also turns invalid requests away: they are not errors, only a use of its capacity', () => {
+    const s = play(open, { watch: 0.7, invalid: 0.3 }, 5, 300);
+    expect(s.flow!.rejected).toBeCloseTo(90);
+    expect(s.flow!.errors).toBe(0);
+  });
+
+  it('a gateway with nothing behind it drops the valid requests', () => {
+    const s = play({ ...doored, connections: [['client', 'gw'], ['lb', 'api'], ['api', 'db']] });
+    expect(s.flow!.errors).toBeCloseTo(0.4);
+    expect(s.flow!.drop.gw).toBeGreaterThan(0);
+  });
+
+  it('a new gateway takes the users and connects to the load balancer, in any order', () => {
+    const built = (order: string[]) => named(order.reduce((acc, type) => build(acc, type, gatewayLevel), createGame(gatewayLevel, empty))).sort();
+    const wired = ['apiGateway>loadBalancer', 'appServer>database', 'client>apiGateway', 'loadBalancer>appServer'];
+    expect(built(['loadBalancer', 'appServer', 'database', 'apiGateway'])).toEqual(wired);
+    expect(built(['apiGateway', 'loadBalancer', 'appServer', 'database'])).toEqual(wired);
+    expect(built(['apiGateway', 'appServer', 'database'])).toEqual(['apiGateway>appServer', 'appServer>database', 'client>apiGateway']);
+  });
+
+  it('connecting the users to the gateway replaces their old way in', () => {
+    const s = connect(createGame(gatewayLevel, { ...doored, connections: [['client', 'lb'], ['gw', 'lb'], ['lb', 'api'], ['api', 'db']] }), 'client', 'gw');
+    expect(named(s).filter(x => x.startsWith('client>'))).toEqual(['client>apiGateway']);
+  });
+});
