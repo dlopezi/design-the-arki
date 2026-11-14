@@ -128,4 +128,9 @@ export const levelTextEs: Record<string, LevelText> = {
     brief: 'Tu app de vídeo se vuelve global y un vídeo se hace viral: llegan 280 descargas del archivo de vídeo y 120 visitas a la página por segundo. Cada descarga la sirve Object Storage, que solo puede enviar un número limitado de archivos grandes por segundo, así que se llena y las descargas empiezan a fallar. Pon una CDN delante. La CDN responde una parte de las descargas cerca de los usuarios, y solo el resto llega a Object Storage. Conecta a los usuarios a la CDN para las descargas, y la CDN a Object Storage.',
     guidedHint: 'Object Storage solo puede enviar un número limitado de archivos grandes por segundo, y un vídeo viral pasa ese límite. Conecta a los usuarios directo a la CDN: responde una parte de las descargas en el borde, y solo el resto sigue hacia Object Storage.',
   },
+  '22-old-content': {
+    title: 'Contenido viejo',
+    brief: 'Se editó el vídeo y los usuarios deben ver la versión nueva pronto: ninguna CDN puede guardar una copia más de 50 segundos. Pero llegan 510 descargas y 90 visitas a la página por segundo, y Object Storage solo puede enviar un número limitado de archivos. El TTL de la CDN es cuánto tiempo guarda una copia. Un TTL largo responde más descargas, pero muestra contenido más viejo. Un TTL corto muestra contenido fresco, pero deja pasar más descargas hasta Object Storage. Elige un TTL que cumpla las dos cosas: selecciona la CDN y cambia su TTL.',
+    guidedHint: 'Un TTL más largo responde más descargas en el borde, pero muestra contenido más viejo. Object Storage necesita que la CDN responda cerca del 60 % de las descargas, y eso pide un TTL de unos 32 s o más. Los usuarios no deben ver contenido de más de 50 s. Elige un TTL entre los dos, por ejemplo 40 s.',
+  },
 };

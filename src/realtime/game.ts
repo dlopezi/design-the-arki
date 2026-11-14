@@ -1,4 +1,4 @@
-import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, UPLOAD } from '../catalog/catalog';
+import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, DOWNLOAD, UPLOAD } from '../catalog/catalog';
 import type { Catalog, Design } from '../engine/types';
 import { CLIENT, instancePrice, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
@@ -39,7 +39,8 @@ export type GameLevel = {
   allowedComponents: string[];
   componentOptions: Record<string, { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> }>;
   requirements: { p95Ms: number; maxErrorRate: number; /** The longest the oldest Message may wait in a queue, in seconds. */ maxQueueAgeS?: number;
-    /** The longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number };
+    /** The longest a Read Replica may be behind the primary database, in seconds. */ maxReplicationLagS?: number;
+    /** The longest a CDN may keep a copy of a file, in seconds: users must not see older content (ADR-0008). */ maxStaleS?: number };
   play: Play;
 };
 
@@ -82,6 +83,9 @@ const log = (s: GameState, e: Omit<GameEvent, 't'>): GameEvent[] => [...s.events
 export const waveEnd = (level: GameLevel) => BUILD_PHASE_S + level.play.wave.lengthS;
 /** Messages waiting in all queues. */
 export const totalBacklog = (s: Pick<GameState, 'backlog'>) => Object.values(s.backlog).reduce((a, v) => a + v, 0);
+/** The longest any CDN keeps a copy of a file, in seconds: the oldest content a user may be shown. 0 with no CDN. */
+export const contentAge = (s: Pick<GameState, 'buildings'>, catalog: Catalog = defaultCatalog) =>
+  Math.max(0, ...s.buildings.flatMap(b => { const spec = catalog[b.type]; return spec?.shortcut && spec.accepts?.includes(DOWNLOAD) ? [Number(b.params.ttlS ?? spec.shortcut.defaultValue)] : []; }));
 export const upkeepPerS = (s: Pick<GameState, 'buildings'>, catalog: Catalog = defaultCatalog) =>
   s.buildings.reduce((sum, b) => sum + instancePrice(b, catalog) * b.instances.length, 0) / UPKEEP_DIVISOR;
 
@@ -338,10 +342,13 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   const tooOld = maxAge !== undefined && Object.values(s.queueAge).some(age => age > maxAge);
   const maxLag = level.requirements.maxReplicationLagS;
   const lagTooHigh = maxLag !== undefined && Object.values(s.lag).some(l => l > maxLag);
+  // A CDN that keeps copies longer than the level allows shows users old content: reputation falls, as for a slow base.
+  const maxStale = level.requirements.maxStaleS;
+  const tooStale = maxStale !== undefined && contentAge(s, catalog) > maxStale;
   s.visits += flow.answered * dt;
   s.money += (PASSIVE_INCOME + (flow.answered / 100) * PER_100_VISITS - upkeepPerS(s, catalog)) * dt;
   if (rps || s.phase === 'drain') {
-    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || lagTooHigh ? REPUTATION.slow : REPUTATION.fine;
+    const change = flow.errors > level.requirements.maxErrorRate ? REPUTATION.failing : flow.p95 > level.requirements.p95Ms || tooOld || lagTooHigh || tooStale ? REPUTATION.slow : REPUTATION.fine;
     s.reputation = Math.max(0, Math.min(100, s.reputation + change * dt));
   }
   if (Math.floor(s.t) !== Math.floor(s0.t)) s.history = [...s.history, { t: Math.floor(s.t), rps, p95: flow.p95, errors: flow.errors, age: Math.max(0, ...Object.values(s.queueAge)), backlog: totalBacklog(s), lag: Math.max(0, ...Object.values(s.lag)) }];

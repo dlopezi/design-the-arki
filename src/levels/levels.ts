@@ -34,7 +34,9 @@ const levelSchema = z.object({
     /** Async levels: the longest the oldest Message may wait in a queue (seconds). */
     maxQueueAgeS: z.number().positive().optional(),
     /** Data levels: the longest a Read Replica may be behind the primary database (seconds). */
-    maxReplicationLagS: z.number().positive().optional() }),
+    maxReplicationLagS: z.number().positive().optional(),
+    /** Edge levels: the longest a CDN may keep a copy of a file (its TTL), so users never see content older than this (seconds). */
+    maxStaleS: z.number().positive().optional() }),
   budget: z.number().positive(),
   starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
@@ -101,6 +103,10 @@ const levelSchema = z.object({
         ctx.addIssue({ code: 'custom', path: path.split('.'), message: `Shard Key "${String(key)}" is not on offer in this level` });
       }
     }
+  }
+  // A freshness limit is about the copies a CDN keeps: without one there is nothing to limit.
+  if (level.requirements.maxStaleS !== undefined && !allowed.has('cdn')) {
+    ctx.addIssue({ code: 'custom', path: ['requirements', 'maxStaleS'], message: 'A level with a freshness limit must allow a cdn' });
   }
   // Downloads are served from Object Storage (ADR-0008): a wave with downloads needs one in the level.
   if ((mix?.download ?? 0) > 0 && !allowed.has('objectStorage')) {

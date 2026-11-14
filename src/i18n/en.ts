@@ -131,6 +131,10 @@ export const en = {
   uploadHint: 'A file sent through the app server keeps it busy as long as ten normal requests. Connect the users straight to Object Storage (the pre-signed URL pattern): the app server only hands out the signed address, and the file goes to Object Storage.',
   /** Lost with downloads in the wave while Object Storage, which has a limit, serves them all. */
   cdnHint: 'Object Storage can only send out so many big files each second, and a viral video passes that limit. Put a CDN in front of it and connect the users to the CDN: it answers a share of the downloads at the edge, and a longer TTL answers more of them.',
+  /** Lost while a CDN kept copies longer than the level allows. */
+  staleHint: 'Your CDN kept each copy of the file longer than users may see old content, so they were shown the old video after the edit. Lower the CDN TTL to the limit or under it. A shorter TTL means fresher content but more downloads reaching Object Storage.',
+  /** Lost with downloads in the wave and a CDN whose TTL is too short for Object Storage. */
+  shortTtlHint: 'Object Storage is still too busy: the CDN TTL is so short that too many downloads get through to it. Raise the TTL, but not above the freshness limit: a longer TTL answers more downloads but shows older content.',
   /** Lost with one Shard full while the others had room: a poor Shard Key. */
   hotShardHint: 'One Shard got most of the traffic while the others had room: a Hot Shard. Your Shard Key spreads the traffic badly, and more Shards would not fix it. Pick a better Shard Key in the Build Phase, one with many values that are used evenly, such as user id.',
   /** Lost with a full database in a level that offers Shard Keys. */
@@ -185,6 +189,7 @@ export const en = {
   objectiveErrors: (rate: number) => `Errors ≤ ${percent(rate)}`,
   objectiveQueueAge: (s: number) => `Queue Age ≤ ${s} s`,
   objectiveReplicationLag: (s: number) => `Replication Lag ≤ ${s} s`,
+  objectiveFreshness: (s: number) => `Content no older than ${s} s (CDN TTL ≤ ${s} s)`,
   objectiveCost: (budget: number) => `Cost ≤ $${budget}/month`,
   objectiveState: { met: 'met', failed: 'not met', pending: 'not run yet' },
   traffic: (rps: number, fromS: number, toS: number) => `${rps} req/s from ${fromS} s to ${toS} s`,
@@ -472,6 +477,8 @@ export const en = {
     mixShort: (mix: Record<string, number>) => Object.entries(mix).map(([type, share]) => `${Math.round(share * 100)}% ${({ watch: 'watches', job: 'upload jobs', read: 'reads', write: 'writes', readYourWrites: 'Read-your-writes', upload: 'uploads', download: 'downloads' } as Record<string, string>)[type] ?? type}`).join(' · '),
     backlog: 'Backlog', queueAge: 'Queue Age', messages: (n: number) => `${n} ${n === 1 ? 'Message' : 'Messages'}`,
     replicationLag: 'Replication Lag', lagShort: 'Lag',
+    freshness: 'Content age',
+    freshnessOf: (age: number, max: number) => `TTL ${age} s / max ${max} s`,
     lagOf: (lag: number, max: number | undefined) => (max === undefined ? `${lag.toFixed(1)} s` : `${lag.toFixed(1)} s / max ${max} s`),
     queueAgeOf: (age: number, max: number | undefined) => (max === undefined ? `${Math.round(age)} s` : `${Math.round(age)} s / max ${max} s`),
     waveInfo: (rps: number, s: number) => `One wave of ${rps} req/s for ${s} s. Hold on without your reputation reaching 0; the stars depend on the money left.`,

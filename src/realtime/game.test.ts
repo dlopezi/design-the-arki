@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design } from '../engine/types';
-import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, createGame, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
+import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 
 const level: GameLevel = {
   allowedComponents: ['loadBalancer', 'appServer', 'cache', 'database'],
@@ -730,5 +730,44 @@ describe('edge: the CDN answers a share of the downloads in front of Object Stor
     const s = play(l, { ...d, connections: [...d.connections, ['client', 'files']] });
     expect(s.flow!.errors).toBe(0);
     expect(s.flow!.load.files ?? 0).toBeLessThan(0.1);
+  });
+});
+
+describe('edge: a freshness limit caps how long a CDN may keep a copy', () => {
+  const freshLevel: GameLevel = {
+    allowedComponents: ['cdn', 'loadBalancer', 'appServer', 'database', 'objectStorage'],
+    componentOptions: { appServer: { maxInstances: 4 }, cdn: { limits: { ttlS: 300 } } },
+    requirements: { p95Ms: 300, maxErrorRate: 0.01, maxStaleS: 50 },
+    play: { startMoney: 800, wave: { rps: 600, lengthS: 30, mix: { watch: 0.15, download: 0.85 } }, starMoney: [100, 200] },
+  };
+  const withTtl = (ttlS: number): Design => ({
+    components: [{ id: 'lb', type: 'loadBalancer' }, { id: 'api', type: 'appServer', params: { instances: 2 } }, { id: 'db', type: 'database' },
+      { id: 'files', type: 'objectStorage' }, { id: 'cdn', type: 'cdn', params: { ttlS } }],
+    connections: [['client', 'lb'], ['lb', 'api'], ['api', 'db'], ['cdn', 'files'], ['client', 'cdn']],
+  });
+  const play = (ttlS: number, seconds: number) => run(callNow(createGame(freshLevel, withTtl(ttlS))), seconds, freshLevel);
+
+  it('content age is the longest TTL of a CDN, and 0 with no CDN', () => {
+    expect(contentAge(createGame(freshLevel, withTtl(40)))).toBe(40);
+    expect(contentAge(createGame(freshLevel, { components: [{ id: 'db', type: 'database' }], connections: [] }))).toBe(0);
+    expect(contentAge(createGame(freshLevel, { components: [{ id: 'c', type: 'cache', params: { ttlS: 90 } }], connections: [] }))).toBe(0); // a cache is not a CDN
+  });
+
+  it('a TTL over the limit costs reputation (old content), though every download is answered', () => {
+    const s = play(120, 15);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.reputation).toBeLessThan(100);
+  });
+
+  it('a TTL at or under the limit, and long enough to protect Object Storage, keeps the reputation', () => {
+    const s = play(40, 15);
+    expect(s.flow!.errors).toBe(0);
+    expect(s.reputation).toBe(100);
+  });
+
+  it('a TTL that is too short lets too many downloads reach Object Storage, which fails', () => {
+    const s = play(10, 5);
+    expect(s.flow!.drop.files).toBeGreaterThan(0);
+    expect(s.flow!.errors).toBeGreaterThan(0.01);
   });
 });
