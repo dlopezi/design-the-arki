@@ -1,4 +1,4 @@
-import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, FEED_WRITE, POST, READ_FEED } from '../catalog/catalog';
+import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, FEED_WRITE, POST, READ_FEED, WRITE } from '../catalog/catalog';
 import type { Catalog } from '../catalog/types';
 
 /**
@@ -85,40 +85,62 @@ export type Flow = {
   load: Record<string, number>;
   /** How many instances receive traffic: all serving ones behind a load balancer, otherwise one. */
   usable: Record<string, number>;
-  /** Messages waiting in each queue after this step (ADR-0006). */
-  backlog: Record<string, number>;
   /** Messages per second each queue released to its Workers in this step. */
   release: Record<string, number>;
   /** Messages per second the serving Workers behind each queue can take; 0 when none serves. */
   releaseCapacity: Record<string, number>;
-  /** Writes each Read Replica still has to apply after this step, and how far behind the primary database that puts it, in seconds. */
-  unapplied: Record<string, number>;
+  /** How far behind the primary database each Read Replica is after this step, in seconds (ADR-0007). */
   lag: Record<string, number>;
   /** Share of capacity in use on each Shard (0–1), for each building that is split into several Shards. */
   shards: Record<string, number[]>;
   /**
-   * Pub/sub (ADR-0009), per Subscription of the level: the posts it has not processed yet after this step (its Backlog), the posts
-   * per second released to it, and the posts per second its serving Workers can take (0 when none serves).
+   * Pub/sub (ADR-0009), per Subscription of the level: the posts per second released to it, and the posts per second its
+   * serving Workers can take (0 when none serves).
    */
-  subBacklog: Record<string, number>;
   subRelease: Record<string, number>;
   subCapacity: Record<string, number>;
   /** Share of capacity in use for each Partition of a Topic (0–1): the load of the busiest Worker instance that reads it, over every Subscription. */
   partitions: Record<string, number[]>;
-  /** What waits in each Partition of a Topic for each Subscription after this step (`topicId|subscription`). */
-  partBacklog: Record<string, number[]>;
   /** In a news-feed level: whether a Feed Worker writes the feeds ahead (fan-out on write), and what one feed read costs the database, in reads. */
   fanOutOnWrite: boolean;
   feedReadCost: number;
+  /** What is still waiting after this step: give it to the next call of `solve`. */
+  carried: Carried;
 };
-/** What lasts from one step to the next: the Messages waiting in each queue, and the length of the step in seconds. */
-export type Queues = { backlog: Record<string, number>; dt: number;
-  /** Writes each Read Replica has not applied yet (ADR-0007), kept from the step before like the Backlog. */
-  unapplied?: Record<string, number>;
-  /** The posts each Subscription has not processed yet (ADR-0009), kept from the step before like the Backlog. */
-  subBacklog?: Record<string, number>;
+/** What `solve` reads: the buildings on the map and the connections between them (`client` is the users). */
+export type Base = { buildings: Building[]; links: Link[];
+  /** Left out, the game's catalog. */
+  catalog?: Catalog };
+/** What reaches the base in one step. The level and the clock decide it, never the player. */
+export type Traffic = {
+  /** Requests per second from the users. */
+  rps: number;
+  /** The length of the step, in seconds (1 when left out). */
+  dt?: number;
+  /** The share of each Request Type (adds up to 1). Left out, all requests are one type that every building accepts, as in chapter 1. */
+  mix?: Record<string, number> | undefined;
+  /** How many clients send each Request Type, for the Client Limit (ADR-0008). */
+  clients?: Record<string, number> | undefined;
+  /** The Shard Keys and Partition Keys the level offers (ADR-0007, ADR-0009). */
+  shardKeys?: ShardKeys | undefined;
+  partitionKeys?: ShardKeys | undefined;
+  /** The systems that must each process every post (ADR-0009): a post answered anywhere is owed to each until a Worker serving it processes it. */
+  subscriptions?: string[];
+  feed?: FeedModel | undefined;
+  /** The Region a DNS sends the users to (ADR-0008). Left out, a DNS sends them to every Region it is connected to. */
+  activeRegion?: string;
+};
+/** What lasts from one step to the next. `solve` takes it and gives it back in the same shape (`Flow.carried`). */
+export type Carried = {
+  /** Messages waiting in each queue (ADR-0006). */
+  backlog: Record<string, number>;
+  /** Writes each Read Replica has not applied yet (ADR-0007). */
+  unapplied: Record<string, number>;
+  /** The posts each Subscription has not processed yet (ADR-0009). */
+  subBacklog: Record<string, number>;
   /** The same, in each Partition of a Topic: for `topicId|subscription`, what waits in each Partition. */
-  partBacklog?: Record<string, number[]> };
+  partBacklog: Record<string, number[]>;
+};
 
 /** How many Partitions a Topic has (none for any other building). */
 export const partitionsOf = (b: Pick<Building, 'type' | 'params'>, catalog: Catalog = defaultCatalog) => {
@@ -154,14 +176,15 @@ const isBackground = (channel: string) => channel.endsWith(BACKGROUND);
 const typeOfChannel = (channel: string) => (isBackground(channel) ? channel.slice(0, -BACKGROUND.length) : channel);
 
 /**
- * Sends `rps` requests from the users through the buildings along the links. `mix` is the share of each Request Type
- * (adds up to 1); left out, all requests are one type that every building accepts, as in chapter 1. `queues` holds the
- * Backlog of each queue from the step before; the result holds it after this one. `subscriptions` are the systems that must
- * each process every post (ADR-0009): a post answered anywhere is owed to each of them until a Worker serving it processes it.
+ * One step of traffic: sends the users' requests through the buildings of `base` along its links. `carried` is what the
+ * step before left waiting (its `Flow.carried`); a part left out counts as empty. The result holds what is waiting after
+ * this step, in the same shape.
  */
-export function solve(buildings: Building[], links: Link[], rps: number, catalog: Catalog = defaultCatalog,
-  mix: Record<string, number> = { [DEFAULT_REQUEST_TYPE]: 1 }, queues: Queues = { backlog: {}, dt: 1 }, keys?: ShardKeys, clients?: Record<string, number>, regions?: { active: string },
-  subscriptions: string[] = [], partitionKeys?: ShardKeys, feed?: FeedModel): Flow {
+export function solve(base: Base, traffic: Traffic, carried: Partial<Carried> = {}): Flow {
+  const { buildings, links, catalog = defaultCatalog } = base;
+  const { rps, mix = { [DEFAULT_REQUEST_TYPE]: 1 }, clients, shardKeys: keys, partitionKeys, subscriptions = [], feed, activeRegion } = traffic;
+  const dt = traffic.dt || 1;
+  const before: Carried = { backlog: carried.backlog ?? {}, unapplied: carried.unapplied ?? {}, subBacklog: carried.subBacklog ?? {}, partBacklog: carried.partBacklog ?? {} };
   const byId = new Map(buildings.map(b => [b.id, b]));
   const serving = (id: string) => byId.get(id)?.instances.filter(isServing).length ?? 0;
   const inflow: Record<string, number> = {}, drop: Record<string, number> = {}, edge: Record<string, number> = {};
@@ -197,7 +220,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const processed: Record<string, number> = {};
   const subRelease: Record<string, number> = {}, subCapacity: Record<string, number> = {};
   const partitionLoads: Record<string, number[]> = {}, partBacklog: Record<string, number[]> = {};
-  const subBefore = (sub: string) => queues.subBacklog?.[sub] ?? 0;
+  const subBefore = (sub: string) => before.subBacklog[sub] ?? 0;
   /** Requests dropped that were already answered by a queue: they are not the users' errors. */
   let lostInBackground = 0;
 
@@ -238,8 +261,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   const send = (from: string, channel: string, amount: number) => {
     const type = typeOfChannel(channel);
     // A DNS sends the users to one Region only: the active one, even when it is dead (the requests then fail until it switches).
-    const regional = !!specOf(from)?.failover && !!regions;
-    const open = links.filter(l => l.from === from && usable[l.to] && (!regional || regionOf(byId.get(l.to) ?? {}) === regions!.active));
+    const regional = !!specOf(from)?.failover && activeRegion !== undefined;
+    const open = links.filter(l => l.from === from && usable[l.to] && (!regional || regionOf(byId.get(l.to) ?? {}) === activeRegion));
     // Where the type can be finished; if nowhere, it still goes to a building that accepts it and is dropped there,
     // so the error shows at the building that has nowhere to send it (as a dead end does today).
     let targets = open.filter(l => canFinish(l.to, type)).map(l => l.to);
@@ -257,7 +280,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   for (const id of order) {
     const f = inflow[id] ?? 0;
     // A Topic still has posts to release while any Subscription has a Backlog, even after the users are gone.
-    const waiting = specOf(id)?.queue ? queues.backlog[id] ?? 0 : specOf(id)?.pubSub ? Math.max(0, ...subscriptions.map(subBefore)) : 0;
+    const waiting = specOf(id)?.queue ? before.backlog[id] ?? 0 : specOf(id)?.pubSub ? Math.max(0, ...subscriptions.map(subBefore)) : 0;
     if (!f && !waiting) continue;
     if (id === CLIENT) { for (const t of types) send(id, t, rps * mix[t]!); continue; }
     const b = byId.get(id)!, spec = catalog[b.type]!;
@@ -272,14 +295,13 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     add(drop, id, f - ok);
     // What gets in is a share of each channel, the same share for all.
     const taken = (c: string) => { const x = inflowBy[id]?.[c] ?? 0; return x === f ? ok : (x * ok) / f; };
-    if (inflowBy[id]?.['write']) writesServed[id] = taken('write');
+    if (inflowBy[id]?.[WRITE]) writesServed[id] = taken(WRITE);
     for (const c of channels) if (isBackground(c) && inflowBy[id]?.[c]) lostInBackground += inflowBy[id]![c]! - taken(c);
     if (spec.pubSub) {
       // A post is answered when it enters the Topic. Every Subscription gets its own copy: the Topic releases to the Workers that
       // serve it, at their total capacity, and what they cannot take yet waits in that Subscription's Backlog (ADR-0009).
       answered += ok; published += ok;
       const type = spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
-      const dt = queues.dt || 1;
       // Partitions: each one is read by one Worker instance of a Subscription at a time, so a Subscription uses at most as many
       // instances as there are Partitions, and Partition p goes to working instance p mod n. Each Subscription keeps its own place
       // in each Partition, so a post waits in its own Partition: a busy one cannot be emptied by the instances of the others (ADR-0009).
@@ -299,7 +321,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
         }
         const owner = (p: number) => (working.length ? p % working.length : -1);
         // What waits in each Partition for this Subscription (spread by the key the first time, or after the Partitions changed).
-        const kept = queues.partBacklog?.[`${id}|${sub}`];
+        const kept = before.partBacklog[`${id}|${sub}`];
         const waitingIn = kept?.length === count ? [...kept] : shares.map(share => subBefore(sub) * share);
         const offeredIn = shares.map((share, p) => share * ok + waitingIn[p]! / dt);
         const releasedIn = shares.map(() => 0);
@@ -341,7 +363,6 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
       const type = spec.accepts?.find(a => types.includes(a)) ?? spec.accepts?.[0] ?? DEFAULT_REQUEST_TYPE;
       const takers = links.filter(l => l.from === id && usable[l.to] && canFinish(l.to, type));
       const rate = takers.reduce((sum, l) => sum + usable[l.to]! * capacityOf(byId.get(l.to)!, catalog), 0);
-      const dt = queues.dt || 1;
       releaseCapacity[id] = rate;
       release[id] = Math.min(ok + waiting / dt, rate);
       backlog[id] = Math.max(0, waiting + (ok - release[id]!) * dt);
@@ -385,13 +406,13 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     }
   }
   // A queue that no traffic reached still keeps its Messages.
-  for (const b of buildings) if (specOf(b.id)?.queue && backlog[b.id] === undefined) backlog[b.id] = queues.backlog[b.id] ?? 0;
+  for (const b of buildings) if (specOf(b.id)?.queue && backlog[b.id] === undefined) backlog[b.id] = before.backlog[b.id] ?? 0;
   // A Message a Worker or the database could not take goes back to its queue to be delivered again: none is ever lost.
   const queueIds = Object.keys(backlog);
   if (lostInBackground > 0 && queueIds.length) {
     for (const id of queueIds) {
       const back = lostInBackground / queueIds.length;
-      backlog[id]! += back * (queues.dt || 1);
+      backlog[id]! += back * dt;
       if (release[id] !== undefined) release[id] = Math.max(0, release[id]! - back);
     }
   }
@@ -399,7 +420,7 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   // Each Subscription owes every post answered in this step, and has caught up with those its Workers processed (ADR-0009).
   // A post a Message Queue gave to another Subscription's Worker never reaches this one, so its Backlog grows.
   const subBacklog: Record<string, number> = {};
-  for (const sub of subscriptions) subBacklog[sub] = Math.max(0, subBefore(sub) + (published - (processed[sub] ?? 0)) * (queues.dt || 1));
+  for (const sub of subscriptions) subBacklog[sub] = Math.max(0, subBefore(sub) + (published - (processed[sub] ?? 0)) * dt);
 
   // Replication Lag (ADR-0007): each Read Replica must apply every write the database it follows has served. Writes it cannot
   // apply as fast as they come pile up, and the pile is how far behind it is. Under the pile it is zero; no replica, no lag.
@@ -411,8 +432,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
     if (!source) continue;
     // A replica that is not serving yet (still being built, or down) is not copying anything: the pile stays as it was.
     const applies = serving(b.id) > 0 ? (spec.applyShare ?? 0) * capacityOf(b, catalog) : 0;
-    const before = queues.unapplied?.[b.id] ?? 0;
-    unapplied[b.id] = applies > 0 ? Math.max(0, before + ((writesServed[source] ?? 0) - applies) * (queues.dt || 1)) : before;
+    const pile = before.unapplied[b.id] ?? 0;
+    unapplied[b.id] = applies > 0 ? Math.max(0, pile + ((writesServed[source] ?? 0) - applies) * dt) : pile;
     lag[b.id] = applies > 0 ? unapplied[b.id]! / applies : 0;
   }
 
@@ -429,7 +450,8 @@ export function solve(buildings: Building[], links: Link[], rps: number, catalog
   }
   const dropped = Object.values(drop).reduce((a, v) => a + v, 0);
   return {
-    rps, answered, rejected, inflow, drop, edge, load, usable, backlog, release, releaseCapacity, shards, unapplied, lag, subBacklog, subRelease, subCapacity, partitions: partitionLoads, partBacklog, fanOutOnWrite, feedReadCost: readCost,
+    rps, answered, rejected, inflow, drop, edge, load, usable, release, releaseCapacity, shards, lag, subRelease, subCapacity, partitions: partitionLoads, fanOutOnWrite, feedReadCost: readCost,
+    carried: { backlog, unapplied, subBacklog, partBacklog },
     errors: rps ? Math.min(1, (dropped - lostInBackground) / rps) : 0,
     p95: rps ? Math.min(2000, Math.round(latency[CLIENT] ?? 0)) : 0,
   };
