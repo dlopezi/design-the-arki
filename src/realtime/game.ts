@@ -1,6 +1,6 @@
 import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, DOWNLOAD, UPLOAD } from '../catalog/catalog';
 import type { Catalog, Design } from '../catalog/types';
-import { CLIENT, MAIN, STANDBY, instancePrice, regionOf, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
+import { CLIENT, MAIN, STANDBY, instancePrice, regionOf, solve, type Building, type Carried, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
 /**
  * Real-time play (ADR-0005): a build phase, then one wave of users. Money grows by itself and with every answered
@@ -67,7 +67,8 @@ export type GameEvent = { t: number; kind: 'building' | 'ready' | 'wave' | 'drai
   type?: string; id?: string; from?: string; to?: string; amount?: number; reason?: string };
 /** One second of the run, for the charts: `age` is the oldest Message in any queue (s), `backlog` the Messages waiting in all of them, `consumerLag` each Subscription's lag (s). */
 export type Sample = { t: number; rps: number; p95: number; errors: number; age: number; backlog: number; lag: number; consumerLag?: Record<string, number> };
-export type GameState = {
+/** The whole game at one moment. It holds what the traffic model carries from one step to the next (`Carried`: the Backlogs and the unapplied writes). */
+export type GameState = Carried & {
   t: number;
   /** build → wave → (drain, while Messages are still waiting after the wave) → won or lost. */
   phase: 'build' | 'wave' | 'drain' | 'won' | 'lost';
@@ -85,18 +86,12 @@ export type GameState = {
   visits: number;
   incidentDone: boolean;
   flow: Flow | null;
-  /** Messages waiting in each queue (ADR-0006): the one state that lasts from one step to the next. */
-  backlog: Record<string, number>;
   /** How long the oldest Message of each queue has waited, estimated: the Backlog over the rate its Workers take it. */
   queueAge: Record<string, number>;
-  /** Writes each Read Replica has not applied yet, and how far behind the primary database that puts it, in seconds (ADR-0007). */
-  unapplied: Record<string, number>;
+  /** How far behind the primary database each Read Replica is, in seconds (ADR-0007). */
   lag: Record<string, number>;
-  /** Posts each Subscription has not processed yet, and how long the oldest of them has waited, in seconds (ADR-0009). */
-  subBacklog: Record<string, number>;
+  /** How long the oldest post each Subscription has not processed has waited, in seconds (ADR-0009). */
   consumerLag: Record<string, number>;
-  /** What waits in each Partition of a Topic for each Subscription (`topicId|subscription`). */
-  partBacklog: Record<string, number[]>;
   /** Worker buildings whose group is rebalancing after an instance went down, and until when (ADR-0009): none of their instances reads. */
   rebalance: Record<string, number>;
   /** A Region failure and the switch to the standby Region: when it fell, when the DNS will switch (null: nothing will), and whether it has. */
@@ -501,20 +496,19 @@ export function step(s0: GameState, dt: number, level: GameLevel, catalog: Catal
   // Traffic, money and reputation.
   const rps = s.phase === 'wave' ? level.play.wave.rps : 0;
   const subs = subscriptionsOf(level);
-  const flow = solve(working, s.links, rps, catalog, level.play.wave.mix, { backlog: s.backlog, dt, unapplied: s.unapplied, subBacklog: s.subBacklog, partBacklog: s.partBacklog }, level.play.shardKeys, level.play.clients, { active: s.failover.switched ? STANDBY : MAIN }, subs, level.play.partitionKeys, feed);
-  s.unapplied = flow.unapplied;
-  s.lag = flow.lag;
+  const flow = solve({ buildings: working, links: s.links, catalog },
+    { rps, dt, mix: level.play.wave.mix, clients: level.play.clients, shardKeys: level.play.shardKeys, partitionKeys: level.play.partitionKeys, subscriptions: subs, feed, activeRegion: s.failover.switched ? STANDBY : MAIN }, s);
   s.flow = flow;
-  s.backlog = flow.backlog;
-  s.queueAge = Object.fromEntries(Object.entries(flow.backlog).map(([id, waiting]) => {
+  s.lag = flow.lag;
+  // What is still waiting (the Backlogs, the writes the Read Replicas have not applied) goes into the state as it came out.
+  Object.assign(s, flow.carried);
+  s.queueAge = Object.fromEntries(Object.entries(s.backlog).map(([id, waiting]) => {
     const rate = flow.releaseCapacity[id] ?? 0;
     return [id, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.queueAge[id] ?? 0) + dt];
   }));
   // The Consumer Lag of each Subscription: its Backlog over the rate its Workers take posts, or growing with the clock when none takes them.
-  s.subBacklog = flow.subBacklog;
-  s.partBacklog = flow.partBacklog;
   s.consumerLag = Object.fromEntries(subs.map(sub => {
-    const waiting = flow.subBacklog[sub] ?? 0, rate = flow.subCapacity[sub] ?? 0;
+    const waiting = s.subBacklog[sub] ?? 0, rate = flow.subCapacity[sub] ?? 0;
     return [sub, waiting < EMPTY_BACKLOG ? 0 : rate > 0 ? waiting / rate : (s0.consumerLag[sub] ?? 0) + dt];
   }));
   const consumersBehind = subs.some(sub => (s.consumerLag[sub] ?? 0) > level.play.subscriptions![sub]!.maxLagS);

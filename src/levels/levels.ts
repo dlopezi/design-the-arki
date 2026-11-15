@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { catalog, requestTypes } from '../catalog/catalog';
+import { catalog, JOB, requestTypes } from '../catalog/catalog';
 import type { Design } from '../catalog/types';
 import type { GameLevel } from '../realtime/game';
 import { lang, type Lang } from '../i18n';
@@ -84,7 +84,7 @@ const levelSchema = z.object({
   // A level with a mix of Request Types, or with a queue, needs the buildings that finish the work (ADR-0006).
   const allowed = new Set(level.allowedComponents);
   const mix = level.play.wave.mix;
-  if (mix && (mix.job ?? 0) > 0 && !(allowed.has('messageQueue') && allowed.has('worker'))) {
+  if (mix && (mix[JOB] ?? 0) > 0 && !(allowed.has('messageQueue') && allowed.has('worker'))) {
     ctx.addIssue({ code: 'custom', path: ['allowedComponents'], message: 'A level whose wave has jobs must allow a messageQueue and a worker' });
   }
   // A Read Replica is a copy of the primary database: without one there is nothing to copy (ADR-0007).

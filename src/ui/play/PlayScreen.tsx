@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { ABUSIVE, catalog, DOWNLOAD, INVALID, POST, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
+import { ABUSIVE, catalog, DOWNLOAD, INVALID, JOB, POST, READ, READ_YOUR_WRITES, UPLOAD } from '../../catalog/catalog';
 import { t } from '../../i18n';
 import type { LevelDefinition, TutorialStep } from '../../levels/levels';
 import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
@@ -374,7 +374,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
       if (subs.some(subBehind)) return t.consumerLagHint;
     }
     // Async levels: jobs with no queue, a Worker called straight from the app server, or Messages that waited too long.
-    const jobs = (level.play.wave.mix?.job ?? 0) > 0;
+    const jobs = (level.play.wave.mix?.[JOB] ?? 0) > 0;
     if (jobs && !game.buildings.some(b => catalog[b.type]!.queue)) return t.queueHint;
     if (game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'worker')) return t.queueHint;
     // Data levels: Read-your-writes that cannot reach the primary database are stale reads on a Read Replica.
@@ -382,7 +382,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
     const hasReadReplica = game.buildings.some(b => b.type === 'readReplica');
     if (hasReadYourWrites && hasReadReplica && !game.links.some(l => typeOfId(l.from) === 'appServer' && typeOfId(l.to) === 'database')) return t.staleReadHint;
     // Reads that no Read Replica receives all land on the primary database.
-    const reads = (level.play.wave.mix?.read ?? 0) > 0;
+    const reads = (level.play.wave.mix?.[READ] ?? 0) > 0;
     if (reads && level.allowedComponents.includes('readReplica') && !game.links.some(l => typeOfId(l.to) === 'readReplica' && typeOfId(l.from) !== 'database')) return t.replicaHint;
     if (lagTooHigh) return t.lagHint;
     if (tooStale) return t.staleHint;

@@ -5,6 +5,11 @@ import type { Catalog } from './types';
  * type, `watch`, so chapter 1 plays as it always did. Each building lists the types it `accepts` (all, when it does not say).
  */
 export const DEFAULT_REQUEST_TYPE = 'watch';
+/** Slow work a user asks for (processing a video): it goes to a Message Queue and a Worker does it later (ADR-0006). */
+export const JOB = 'job';
+/** A read and a write of the database: a Read Replica takes reads only (ADR-0007). */
+export const READ = 'read';
+export const WRITE = 'write';
 /** A big file sent by a user: it keeps an app server busy for a long time (ADR-0007). */
 export const UPLOAD = 'upload';
 /** A read that must show the user's own latest change: only the primary database can answer it (ADR-0007). */
@@ -19,7 +24,7 @@ export const ABUSIVE = 'abusive';
 export const POST = 'post';
 /** A user reads their feed: synchronous, answered by the database (ADR-0009). */
 export const READ_FEED = 'readFeed';
-export const requestTypes = ['watch', 'job', 'read', 'write', READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE, POST, READ_FEED];
+export const requestTypes = [DEFAULT_REQUEST_TYPE, JOB, READ, WRITE, READ_YOUR_WRITES, UPLOAD, DOWNLOAD, INVALID, ABUSIVE, POST, READ_FEED];
 /** What a Worker writes to the database after a job: internal, so a level's mix never lists it. */
 export const RESULT_TYPE = 'result';
 /** Fan-out on write (ADR-0009): a Feed Worker writes each post into every follower's feed. Internal, never in a level's mix. */
@@ -50,7 +55,7 @@ export const catalog: Catalog = {
     primitive: 'station', workers: 50, meanServiceMs: 2, monthlyCost: 30, endsRequests: false, buildS: 6,
     shortcut: { param: 'ttlS', defaultValue: 10, halfAt: 30, max: 0.95 },
     // Only reads are worth caching: a processing job is not. A feed read can be cached too (a timeline cache, as in Redis).
-    accepts: ['watch', READ_FEED],
+    accepts: [DEFAULT_REQUEST_TYPE, READ_FEED],
     presentation: { zone: 'data', technology: 'Redis' },
   },
   database: {
@@ -59,7 +64,7 @@ export const catalog: Catalog = {
     sizes: { small: { workers: 8, monthlyCost: 50 }, medium: { workers: 16, monthlyCost: 150 }, large: { workers: 32, monthlyCost: 400 } },
     defaultSize: 'small',
     // It serves every kind of read (also Read-your-writes, which a Read Replica cannot), takes writes and the results Workers write; processing a job is not its work.
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true,
+    accepts: [DEFAULT_REQUEST_TYPE, READ, WRITE, READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true,
     // In a level that offers Shard Keys its instances are Shards (ADR-0007).
     shardable: true,
     presentation: { zone: 'data', technology: 'PostgreSQL', instancePrefix: 'shard' },
@@ -68,7 +73,7 @@ export const catalog: Catalog = {
   // before the primary does, and instances share them without a load balancer.
   readReplica: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true,
-    accepts: ['read'], prefers: ['read'], follows: 'database', applyShare: 0.25, buildS: 7,
+    accepts: [READ], prefers: [READ], follows: 'database', applyShare: 0.25, buildS: 7,
     sizes: {
       small: { workers: 8, monthlyCost: 50, vcpu: 1 },
       medium: { workers: 16, monthlyCost: 100, vcpu: 2 },
@@ -80,14 +85,14 @@ export const catalog: Catalog = {
   // Chapter 2 (Async). A managed queue: no settings, a fixed price, and a capacity that never fills in these levels.
   // It also takes posts, so a player can try one for pub/sub work and see that it gives each Message to one Worker only (ADR-0009).
   messageQueue: {
-    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, queue: true, distributes: true, accepts: ['job', POST], buildS: 4,
+    primitive: 'station', workers: 1000, meanServiceMs: 1, monthlyCost: 20, endsRequests: false, queue: true, distributes: true, accepts: [JOB, POST], buildS: 4,
     presentation: { zone: 'application', technology: 'Amazon SQS', hideCapacity: true },
   },
   // Takes Messages from the queue and processes each job (about a second), then writes the result to the database.
   // Concurrency is how many jobs one instance processes at once. In a level with Subscriptions each Worker building serves
   // one of them (a consumer group, ADR-0009): it processes posts and their work leaves the system (a push service, a search index).
   worker: {
-    primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: ['job', POST], emits: RESULT_TYPE, buildS: 5,
+    primitive: 'station', workers: 4, meanServiceMs: 1000, monthlyCost: 40, endsRequests: false, scalesOut: true, accepts: [JOB, POST], emits: RESULT_TYPE, buildS: 5,
     ends: [POST], subscribes: true, celebrityLimit: { options: [10, 100, 1000, 10000] },
     sizes: {
       small: { workers: 2, monthlyCost: 20, vcpu: 1 },
@@ -149,7 +154,7 @@ export const catalog: Catalog = {
   // primary database it replaces. Not a building the player builds.
   promotedReplica: {
     primitive: 'station', workers: 8, meanServiceMs: 20, monthlyCost: 50, endsRequests: true, scalesOut: true, balanced: true, internal: true,
-    accepts: ['watch', 'read', 'write', READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true, buildS: 7,
+    accepts: [DEFAULT_REQUEST_TYPE, READ, WRITE, READ_YOUR_WRITES, RESULT_TYPE, ABUSIVE, READ_FEED, FEED_WRITE], feedStore: true, buildS: 7,
     sizes: {
       small: { workers: 8, monthlyCost: 50, vcpu: 1 },
       medium: { workers: 16, monthlyCost: 100, vcpu: 2 },
