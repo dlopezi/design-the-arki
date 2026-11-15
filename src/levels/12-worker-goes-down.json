@@ -3,24 +3,11 @@
   "chapter": "Async",
   "title": "A Worker goes down",
   "brief": "Eight uploads arrive every second, and 10 seconds into the wave one of your Workers crashes. Nothing is lost: the Messages stay in the queue and the other Workers keep taking them. This is at-least-once delivery. The price is that a job a Worker was processing when it crashed will be delivered again, so a job may run twice, and real Workers must be idempotent: running a job twice must give the same result as running it once. Do you have enough Workers for a bad day?",
-  "durationS": 40,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 40,
-      "rps": 8
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxQueueAgeS": 10
   },
-  "budget": 300,
-  "starCostThresholds": [
-    220,
-    180
-  ],
   "allowedComponents": [
     "appServer",
     "database",

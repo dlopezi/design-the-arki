@@ -3,23 +3,10 @@
   "chapter": "Edge",
   "title": "Worldwide launch",
   "brief": "Launch day for the whole world, and everything goes wrong at once: 700 requests arrive every second. 245 are downloads of a viral video, and Object Storage cannot send out that many files. Three clients send 315 requests, far more than the 35 normal clients send in all, and they fill your app servers. People also upload 35 big files a second, which must not go through the app servers. And 45 seconds into the wave the whole main Region goes down. Use what you learned: a CDN in front of Object Storage, an API Gateway with a Client Limit at the door, a DNS in front of a standby Region with a Read Replica, and uploads straight to Object Storage. The API Gateway, the CDN, the DNS and Object Storage stand outside the Regions, so they survive.",
-  "durationS": 70,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 70,
-      "rps": 700
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 800,
-  "starCostThresholds": [
-    700,
-    600
-  ],
   "allowedComponents": [
     "cdn",
     "apiGateway",

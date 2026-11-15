@@ -3,23 +3,10 @@
   "chapter": "Events",
   "title": "Hot partition",
   "brief": "Ten posts arrive each second, over three Partitions read by three Worker instances. But the Topic uses the country as its Partition Key, and most of your users live in one country: 60% of the posts land in one Partition, and the instance that reads it cannot keep up while the others wait. More Partitions or more instances do not help, because one country always goes to one Partition. Pick a better Partition Key in the Build Phase: the user id has many values used evenly.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 60,
-      "rps": 50
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 600,
-  "starCostThresholds": [
-    500,
-    450
-  ],
   "allowedComponents": [
     "appServer",
     "database",

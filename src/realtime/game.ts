@@ -1,5 +1,5 @@
 import { catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, DOWNLOAD, UPLOAD } from '../catalog/catalog';
-import type { Catalog, Design } from '../engine/types';
+import type { Catalog, Design } from '../catalog/types';
 import { CLIENT, MAIN, STANDBY, instancePrice, regionOf, solve, type Building, type Flow, type Instance, type Link, type ShardKeys } from './flow';
 
 /**
@@ -148,6 +148,10 @@ export function toDesign(s: GameState): Design {
     connections: s.links.map(l => [l.from, l.to]),
   };
 }
+
+/** What a design costs to build: the price of every instance of every building (tests buy the Reference Design with it). */
+export const designCost = (design: Design, catalog: Catalog = defaultCatalog) =>
+  design.components.reduce((sum, c) => sum + instancePrice({ type: c.type, params: (c.params ?? {}) as Building['params'] }, catalog) * Math.max(1, Number(c.params?.instances ?? 1)), 0);
 
 // ───────── Connections ─────────
 const typeOf = (s: GameState, id: string) => s.buildings.find(b => b.id === id)?.type;
@@ -551,6 +555,8 @@ export function runToEnd(s: GameState, level: GameLevel, limitS = 900, catalog: 
   for (let spent = 0; spent < limitS && next.phase !== 'won' && next.phase !== 'lost'; spent++) next = run(next, 1, level, catalog);
   return next;
 }
+/** The most stars a level gives: one for lasting the wave, and one for each money threshold. */
+export const maxStarsOf = (level: { play: Pick<Play, 'starMoney'> }) => 1 + level.play.starMoney.length;
 /** 1 star for lasting the wave, one more for each money threshold reached; 0 when lost. */
 export const starsOf = (s: GameState, level: GameLevel) =>
   s.phase === 'won' ? 1 + level.play.starMoney.filter(m => s.money >= m).length : 0;

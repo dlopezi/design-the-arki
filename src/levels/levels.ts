@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { catalog, requestTypes } from '../catalog/catalog';
-import type { Design, Level } from '../engine/types';
-import type { Play } from '../realtime/game';
+import type { Design } from '../catalog/types';
+import type { GameLevel } from '../realtime/game';
 import { lang, type Lang } from '../i18n';
 import { chaptersEs, levelTextEs } from './text.es';
 
@@ -28,8 +28,6 @@ const levelSchema = z.object({
   chapter: z.string().min(1),
   title: z.string().min(1),
   brief: z.string().min(1),
-  durationS: z.number().positive(),
-  traffic: z.array(z.object({ fromS: z.number().min(0), toS: z.number().positive(), rps: z.number().positive() })).min(1),
   requirements: z.object({ p95Ms: z.number().positive(), maxErrorRate: z.number().min(0).max(1),
     /** Async levels: the longest the oldest Message may wait in a queue (seconds). */
     maxQueueAgeS: z.number().positive().optional(),
@@ -37,10 +35,7 @@ const levelSchema = z.object({
     maxReplicationLagS: z.number().positive().optional(),
     /** Edge levels: the longest a CDN may keep a copy of a file (its TTL), so users never see content older than this (seconds). */
     maxStaleS: z.number().positive().optional() }),
-  budget: z.number().positive(),
-  starCostThresholds: z.array(z.number().positive()).refine(t => t.every((x, i) => i === 0 || x < t[i - 1]!), 'starCostThresholds must be strictly decreasing'),
   allowedComponents: z.array(componentType).min(1),
-  failureEvents: z.array(z.object({ atS: z.number().min(0), componentType, instance: z.number().int().min(0) })).default([]),
   /** Per component type: which sizes and how many instances the player may choose. */
   componentOptions: z.record(z.string(), z.object({
     sizes: z.array(z.string()).min(1).optional(),
@@ -192,14 +187,12 @@ export type TutorialStep = {
   until: { select: string } | { connect: [string, string] } | { event: 'run' | 'pass' };
 };
 
-export type ComponentOptions = { sizes?: string[]; maxInstances?: number; limits?: Record<string, number> };
-
-export type LevelDefinition = Level & {
-  id: string; chapter: string; title: string; brief: string; allowedComponents: string[];
-  componentOptions: Record<string, ComponentOptions>; referenceDesign: Design;
+/** A level file: what the game rules read (`GameLevel`), plus its texts and its designs. */
+export type LevelDefinition = GameLevel & {
+  id: string; chapter: string; title: string; brief: string;
+  referenceDesign: Design;
   startingDesigns: { guided: Design; normal: Design; hard: Design }; guidedHint: string;
   tutorial?: TutorialStep[];
-  play: Play;
 };
 
 /** Validates raw level data; throws with every problem listed (path and message). */

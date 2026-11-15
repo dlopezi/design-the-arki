@@ -3,25 +3,12 @@
   "chapter": "Data scale",
   "title": "Release day",
   "brief": "Release day for the video app, and everything has to work together. 440 requests arrive every second: watches, reads and writes, big uploads and processing jobs. You need a load balancer in front of several app servers, a cache for watches, Read Replicas for reads, Object Storage for the files, and a Message Queue with Workers for the processing. Users must see their own changes, so those reads go to the primary database. There is one new limit: the Replication Lag. Heavy writes make a Read Replica fall behind, and the lag may not pass 2 seconds. A bigger Read Replica applies writes faster. Watch the lag next to the other objectives.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 440
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxQueueAgeS": 20,
     "maxReplicationLagS": 2
   },
-  "budget": 700,
-  "starCostThresholds": [
-    550,
-    500
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

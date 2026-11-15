@@ -3,24 +3,11 @@
   "chapter": "Events",
   "title": "One post, many reactions",
   "brief": "Your new social network is live. When someone posts, three systems must react: Notifications tells their followers, Search indexes the post, and Analytics counts it. Three posts arrive each second, and each system needs every one of them. A Message Queue gives each Message to one Worker only, so each system would miss most posts. A Topic keeps a copy of every post for each Subscription, and each Subscription has its own Worker.",
-  "durationS": 45,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 45,
-      "rps": 15
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxQueueAgeS": 30
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    250
-  ],
   "allowedComponents": [
     "appServer",
     "database",

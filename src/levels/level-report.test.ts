@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { designCost } from '../engine/simulate';
+import { designCost } from '../realtime/game';
 import { callNow, createGame, run, runToEnd, starsOf } from '../realtime/game';
 import { allLevels } from './levels';
 import { MODES, startingDesign } from './modes';

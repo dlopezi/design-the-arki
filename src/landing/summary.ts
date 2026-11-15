@@ -1,5 +1,6 @@
 import type { LevelDefinition } from '../levels/levels';
 import type { Progress } from '../progress/progress';
+import { maxStarsOf } from '../realtime/game';
 
 export type PlayerSummary = {
   stars: number;
@@ -10,7 +11,7 @@ export type PlayerSummary = {
   next: { number: number; title: string } | null;
 };
 
-type SummaryLevel = Pick<LevelDefinition, 'id' | 'chapter' | 'title' | 'starCostThresholds'>;
+type SummaryLevel = Pick<LevelDefinition, 'id' | 'chapter' | 'title'> & Parameters<typeof maxStarsOf>[0];
 
 /** What the title screen's player bar and menu show: stars collected, chapter progress and the next level. */
 export function playerSummary(levels: SummaryLevel[], progress: Progress): PlayerSummary {
@@ -22,7 +23,7 @@ export function playerSummary(levels: SummaryLevel[], progress: Progress): Playe
   const inChapter = levels.filter(l => l.chapter === chapterName);
   return {
     stars: levels.reduce((sum, l) => sum + starsOf(l.id), 0),
-    maxStars: levels.reduce((sum, l) => sum + 1 + l.starCostThresholds.length, 0),
+    maxStars: levels.reduce((sum, l) => sum + maxStarsOf(l), 0),
     chapter: { number: chapters.indexOf(chapterName) + 1, name: chapterName, passed: inChapter.filter(l => starsOf(l.id) > 0).length, levels: inChapter.length },
     next: next ? { number: nextIndex + 1, title: next.title } : null,
   };

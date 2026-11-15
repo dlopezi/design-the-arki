@@ -3,33 +3,10 @@
   "chapter": "Core",
   "title": "Flash sale",
   "brief": "A flash sale: 500 people per second for 30 seconds, and most of them load the same product pages. A bigger database would cope, but is there a cheaper way?",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 200
-    },
-    {
-      "fromS": 30,
-      "toS": 40,
-      "rps": 500
-    },
-    {
-      "fromS": 40,
-      "toS": 60,
-      "rps": 200
-    }
-  ],
   "requirements": {
     "p95Ms": 200,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    230
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

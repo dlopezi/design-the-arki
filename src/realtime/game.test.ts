@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Design } from '../engine/types';
+import type { Design } from '../catalog/types';
 import { hotShardOf } from './flow';
 import { BUILD_PHASE_S, PASSIVE_INCOME, build, callNow, connect, contentAge, createGame, setCelebrityLimit, setClientLimit, setPartitionKey, setPartitions, setSubscription, upkeepPerS, runToEnd, buildProblem, demolish, disconnect, resize, run, setShardKey, setTtl, starsOf, toDesign, type GameLevel, type GameState } from './game';
 

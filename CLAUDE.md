@@ -5,7 +5,7 @@ A browser puzzle game about software architecture for developers preparing for s
 ## Commands
 
 - `npm run dev`: start the game locally
-- `npm run check`: typecheck + unit tests (engine and level files)
+- `npm run check`: typecheck + unit tests (game rules and level files)
 - `npm run e2e`: browser tests (builds and serves the game)
 - `npm run verify`: `check` + `e2e`, what CI runs; run it before a Pull Request
 - `LEVEL=<id> npm run level-report`: the numbers for tuning a level (stars, starting designs)

@@ -3,23 +3,10 @@
   "chapter": "Data scale",
   "title": "Too much to write",
   "brief": "Your video app keeps growing: 900 requests arrive every second and seven in ten are writes (new videos, comments, likes). A Read Replica cannot help with writes, and one primary database serves about 400 requests a second. The answer is Sharding: split the data over several Shards, each a database that holds one slice and serves only that slice. The Shard Key decides which Shard holds a piece of data: here user id and video id both spread the traffic evenly. Add Shards until none of them is full. Each Shard costs money, so do not add more than you need.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 900
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 700,
-  "starCostThresholds": [
-    500,
-    440
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

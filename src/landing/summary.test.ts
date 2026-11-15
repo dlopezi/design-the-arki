@@ -3,9 +3,9 @@ import type { Progress } from '../progress/progress';
 import { playerSummary } from './summary';
 
 const levels = [
-  { id: 'a', chapter: 'Core', title: 'A', starCostThresholds: [10, 5] },
-  { id: 'b', chapter: 'Core', title: 'B', starCostThresholds: [10] },
-  { id: 'c', chapter: 'Async', title: 'C', starCostThresholds: [10, 5] },
+  { id: 'a', chapter: 'Core', title: 'A', play: { starMoney: [10, 20] } },
+  { id: 'b', chapter: 'Core', title: 'B', play: { starMoney: [10] } },
+  { id: 'c', chapter: 'Async', title: 'C', play: { starMoney: [10, 20] } },
 ];
 const progress = (stars: Record<string, number>): Progress => ({ version: 1, levels: Object.fromEntries(Object.entries(stars).map(([id, bestStars]) => [id, { bestStars }])) });
 

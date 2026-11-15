@@ -3,23 +3,10 @@
   "chapter": "Edge",
   "title": "The Region falls",
   "brief": "A whole Region, a data centre with all its power and network, goes down 20 seconds into the wave. Everything you built in Region 1 fails at once. You need a standby Region: a second load balancer, app servers and a Read Replica in Region 2, always on and paid for. Put a DNS in front of both Regions. It sends the users to Region 1, and when Region 1 fails it switches them to Region 2, but only after its TTL has passed. Until then every request fails, and your reputation falls fast. A shorter TTL switches sooner and costs more. When the DNS switches, the Read Replica in Region 2 becomes the primary database (failover). Use the Build in switch to build in Region 2, and connect the DNS to both Regions.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 60,
-      "rps": 160
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 600,
-  "starCostThresholds": [
-    500,
-    400
-  ],
   "allowedComponents": [
     "dns",
     "loadBalancer",

@@ -1,4 +1,4 @@
-import type { Design } from '../engine/types';
+import type { Design } from '../catalog/types';
 import { modeRank, type Mode } from '../levels/modes';
 
 // Player progress lives only in this browser (ADR-0003). Every read and write tolerates storage

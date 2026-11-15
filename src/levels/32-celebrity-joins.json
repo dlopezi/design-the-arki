@@ -3,23 +3,10 @@
   "chapter": "Events",
   "title": "The celebrity joins",
   "brief": "Launch day for the social network, and everything happens at once. 500 requests arrive each second: 200 are junk with no token, 290 are feed reads and 10 are posts. 20 s into the wave a celebrity joins: for 20 s, 3 posts in 10 are theirs, each followed by 3,000 people (millions in real life), and writing every one of them into each follower's feed floods the Database. At 45 s a Notifications Worker instance goes down. Use what you have learned: an API Gateway at the door, a load balancer and two app servers, a cache in front of the Database for the feed reads, a Topic with a Partition for each working Worker instance, a spare instance, and a Celebrity Limit on the Feed Worker.",
-  "durationS": 70,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 70,
-      "rps": 500
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 900,
-  "starCostThresholds": [
-    800,
-    700
-  ],
   "allowedComponents": [
     "apiGateway",
     "loadBalancer",

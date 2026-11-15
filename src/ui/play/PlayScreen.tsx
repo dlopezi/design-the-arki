@@ -6,7 +6,7 @@ import { hintAllowed, startingDesign, type Mode } from '../../levels/modes';
 import { CLIENT, MAIN, STANDBY, regionOf, FULL_LOAD, ROOMY_LOAD, capacityOf, hitRateOf, hotShardOf, instancePrice, isServing, linkKey, partitionsOf, type Building as Bld, type Link } from '../../realtime/flow';
 import {
   BUILD_PHASE_S, EARLY_BONUS_PER_S, PASSIVE_INCOME, PER_100_VISITS, REFUND, UPKEEP_DIVISOR, build, buildProblem, callNow, connect, contentAge, createGame,
-  demolish, disconnect, maxPartitions, resize, setCelebrityLimit, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
+  demolish, disconnect, maxPartitions, maxStarsOf, resize, setCelebrityLimit, resizeCost, rewire, run, setAutoLink, setClientLimit, setPartitionKey, setPartitions, setShardKey, setSubscription, setTtl, starsOf, subscriptionsOf, toDesign, totalBacklog, upkeepPerS, waveEnd, worstSubscription, type GameEvent, type GameState,
 } from '../../realtime/game';
 import { track } from '../../analytics/analytics';
 import { Building, buildingName, componentArt } from '../componentArt';
@@ -670,7 +670,7 @@ export function PlayScreen({ level, number, mode, newTypes, nextHref, levels, pr
   }
 
   const stars = starsOf(game, level);
-  const maxStars = 1 + level.play.starMoney.length;
+  const maxStars = maxStarsOf(level);
   return (
     <div className="play-screen">
       <header className="play-bar">

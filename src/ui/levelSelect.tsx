@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n';
 import type { LevelDefinition } from '../levels/levels';
 import { isUnlocked, playMode, type Progress } from '../progress/progress';
+import { maxStarsOf } from '../realtime/game';
 import { Stars } from './stars';
 import { FeedbackButton } from './feedbackDialog';
 import { manualHref, modeHref, optionsHref, playHref } from './routes';
@@ -83,7 +84,6 @@ export function LevelSelect({ levels, progress, notice, storageWorks }: Props) {
   const ids = levels.map(l => l.id);
   const chapters = [...new Set(levels.map(l => l.chapter))];
   const starsOf = (id: string) => progress.levels[id]?.bestStars ?? 0;
-  const maxStarsOf = (l: LevelDefinition) => 1 + l.starCostThresholds.length;
   const totalStars = levels.reduce((sum, l) => sum + starsOf(l.id), 0);
   const maxStars = levels.reduce((sum, l) => sum + maxStarsOf(l), 0);
   // The next level to play: the first unlocked one not passed yet.

@@ -3,24 +3,11 @@
   "chapter": "Async",
   "title": "Upload rush",
   "brief": "A famous creator posts a challenge, and for 20 seconds 30 uploads arrive every second: far more than your Workers can process. The queue takes every job at once and lets the Workers work through them at their own pace, which also protects the small database from the spike. This is load leveling. But a queue only absorbs a peak. If the load stays above what your Workers can process, the Backlog and the Queue Age grow without end.",
-  "durationS": 20,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 20,
-      "rps": 30
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxQueueAgeS": 60
   },
-  "budget": 300,
-  "starCostThresholds": [
-    200,
-    160
-  ],
   "allowedComponents": [
     "appServer",
     "database",

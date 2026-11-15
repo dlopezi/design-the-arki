@@ -3,23 +3,10 @@
   "chapter": "Core",
   "title": "First spike",
   "brief": "The shop was mentioned in a newsletter and traffic jumped to 300 people per second. One app server handles about 200. Put a load balancer in front and run more instances.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 60,
-      "rps": 300
-    }
-  ],
   "requirements": {
     "p95Ms": 200,
     "maxErrorRate": 0.01
   },
-  "budget": 200,
-  "starCostThresholds": [
-    180,
-    160
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

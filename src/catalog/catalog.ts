@@ -1,4 +1,4 @@
-import type { Catalog } from '../engine/types';
+import type { Catalog } from './types';
 
 /**
  * Request Types: the kinds of request a level's wave can mix (ADR-0006). A wave without a mix carries one implicit
@@ -25,7 +25,7 @@ export const RESULT_TYPE = 'result';
 /** Fan-out on write (ADR-0009): a Feed Worker writes each post into every follower's feed. Internal, never in a level's mix. */
 export const FEED_WRITE = 'feedWrite';
 
-// Every component type is a combination of engine primitives plus its numbers (ADR-0004).
+// Every component type is a combination of generic primitives plus its numbers (ADR-0004).
 export const catalog: Catalog = {
   // Capacity (~10 000 req/s) is deliberately far above early-access traffic and not shown to players.
   loadBalancer: {
