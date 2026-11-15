@@ -3,23 +3,10 @@
   "chapter": "Data scale",
   "title": "Too many reads",
   "brief": "Your video app is a hit: 480 requests arrive every second, and nine in ten only read data (video lists, comments, view counts). One primary database serves about 400 requests a second, so it is full. The data must be fresh, so a cache does not help here. A Read Replica is a copy of the database that answers reads only. Add Read Replicas: the app server sends the reads to them and keeps the writes for the primary database. Read Replicas scale reads, not writes.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 480
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 600,
-  "starCostThresholds": [
-    400,
-    340
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

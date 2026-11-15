@@ -3,23 +3,10 @@
   "chapter": "Events",
   "title": "Too much for one Worker",
   "brief": "The network grows: ten posts arrive each second, and one Worker instance takes four. Notifications and Search each need three instances. But a Topic is split into Partitions, and only one instance of a Subscription reads a Partition at a time: with two Partitions, a third instance has nothing to read and stands idle. Raise the Partitions of the Topic in the Build Phase, then add the instances. Each Partition costs a little each month.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 60,
-      "rps": 50
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 600,
-  "starCostThresholds": [
-    500,
-    450
-  ],
   "allowedComponents": [
     "appServer",
     "database",

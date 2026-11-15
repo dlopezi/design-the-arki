@@ -3,23 +3,10 @@
   "chapter": "Data scale",
   "title": "Big uploads",
   "brief": "People now upload big video files: 90 uploads and 210 watches arrive every second. A file sent through the app server keeps it busy as long as ten normal requests, so your app servers drown. Object Storage stores big files and takes uploads only. Use the pre-signed URL pattern: the app server hands out a signed address, and the browser sends the file straight to Object Storage. Connect the users to Object Storage as well as to the app server. Later, the job in the queue will only point to the stored file.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 300
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    240
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",

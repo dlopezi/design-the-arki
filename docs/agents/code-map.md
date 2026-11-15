@@ -4,7 +4,7 @@ Navigation for the jobs that touch many files. Tests enforce part of each list; 
 
 ## Add a building
 
-1. `src/catalog/catalog.ts`: the entry. Behaviour comes from its fields (`accepts`, `prefers`, `effort`, ...); a new field is declared in `src/engine/types.ts`. A new Request Type is a named constant there.
+1. `src/catalog/catalog.ts`: the entry. Behaviour comes from its fields (`accepts`, `prefers`, `effort`, ...); a new field is declared in `src/catalog/types.ts`. A new Request Type is a named constant there.
 2. `src/realtime/flow.ts` reads the fields; `src/realtime/game.ts` holds the rules: `linkProblem` (refusals), `autoLink` (default wiring), `buildProblem`.
 3. `src/ui/componentArt.tsx`: a colour and a drawing (a test needs both).
 4. `src/i18n/en.ts` and `es.ts`: `componentTypes`, `componentIntros`, `hints`, `archive.buildings.<type>` (the Manual card, a test needs it), `rt.refusal` for a new refusal, and `mixShort` for a new Request Type.

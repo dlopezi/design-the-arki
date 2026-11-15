@@ -3,24 +3,11 @@
   "chapter": "Async",
   "title": "Slow processing",
   "brief": "Your video app lets people upload videos, and every upload must be processed: about one second of work. Six uploads arrive each second. Processing inside the request makes every user wait. Put a Message Queue between the app server and a Worker: the queue answers at once, and the Worker does the job in the background.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 6
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxQueueAgeS": 30
   },
-  "budget": 300,
-  "starCostThresholds": [
-    200,
-    160
-  ],
   "allowedComponents": [
     "appServer",
     "database",

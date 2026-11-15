@@ -1,5 +1,5 @@
 import { ABUSIVE, catalog as defaultCatalog, DEFAULT_REQUEST_TYPE, FEED_WRITE, POST, READ_FEED } from '../catalog/catalog';
-import type { Catalog } from '../engine/types';
+import type { Catalog } from '../catalog/types';
 
 /**
  * The traffic model of real-time play (ADR-0005): each second, the users' requests follow the connections
@@ -140,7 +140,7 @@ export const capacityOf = (b: Building, catalog: Catalog = defaultCatalog) =>
 /** Monthly cost of one instance at the building's size. */
 export const instancePrice = (b: Pick<Building, 'type' | 'params'>, catalog: Catalog = defaultCatalog) =>
   perInstance({ id: '', instances: [], ...b }, catalog).monthlyCost;
-/** Share of requests a cache answers, from its TTL (same rule as the engine's shortcut). */
+/** Share of requests a cache answers, from its TTL: `value / (value + halfAt)`, up to `max`. */
 export function hitRateOf(b: Building, catalog: Catalog = defaultCatalog): number {
   const shortcut = catalog[b.type]?.shortcut;
   if (!shortcut) return 0;

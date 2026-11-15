@@ -3,40 +3,16 @@
   "chapter": "Core",
   "title": "Tight budget",
   "brief": "The flash sale is back, and this time money is short. A bigger database would cope, but you cannot afford it. Find the cheapest base that still holds.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 200
-    },
-    {
-      "fromS": 30,
-      "toS": 40,
-      "rps": 500
-    },
-    {
-      "fromS": 40,
-      "toS": 60,
-      "rps": 200
-    }
-  ],
   "requirements": {
     "p95Ms": 200,
     "maxErrorRate": 0.01
   },
-  "budget": 230,
-  "starCostThresholds": [
-    225,
-    220
-  ],
   "allowedComponents": [
     "loadBalancer",
     "appServer",
     "cache",
     "database"
   ],
-  "failureEvents": [],
   "componentOptions": {
     "appServer": {
       "sizes": [

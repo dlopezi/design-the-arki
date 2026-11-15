@@ -2,8 +2,6 @@
 // Technical names (load balancer, cache, p95, TTL, req/s) stay as players will hear them in interviews.
 import { percent, type Strings } from './en';
 
-const stars = (n: number) => '★'.repeat(n);
-
 export const es: Strings = {
   play: 'Jugar',
   levelSelect: {
@@ -201,19 +199,12 @@ export const es: Strings = {
   objectiveFreshness: (s: number) => `Contenido de no más de ${s} s (TTL de la CDN ≤ ${s} s)`,
   objectiveConsumerLag: (limits: [name: string, s: number][]) => `Consumer Lag ≤ ${limits.map(([name, s]) => `${name} ${s} s`).join(' · ')}`,
   objectiveQueueAge: (s: number) => `Edad de la cola ≤ ${s} s`,
-  objectiveCost: (budget: number) => `Coste ≤ $${budget}/mes`,
   objectiveState: { met: 'cumplido', failed: 'no cumplido', pending: 'sin ejecutar' },
-  traffic: (rps: number, fromS: number, toS: number) => `${rps} req/s de ${fromS} s a ${toS} s`,
-  monthlyCost: 'Coste mensual',
-  costMeterText: (cost: number, budget: number, thresholds: number[]) =>
-    `$${cost} de $${budget}` + (thresholds.length ? '; ' + thresholds.map((t, i) => `${stars(i + 2)} con $${t}`).join(', ') : ''),
   passed: 'Nivel superado',
   failed: 'Nivel fallido',
   starsLabel: (n: number, max: number) => `${n} de ${max} estrellas`,
   statP95: 'p95',
   statErrors: 'Errores',
-  statCost: 'Coste',
-  nextStar: (cost: number, starCount: number) => `Baja el coste a $${cost}/mes para ${stars(starCount)}.`,
   failedObjectives: 'No cumplido:',
   backToDesign: 'Volver al diseño',
   components: 'Componentes',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog/catalog';
-import { designCost } from '../engine/simulate';
+import { designCost } from '../realtime/game';
 import { hotShardOf } from '../realtime/flow';
 import { callNow, createGame, run, runToEnd, starsOf } from '../realtime/game';
 import { allLevels, parseLevel } from './levels';
@@ -306,13 +306,13 @@ describe('level files', () => {
   });
 
   it('rejects a level file without requirements', () => {
-    const broken = { id: 'x', title: 'X', brief: 'b', durationS: 10, traffic: [{ fromS: 0, toS: 10, rps: 5 }],
+    const broken = { id: 'x', title: 'X', brief: 'b',
       referenceDesign: { components: [], connections: [] } };
     expect(() => parseLevel(broken)).toThrow(/requirements/);
   });
 
   it('rejects a reference design that uses an unknown component type', () => {
-    const broken = { id: 'x', title: 'X', brief: 'b', durationS: 10, traffic: [{ fromS: 0, toS: 10, rps: 5 }],
+    const broken = { id: 'x', title: 'X', brief: 'b',
       requirements: { p95Ms: 200, maxErrorRate: 0.01 },
       referenceDesign: { components: [{ id: 'q', type: 'quantumComputer' }], connections: [['client', 'q']] } };
     expect(() => parseLevel(broken)).toThrow(/quantumComputer/);

@@ -3,24 +3,11 @@
   "chapter": "Edge",
   "title": "Old content",
   "brief": "The video was edited, and users must see the new version soon: no CDN may keep a copy for more than 50 seconds. But 510 downloads and 90 page views arrive every second, and Object Storage can send out only so many files. The CDN TTL is how long it keeps a copy. A long TTL answers more downloads, but shows older content. A short TTL shows fresh content, but lets more downloads reach Object Storage. Pick a TTL that does both: select the CDN and change its TTL.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 600
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01,
     "maxStaleS": 50
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    240
-  ],
   "allowedComponents": [
     "cdn",
     "loadBalancer",

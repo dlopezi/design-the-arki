@@ -3,23 +3,10 @@
   "chapter": "Edge",
   "title": "Abusive client",
   "brief": "Four clients are sending 90 requests per second each: 360 requests, all of them valid, that fill your app servers. Your 30 normal clients send about 8 requests per second each, 240 in all. The API Gateway has a Client Limit: the most requests per second one client may send. Anything above it is turned away. Set it high enough for normal clients, and low enough to stop the abusive ones. If it is too low, normal clients are refused too, and every refusal counts as an error. Connect the users to the API Gateway, then select it and set its Client Limit.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 600
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    240
-  ],
   "allowedComponents": [
     "apiGateway",
     "loadBalancer",

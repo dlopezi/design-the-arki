@@ -3,23 +3,10 @@
   "chapter": "Edge",
   "title": "Far away videos",
   "brief": "Your video app goes global, and one video goes viral: 280 downloads of the video file and 120 page views arrive every second. Every download is served by Object Storage, which can send out only so many big files each second, so it fills up and downloads start to fail. Put a CDN in front of it. The CDN answers a share of the downloads close to the users, and only the rest reaches Object Storage. Connect the users to the CDN for downloads, and the CDN to Object Storage.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 400
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    240
-  ],
   "allowedComponents": [
     "cdn",
     "loadBalancer",

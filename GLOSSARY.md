@@ -7,7 +7,7 @@ A browser puzzle game where players design software architectures that must surv
 ### Levels and progression
 
 **Level**:
-A single puzzle: a traffic profile, requirements, a budget, the allowed components and optional failure events. The campaign map presents it to players as a *mission*; in code and docs it stays a level.
+A single puzzle: one Wave of users, Requirements, the starting Money, the allowed components and an optional Failure Event. The campaign map presents it to players as a *mission*; in code and docs it stays a level.
 _Avoid_: Stage, mission, puzzle
 
 **Chapter**:
@@ -33,9 +33,6 @@ _Avoid_: Goals, objectives
 **Queue Age**:
 How long the oldest Message in a Message Queue has been waiting; async levels set a maximum.
 _Avoid_: Processing deadline, delay, Consumer Lag (reserved for Topic Subscriptions)
-
-**Budget**:
-The maximum monthly cost a design may have in a level.
 
 **Stars**:
 One for lasting the wave, plus one for each money threshold reached by the money left at the end.
@@ -227,11 +224,8 @@ The base's health during the wave: it falls while requests fail or are too slow,
 _Avoid_: Health, HP, lives
 
 **Simulation**:
-A deterministic, seeded run of a level's traffic through a design that produces metrics and a pass/fail result.
+A deterministic run of a level in real time: the same actions at the same times always give the same game (ADR-0005).
 _Avoid_: Run, test
-
-**Traffic Profile**:
-The level-defined shape of incoming requests over time.
 
 **Failure Event**:
 A scripted incident during a simulation, such as a traffic spike or a node or zone outage.

@@ -29,13 +29,13 @@ npm run dev
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Start the game locally |
-| `npm run check` | Typecheck and unit tests (engine and levels) |
+| `npm run check` | Typecheck and unit tests (game rules and levels) |
 | `npm run e2e` | Browser tests with Playwright (builds and serves the game) |
 | `npm run build` | Static build into `dist/` |
 
 ## Project layout
 
-- `src/engine/`: deterministic simulation engine, pure TypeScript, no UI
+- `src/realtime/`: the game rules and the traffic model, pure TypeScript, no UI
 - `src/levels/`: levels as schema-validated JSON, each tested against a reference design
 - `src/catalog/`: components, technologies and costs
 - `src/ui/`: React game screen (React Flow canvas, HUD, inspector, results)

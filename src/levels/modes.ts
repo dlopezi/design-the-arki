@@ -1,7 +1,7 @@
-import type { Design } from '../engine/types';
+import type { Design } from '../catalog/types';
 import type { LevelDefinition } from './levels';
 
-/** Difficulty modes, easiest first. Stars depend only on cost; the badge records the hardest mode passed. */
+/** Difficulty modes, easiest first. Stars depend only on the money left; the badge records the hardest mode passed. */
 export const MODES = ['guided', 'normal', 'hard', 'god'] as const;
 export type Mode = (typeof MODES)[number];
 

@@ -3,23 +3,10 @@
   "chapter": "Edge",
   "title": "One door",
   "brief": "A bot is scanning your API: 360 invalid requests (no token, junk) arrive every second, next to 240 real page views. An app server has to read each request before it can refuse it, so the junk uses the capacity your real users need, and your two app servers cannot take more. Put an API Gateway at the door. It checks every request first and turns the invalid ones away at a tiny cost, so the app servers see only valid requests. Connect the users to the API Gateway, and the API Gateway to the load balancer.",
-  "durationS": 30,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 30,
-      "rps": 600
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    240
-  ],
   "allowedComponents": [
     "apiGateway",
     "loadBalancer",

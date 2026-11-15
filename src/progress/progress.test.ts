@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Design } from '../engine/types';
+import type { Design } from '../catalog/types';
 import { playMode, withMode, withPass, type Progress } from './progress';
 
 const empty: Progress = { version: 1, levels: {} };

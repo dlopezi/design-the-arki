@@ -3,23 +3,10 @@
   "chapter": "Events",
   "title": "A slow subscriber",
   "brief": "Six posts arrive each second. Notifications must reach the followers fast: its Consumer Lag may be 5 s at most. Analytics only builds a report, so it may fall behind up to 30 s and catch up after the wave. Each Subscription has its own Workers and its own Backlog, so a slow Analytics never slows Notifications. One Worker instance takes 4 posts a second. Give each Subscription the Workers it needs, and no more.",
-  "durationS": 50,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 50,
-      "rps": 30
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 400,
-  "starCostThresholds": [
-    300,
-    250
-  ],
   "allowedComponents": [
     "appServer",
     "database",

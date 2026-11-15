@@ -3,23 +3,10 @@
   "chapter": "Events",
   "title": "Your feed",
   "brief": "People open their feed far more often than they post: 120 feed reads and 5 posts arrive each second. A user follows 20 accounts, so building the feed when it is read (fan-out on read) means 20 reads for every feed: 2,400 reads a second, more than any database tier. Build it when posts are written instead (fan-out on write): a Worker for the Feed Subscription writes each post into the feed of every follower, 30 writes per post, and reading a feed becomes one read.",
-  "durationS": 60,
-  "traffic": [
-    {
-      "fromS": 0,
-      "toS": 60,
-      "rps": 125
-    }
-  ],
   "requirements": {
     "p95Ms": 300,
     "maxErrorRate": 0.01
   },
-  "budget": 600,
-  "starCostThresholds": [
-    500,
-    450
-  ],
   "allowedComponents": [
     "appServer",
     "database",
